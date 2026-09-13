@@ -31,3 +31,15 @@ def test_parser_session_create() -> None:
     assert args.package == "com.example.app"
     assert args.root == Path("runtime")
     assert args.json is True
+
+
+def test_parser_metadata_collect() -> None:
+    parser = cli._build_parser()
+
+    args = parser.parse_args(
+        ["metadata-collect", "runtime/session-1", "--json"]
+    )
+
+    assert args.command == "metadata-collect"
+    assert args.session_root == Path("runtime/session-1")
+    assert args.json is True

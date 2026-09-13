@@ -5,8 +5,8 @@
 ## Текущее состояние
 
 **Этап:** v0.1 — Research Session Core  
-**Реализовано:** ADB Target Manager, Session Manager.  
-**Следующий модуль:** Device/System Metadata Collector.
+**Реализовано:** ADB Target Manager, Session Manager, Device/System Metadata Collector.  
+**Следующий модуль:** Logcat Collector.
 
 ## Зафиксированные решения
 
@@ -43,11 +43,17 @@ Collector failure во время ACTIVE не переводит state machine �
 ### ADR-011 — Manifest записывается атомарно
 Каждое изменение session metadata записывается через временный файл и `os.replace`, чтобы аварийное завершение процесса не оставляло наполовину записанный JSON.
 
+### ADR-012 — Metadata сохраняется одновременно как RAW и normalized
+Device/System Metadata Collector сохраняет оригинальные ответы ADB в `01_raw/device/`. Удобный JSON в `02_normalized/target.json` является производным представлением и не заменяет исходные ответы Android.
+
+### ADR-013 — Необязательные metadata-команды не рушат snapshot
+Обязательные источники (`getprop`, package dump, package paths, clock) должны быть получены полностью. Сбой дополнительной команды (`uname`, SELinux, display metadata и т. п.) фиксируется в raw/normalized данных, но сам collector остаётся успешным.
+
 ## Порядок реализации v0.1
 
 1. **ADB Target Manager — реализован.**
 2. **Session Manager и state machine — реализован.**
-3. Device/system metadata collector.
+3. **Device/system metadata collector — реализован.**
 4. Logcat collector.
 5. Screen recording collector.
 6. Raw network collector.

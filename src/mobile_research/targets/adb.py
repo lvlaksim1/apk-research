@@ -230,17 +230,31 @@ class AdbClient:
             )
         return result
 
+    def shell_output(
+        self,
+        serial: str,
+        *arguments: str,
+        timeout: float = 10.0,
+    ) -> str:
+        """Run a fixed Android shell command and return stdout as text."""
+
+        result = self._run_checked(
+            ["-s", serial, "shell", *arguments],
+            timeout=timeout,
+        )
+        return result.stdout or ""
+
     def _shell_value(
         self,
         serial: str,
         *arguments: str,
         timeout: float = 10.0,
     ) -> str:
-        result = self._run_checked(
-            ["-s", serial, "shell", *arguments],
+        return self.shell_output(
+            serial,
+            *arguments,
             timeout=timeout,
-        )
-        return (result.stdout or "").strip()
+        ).strip()
 
     def list_targets(self) -> list[AdbTarget]:
         result = self._run_checked(["devices", "-l"])
@@ -346,4 +360,27 @@ class AdbClient:
         return any(
             line.strip().startswith("package:")
             for line in (result.stdout or "").splitlines()
+        )
+
+    def get_all_properties(self, serial: str) -> str:
+        self.ensure_ready(serial)
+        return self.shell_output(serial, "getprop")
+
+    def get_package_dump(self, serial: str, package_name: str) -> str:
+        self.ensure_ready(serial)
+        package_name = validate_package_name(package_name)
+        return self.shell_output(serial, "dumpsys", "package", package_name)
+
+    def get_package_paths(self, serial: str, package_name: str) -> str:
+        self.ensure_ready(serial)
+        package_name = validate_package_name(package_name)
+        return self.shell_output(serial, "pm", "path", package_name)
+
+    def get_utc_time(self, serial: str) -> str:
+        self.ensure_ready(serial)
+        return self._shell_value(
+            serial,
+            "date",
+            "-u",
+            "+%Y-%m-%dT%H:%M:%SZ",
         )

@@ -10,6 +10,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 - **ADB Target Manager**
 - **Session Manager**
+- **Device/System Metadata Collector**
 
 Первая end-to-end цель: провести одну воспроизводимую исследовательскую сессию на Android target и получить архив с исходными диагностическими данными.
 
@@ -53,6 +54,19 @@ Mobile Research — Windows-система для воспроизводимог
 
 Важное правило: non-fatal collector failure во время `active` помечает сессию как degraded, но не уничтожает уже собираемые evidence. После штатного STOP итог становится `partial`.
 
+## Device/System Metadata Collector
+
+Первый реальный evidence collector сохраняет:
+
+- полный raw `getprop`;
+- raw `dumpsys package <package>`;
+- raw пути APK из `pm path`;
+- системный snapshot: `id`, `uname -a`, SELinux, размер и плотность экрана;
+- target/host clock markers вокруг snapshot;
+- производный `02_normalized/target.json` с базовыми характеристиками target и package.
+
+Обязательные команды приводят collector к `failed`, а сбой дополнительной системной команды фиксируется внутри snapshot и не уничтожает остальные данные.
+
 ## CLI
 
 ```powershell
@@ -62,6 +76,7 @@ mobile-research target-info emulator-5554 --json
 mobile-research package-check emulator-5554 com.example.app
 
 mobile-research session-create emulator-5554 com.example.app --json
+mobile-research metadata-collect "C:\path\to\session" --json
 mobile-research session-status "C:\path\to\session" --json
 ```
 
@@ -117,7 +132,7 @@ python -m pytest -q
 
 ## Следующий этап
 
-**Device/System Metadata Collector**, который наполнит `01_raw/device/` исходными данными target/package и зарегистрирует их в Session Manager.
+**Logcat Collector** — первый непрерывный collector, который должен стартовать до исследуемого package и безопасно завершаться без потери уже записанного raw logcat.
 
 ## CI
 

@@ -210,3 +210,74 @@ def test_package_check_detects_installed_package() -> None:
         "emulator-5554",
         "com.example.app",
     ) is True
+
+
+def test_metadata_snapshot_adb_commands() -> None:
+    responses = {
+        ("devices", "-l"): _completed(
+            "List of devices attached\n"
+            "emulator-5554 device model:sdk_gphone transport_id:1\n"
+        ),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "getprop",
+        ): _completed("[ro.build.version.release]: [15]\n"),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "dumpsys",
+            "package",
+            "com.example.app",
+        ): _completed("versionName=1.0\n"),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "pm",
+            "path",
+            "com.example.app",
+        ): _completed("package:/data/app/example/base.apk\n"),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "date",
+            "-u",
+            "+%Y-%m-%dT%H:%M:%SZ",
+        ): _completed("2026-09-13T18:00:00Z\n"),
+    }
+
+    def runner(
+        arguments: Sequence[str],
+        timeout: float,
+    ) -> subprocess.CompletedProcess[str]:
+        key = tuple(arguments)
+        if key == (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "getprop",
+            "ro.kernel.qemu",
+        ):
+            return _completed("1\n")
+        return responses[key]
+
+    client = AdbClient(Path("adb"), runner=runner)
+
+    assert "ro.build.version.release" in client.get_all_properties(
+        "emulator-5554"
+    )
+    assert "versionName=1.0" in client.get_package_dump(
+        "emulator-5554",
+        "com.example.app",
+    )
+    assert client.get_package_paths(
+        "emulator-5554",
+        "com.example.app",
+    ).startswith("package:")
+    assert client.get_utc_time("emulator-5554") == (
+        "2026-09-13T18:00:00Z"
+    )

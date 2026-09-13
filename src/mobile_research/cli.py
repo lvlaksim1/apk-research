@@ -7,6 +7,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from mobile_research.collectors import DeviceMetadataCollector, MetadataCollectorError
 from mobile_research.session import SessionError, SessionManager
 from mobile_research.targets import AdbClient, AdbError
 
@@ -67,6 +68,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     status_parser.add_argument("session_root", type=Path)
     status_parser.add_argument("--json", action="store_true")
+
+    metadata_parser = subparsers.add_parser(
+        "metadata-collect",
+        help="Capture raw device/package metadata for an existing session.",
+    )
+    metadata_parser.add_argument("session_root", type=Path)
+    metadata_parser.add_argument("--json", action="store_true")
 
     return parser
 
@@ -184,6 +192,26 @@ def _session_status_command(
     return 0
 
 
+def _metadata_collect_command(
+    client: AdbClient,
+    session_root: Path,
+    as_json: bool,
+) -> int:
+    manager = SessionManager.load(session_root)
+    collector = DeviceMetadataCollector(client, manager)
+    result = collector.collect()
+
+    if as_json:
+        _print_json(result.to_dict())
+    else:
+        print(f"collector: {result.collector}")
+        print(f"status: {result.status}")
+        print(f"raw_artifacts: {len(result.raw_artifacts)}")
+        print(f"normalized_artifact: {result.normalized_artifact}")
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -196,6 +224,13 @@ def main(argv: list[str] | None = None) -> int:
             )
 
         client = AdbClient.from_environment(args.adb)
+
+        if args.command == "metadata-collect":
+            return _metadata_collect_command(
+                client,
+                args.session_root,
+                args.json,
+            )
 
         if args.command == "targets":
             return _targets_command(client, args.json)
@@ -216,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.root,
                 args.json,
             )
-    except (AdbError, SessionError, ValueError) as exc:
+    except (AdbError, MetadataCollectorError, SessionError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
