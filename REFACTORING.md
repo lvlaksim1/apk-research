@@ -4,9 +4,10 @@
 
 ## Текущее состояние
 
-**Этап:** v0.1 — Research Session Core  
-**Реализовано:** ADB Target Manager, Session Manager, Device/System Metadata Collector, Logcat Collector, Screen Recording Collector, Raw Network Collector, Export/Checksum subsystem, End-to-end Session Orchestrator.  
-**Следующий этап:** реальный AVD-RESEARCH acceptance run.
+**Этап:** v0.1.0 — Research Session Core release baseline  
+**Реализовано:** ADB Target Manager, Session Manager, Device/System Metadata Collector, Logcat Collector, Screen Recording Collector, Raw Network Collector, Export/Checksum subsystem, semantic Research ZIP audit, End-to-end Session Orchestrator и автоматический real AVD-RESEARCH acceptance.  
+**Release gate:** два последовательных real AVD `complete` подтверждены до release freeze; exact release commit повторно проходит Windows CI + real AVD acceptance перед публикацией.  
+**Следующий этап:** v0.2.
 
 ## Зафиксированные решения
 
@@ -101,7 +102,9 @@ Health-check фиксирует деградацию, но остальные so
 6. **Raw network collector — реализован.**
 7. **Export/checksum subsystem — реализован.**
 8. **End-to-end Session Orchestrator + synthetic acceptance test — реализованы.**
-9. Real AVD-RESEARCH acceptance run.
+9. **Real AVD-RESEARCH acceptance run — реализован и автоматизирован.**
+10. **Semantic Research ZIP release audit — реализован.**
+11. **v0.1.0 release gate — реализован.**
 
 ## Будущие направления
 
@@ -130,3 +133,13 @@ Health-check фиксирует деградацию, но остальные so
 
 ### ADR-032 — Первый релиз требует semantic audit, а не только ZIP integrity
 CRC/SHA-256 доказывают целостность архива, но не достаточность evidence. Release acceptance дополнительно проверяет lifecycle order, collector statuses, clock skew, временное покрытие logcat/PCAP, package launch и screen frame timing. Формально валидный, но семантически неполный Research ZIP не проходит release gate.
+
+
+### ADR-033 — Release публикуется только после gates exact commit SHA
+Release workflow не доверяет предыдущим успешным runs. Он ждёт завершения workflow `CI` и `AVD Research Acceptance` для собственного `GITHUB_SHA`. Только после двух `success` разрешены build/tag/GitHub Release. Это предотвращает публикацию версии, отличающейся от реально протестированного кода.
+
+### ADR-034 — Release assets являются воспроизводимыми Python artifacts
+v0.1.0 публикует wheel и sdist, собранные из release commit, плюс `SHA256SUMS.txt`. Research ZIP из acceptance остаётся краткоживущим CI evidence и не превращается в release artifact, поскольку это результат синтетического исследования, а не дистрибутив программы.
+
+### ADR-035 — Release docs являются обязательной частью release commit
+Release workflow проверяет, что `README.md`, `REFACTORING.md`, `CHANGELOG.md` и `RELEASE_NOTES.md` содержат выпускаемую версию. Публикация блокируется, если release documentation не синхронизирована с `pyproject.toml`.

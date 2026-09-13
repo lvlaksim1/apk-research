@@ -4,7 +4,9 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-Проект находится на этапе **v0.1 — Research Session Core**.
+**v0.1.0 — Research Session Core** — первый стабильный release baseline проекта.
+
+Release gate включает Windows CI, реальный AVD-RESEARCH acceptance и semantic audit итогового Research ZIP. Перед release freeze получены два последовательных реальных `complete` результата на Android 15 / API 35.
 
 Реализованы:
 
@@ -17,7 +19,7 @@ Mobile Research — Windows-система для воспроизводимог
 - **Export / Checksums / Research ZIP**
 - **End-to-end Session Orchestrator**
 
-Первая end-to-end цель: провести одну воспроизводимую исследовательскую сессию на Android target и получить архив с исходными диагностическими данными.
+v0.1.0 доказывает полный вертикальный цикл: реальный Android target → обязательные collectors → запуск package → STOP → проверенный Research ZIP → semantic timeline/evidence audit.
 
 ## Архитектурные принципы
 
@@ -271,8 +273,13 @@ python -m pytest -q
 
 ## Следующий этап
 
-**Real AVD-RESEARCH acceptance run** — запуск полного цикла на настоящем Android Emulator с root/tcpdump и проверка полученного Research ZIP.
+После v0.1.0 развитие идёт как **v0.2**. Приоритеты: AVD lifecycle/snapshots, normalized timeline, расширение target abstraction для AVD-PLAY/Physical Device и только затем дополнительные decoder/instrumentation слои. Raw evidence contract v0.1.0 остаётся совместимой базой.
 
-## CI
+## CI и release gate
 
-CI автоматически запускается на push и pull request. Ручной запуск workflow не используется.
+- `CI` автоматически запускается на push/pull request на Windows;
+- `AVD Research Acceptance` автоматически запускает настоящий Android Emulator на Ubuntu/KVM;
+- `Release` запускается по release-prep commit, ждёт успешные CI + AVD acceptance **того же commit SHA**, затем собирает wheel/sdist, создаёт `SHA256SUMS.txt` и публикует tag/GitHub Release;
+- ручной `workflow_dispatch` не используется.
+
+Release `v0.1.0` не считается готовым, пока exact release commit не пройдёт оба обязательных gate.
