@@ -5,7 +5,8 @@
 ## Текущее состояние
 
 **Этап:** v0.1 — Research Session Core  
-**Статус:** архитектура и каркас зафиксированы; функциональные collectors ещё не реализованы.
+**Реализовано:** ADB Target Manager.  
+**Следующий модуль:** Session Manager.
 
 ## Зафиксированные решения
 
@@ -33,9 +34,12 @@ Raw evidence сохраняется до интерпретации. Для се
 ### ADR-008 — v0.1 без MITM
 Сначала доказывается надёжный сбор raw traffic, logcat, screen recording и metadata.
 
+### ADR-009 — ADB вызывается без локального shell
+Target Manager передаёт аргументы ADB напрямую в subprocess. Package name валидируется до remote shell command.
+
 ## Порядок реализации v0.1
 
-1. ADB Target Manager.
+1. **ADB Target Manager — реализован.**
 2. Session Manager и state machine.
 3. Device/system metadata collector.
 4. Logcat collector.

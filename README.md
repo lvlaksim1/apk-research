@@ -4,9 +4,11 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-Проект находится на этапе **v0.1 — Research Session Core**. Функциональная версия ещё не реализована.
+Проект находится на этапе **v0.1 — Research Session Core**.
 
-Первая цель проекта: провести одну воспроизводимую исследовательскую сессию на Android target и получить архив с исходными диагностическими данными.
+Реализован первый функциональный модуль: **ADB Target Manager**.
+
+Первая end-to-end цель проекта: провести одну воспроизводимую исследовательскую сессию на Android target и получить архив с исходными диагностическими данными.
 
 ## Архитектурные принципы
 
@@ -18,7 +20,36 @@ Mobile Research — Windows-система для воспроизводимог
 - Android Research Agent не является обязательной частью архитектуры и в v0.1 отсутствует.
 - GUI, MITM, статический анализ APK, AVD-PLAY и Physical Device не входят в v0.1.
 
-## v0.1: минимальный рабочий сценарий
+## Реализовано
+
+### ADB Target Manager
+
+Умеет:
+
+- находить ADB через явный путь, PATH, ANDROID_SDK_ROOT, ANDROID_HOME или стандартный Windows Android SDK path;
+- перечислять targets из `adb devices -l`;
+- сохранять состояния `device`, `offline`, `unauthorized`;
+- определять emulator/physical для готового target;
+- получать Android release, SDK level, manufacturer, model, ABI, build fingerprint и текущий root status;
+- проверять наличие package на target;
+- выдавать данные в обычном или JSON-формате.
+
+Примеры:
+
+```powershell
+mobile-research targets
+mobile-research targets --json
+mobile-research target-info emulator-5554 --json
+mobile-research package-check emulator-5554 com.example.app
+```
+
+То же без установленного entry point:
+
+```powershell
+python -m mobile_research targets --json
+```
+
+## v0.1: целевой сценарий
 
 ```text
 ADB target
@@ -48,9 +79,9 @@ Research ZIP
 
 Полный контракт v0.1: [docs/V0.1_SPEC.md](docs/V0.1_SPEC.md).
 
-Архитектурные решения и границы проекта: [REFACTORING.md](REFACTORING.md).
+Архитектурные решения: [REFACTORING.md](REFACTORING.md).
 
-## Структура исходного кода
+## Структура
 
 ```text
 src/mobile_research/
@@ -64,13 +95,20 @@ src/mobile_research/
 
 - Windows — целевая host-платформа.
 - Python >= 3.11.
-- Android Debug Bridge (ADB) будет внешней runtime-зависимостью.
-- На первом этапе интерфейс — CLI; GUI появится после стабилизации Research Session Core.
+- Android Debug Bridge (ADB) — внешняя runtime-зависимость.
+- На первом этапе интерфейс — CLI.
 
-## Следующая реализация
+Установка для разработки:
 
-Первый функциональный модуль — **ADB Target Manager**: обнаружение ADB, перечисление targets, определение emulator/physical, получение версии Android и основных параметров устройства.
+```powershell
+python -m pip install -e ".[dev]"
+python -m pytest -q
+```
+
+## Следующий этап
+
+**Session Manager**: session ID, state machine, runtime layout, manifest и безопасное завершение/сохранение partial session.
 
 ## CI
 
-CI запускается автоматически на каждый push и pull request. Ручной запуск workflow намеренно не используется.
+CI автоматически запускается на push и pull request. Ручной запуск workflow не используется.
