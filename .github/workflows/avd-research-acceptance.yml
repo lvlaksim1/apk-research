@@ -64,11 +64,33 @@ jobs:
           nohup "$ANDROID_HOME/emulator/emulator"             @mobile_research_api35             -port 5554             -no-window             -gpu swiftshader_indirect             -no-snapshot             -noaudio             -no-boot-anim             -wipe-data             > emulator.log 2>&1 &
           echo $! > emulator.pid
 
-          adb wait-for-device
-          timeout 300 bash -c 'until [ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
+          sleep 5
+          if ! kill -0 "$(cat emulator.pid)" 2>/dev/null; then
+            echo "Android Emulator exited before ADB became available."
+            cat emulator.log
+            exit 1
+          fi
+
+          if ! timeout 120 adb wait-for-device; then
+            echo "ADB did not detect the emulator within 120 seconds."
+            cat emulator.log
+            adb devices -l || true
+            exit 1
+          fi
+
+          if ! timeout 300 bash -c 'until [ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'; then
+            echo "Android did not report sys.boot_completed=1."
+            cat emulator.log
+            adb devices -l || true
+            exit 1
+          fi
 
           adb -s emulator-5554 root
-          adb -s emulator-5554 wait-for-device
+          if ! timeout 60 adb -s emulator-5554 wait-for-device; then
+            echo "ADB did not return after adb root."
+            cat emulator.log
+            exit 1
+          fi
           timeout 60 bash -c 'until [ "$(adb -s emulator-5554 shell id -u | tr -d "\r")" = "0" ]; do sleep 2; done'
 
           adb -s emulator-5554 shell getprop ro.build.version.release
