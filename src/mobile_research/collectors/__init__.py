@@ -10,6 +10,11 @@ from .logcat import (
     LogcatCollectorError,
     LogcatResult,
 )
+from .screen_recording import (
+    ScreenRecordingCollector,
+    ScreenRecordingCollectorError,
+    ScreenRecordingResult,
+)
 
 __all__ = [
     "DeviceMetadataCollector",
@@ -18,4 +23,7 @@ __all__ = [
     "LogcatCollector",
     "LogcatCollectorError",
     "LogcatResult",
+    "ScreenRecordingCollector",
+    "ScreenRecordingCollectorError",
+    "ScreenRecordingResult",
 ]

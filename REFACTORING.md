@@ -5,8 +5,8 @@
 ## Текущее состояние
 
 **Этап:** v0.1 — Research Session Core  
-**Реализовано:** ADB Target Manager, Session Manager, Device/System Metadata Collector, Logcat Collector.  
-**Следующий модуль:** Screen Recording Collector.
+**Реализовано:** ADB Target Manager, Session Manager, Device/System Metadata Collector, Logcat Collector, Screen Recording Collector.  
+**Следующий модуль:** Raw Network Collector.
 
 ## Зафиксированные решения
 
@@ -55,13 +55,22 @@ Logcat Collector не использует `logcat -c`, поскольку оч�
 ### ADR-015 — STOP collector является двухступенчатым
 Непрерывный collector сначала получает graceful terminate и grace period. Только если процесс не завершился, выполняется kill. Forced kill фиксируется в metadata, но сам по себе не делает уже записанный evidence невалидным.
 
+### ADR-016 — Screen recording хранится независимыми chunks
+Screen Recording Collector не создаёт один монолитный файл. Каждый MP4 chunk после завершения сразу переносится с Android на Windows и регистрируется как отдельный raw artifact. Поэтому повреждение следующего chunk не уничтожает уже полученную видеохронологию.
+
+### ADR-017 — Screenrecord chunk duration = 170 seconds
+Для широкой совместимости v0.1 не использует потенциально различающееся между Android-ветками поведение unlimited screenrecord. Chunk ограничен 170 секундами, то есть ниже документированного 180-секундного предела.
+
+### ADR-018 — Screenrecord STOP сначала адресный
+Если удаётся однозначно определить новый PID `screenrecord`, STOP посылает ему SIGINT. Если PID недоступен или процесс не завершается, используется host-side terminate и затем kill после grace period.
+
 ## Порядок реализации v0.1
 
 1. **ADB Target Manager — реализован.**
 2. **Session Manager и state machine — реализован.**
 3. **Device/system metadata collector — реализован.**
 4. **Logcat collector — реализован.**
-5. Screen recording collector.
+5. **Screen recording collector — реализован.**
 6. Raw network collector.
 7. Export/checksum subsystem.
 8. End-to-end acceptance test.

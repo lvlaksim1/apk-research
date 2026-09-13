@@ -168,6 +168,32 @@ def validate_package_name(package_name: str) -> str:
     return package_name
 
 
+
+_REMOTE_RESEARCH_ROOT = "/data/local/tmp/mobile-research"
+_PROCESS_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+
+
+def validate_remote_research_path(path: str) -> str:
+    normalized = path.replace("\\", "/").rstrip("/")
+    if (
+        not normalized.startswith(_REMOTE_RESEARCH_ROOT)
+        or normalized == _REMOTE_RESEARCH_ROOT
+        or "/../" in f"{normalized}/"
+        or "/./" in f"{normalized}/"
+    ):
+        raise ValueError(
+            "Remote research path must remain under "
+            f"{_REMOTE_RESEARCH_ROOT}/: {path!r}"
+        )
+    return normalized
+
+
+def validate_process_name(process_name: str) -> str:
+    process_name = process_name.strip()
+    if not _PROCESS_NAME_RE.fullmatch(process_name):
+        raise ValueError(f"Invalid Android process name: {process_name!r}")
+    return process_name
+
 class AdbClient:
     """Small ADB client used by the Target Manager.
 
@@ -383,4 +409,83 @@ class AdbClient:
             "date",
             "-u",
             "+%Y-%m-%dT%H:%M:%SZ",
+        )
+
+    def make_remote_directory(self, serial: str, remote_path: str) -> None:
+        remote_path = validate_remote_research_path(remote_path)
+        self.ensure_ready(serial)
+        self._run_checked(
+            ["-s", serial, "shell", "mkdir", "-p", remote_path]
+        )
+
+    def pull_file(
+        self,
+        serial: str,
+        remote_path: str,
+        local_path: str | os.PathLike[str],
+        *,
+        timeout: float = 120.0,
+    ) -> None:
+        remote_path = validate_remote_research_path(remote_path)
+        self.ensure_ready(serial)
+        local = Path(local_path)
+        local.parent.mkdir(parents=True, exist_ok=True)
+        self._run_checked(
+            ["-s", serial, "pull", remote_path, str(local)],
+            timeout=timeout,
+        )
+
+    def remove_remote_file(self, serial: str, remote_path: str) -> None:
+        remote_path = validate_remote_research_path(remote_path)
+        self.ensure_ready(serial)
+        self._run_checked(
+            ["-s", serial, "shell", "rm", "-f", remote_path]
+        )
+
+    def get_process_ids(
+        self,
+        serial: str,
+        process_name: str,
+    ) -> list[int]:
+        self.ensure_ready(serial)
+        process_name = validate_process_name(process_name)
+        try:
+            result = self._run_checked(
+                ["-s", serial, "shell", "pidof", process_name]
+            )
+        except AdbCommandError as exc:
+            if exc.returncode == 1:
+                return []
+            raise
+
+        process_ids: list[int] = []
+        for token in (result.stdout or "").split():
+            try:
+                value = int(token)
+            except ValueError:
+                continue
+            if value > 0:
+                process_ids.append(value)
+        return process_ids
+
+    def send_signal(
+        self,
+        serial: str,
+        process_id: int,
+        signal_number: int,
+    ) -> None:
+        self.ensure_ready(serial)
+        if process_id <= 0:
+            raise ValueError("process_id must be positive")
+        if not 1 <= signal_number <= 64:
+            raise ValueError("signal_number must be between 1 and 64")
+        self._run_checked(
+            [
+                "-s",
+                serial,
+                "shell",
+                "kill",
+                f"-{signal_number}",
+                str(process_id),
+            ]
         )

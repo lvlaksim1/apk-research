@@ -12,6 +12,7 @@ Mobile Research — Windows-система для воспроизводимог
 - **Session Manager**
 - **Device/System Metadata Collector**
 - **Logcat Collector**
+- **Screen Recording Collector**
 
 Первая end-to-end цель: провести одну воспроизводимую исследовательскую сессию на Android target и получить архив с исходными диагностическими данными.
 
@@ -84,6 +85,20 @@ Mobile Research — Windows-система для воспроизводимог
 
 Служебная информация процесса сохраняется в `02_normalized/logcat.json`.
 
+## Screen Recording Collector
+
+Записывает экран последовательными MP4 chunks:
+
+- штатный chunk — 170 секунд при совместимом диапазоне 1–180 секунд;
+- каждый chunk сначала создаётся на Android, затем сразу переносится на Windows;
+- уже перенесённые chunks не зависят от последующих ошибок;
+- каждый video chunk и diagnostic log регистрируются в Session Manager;
+- завершившийся по time limit chunk автоматически заменяется следующим при очередной health-check;
+- STOP пытается послать адресный SIGINT PID нашего `screenrecord`;
+- затем используется terminate → grace period → kill как fallback;
+- пустой, неперенесённый или аварийно завершившийся chunk делает collector `failed`, сохраняя предыдущие chunks;
+- `02_normalized/screen.json` содержит хронологию chunks, команды, return codes, remote PID, timestamps и размеры.
+
 ## CLI
 
 ```powershell
@@ -149,7 +164,7 @@ python -m pytest -q
 
 ## Следующий этап
 
-**Screen Recording Collector** — непрерывная запись экрана с chunking, безопасным STOP и сохранением уже созданных видеофрагментов при сбое.
+**Raw Network Collector** — обязательный packet capture, независимый от будущего MITM/HTTP-декодирования.
 
 ## CI
 

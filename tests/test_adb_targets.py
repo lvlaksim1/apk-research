@@ -281,3 +281,102 @@ def test_metadata_snapshot_adb_commands() -> None:
     assert client.get_utc_time("emulator-5554") == (
         "2026-09-13T18:00:00Z"
     )
+
+
+def test_remote_screen_recording_helpers(tmp_path: Path) -> None:
+    local_file = tmp_path / "screen.mp4"
+    responses = {
+        ("devices", "-l"): _completed(
+            "List of devices attached\n"
+            "emulator-5554 device model:sdk_gphone transport_id:1\n"
+        ),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "mkdir",
+            "-p",
+            "/data/local/tmp/mobile-research/session-1",
+        ): _completed(),
+        (
+            "-s",
+            "emulator-5554",
+            "pull",
+            (
+                "/data/local/tmp/mobile-research/"
+                "session-1/screen-0001.mp4"
+            ),
+            str(local_file),
+        ): _completed(),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "rm",
+            "-f",
+            (
+                "/data/local/tmp/mobile-research/"
+                "session-1/screen-0001.mp4"
+            ),
+        ): _completed(),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "pidof",
+            "screenrecord",
+        ): _completed("321 654\n"),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "kill",
+            "-2",
+            "321",
+        ): _completed(),
+    }
+
+    def runner(
+        arguments: Sequence[str],
+        timeout: float,
+    ) -> subprocess.CompletedProcess[str]:
+        return responses[tuple(arguments)]
+
+    client = AdbClient(Path("adb"), runner=runner)
+
+    client.make_remote_directory(
+        "emulator-5554",
+        "/data/local/tmp/mobile-research/session-1",
+    )
+    client.pull_file(
+        "emulator-5554",
+        (
+            "/data/local/tmp/mobile-research/"
+            "session-1/screen-0001.mp4"
+        ),
+        local_file,
+    )
+    client.remove_remote_file(
+        "emulator-5554",
+        (
+            "/data/local/tmp/mobile-research/"
+            "session-1/screen-0001.mp4"
+        ),
+    )
+
+    assert client.get_process_ids(
+        "emulator-5554",
+        "screenrecord",
+    ) == [321, 654]
+
+    client.send_signal("emulator-5554", 321, 2)
+
+
+def test_remote_research_path_rejects_escape() -> None:
+    client = AdbClient(Path("adb"), runner=lambda args, timeout: _completed())
+
+    with pytest.raises(ValueError):
+        client.make_remote_directory(
+            "emulator-5554",
+            "/data/local/tmp/mobile-research/../escape",
+        )
