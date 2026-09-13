@@ -11,6 +11,7 @@ Mobile Research — Windows-система для воспроизводимог
 - **ADB Target Manager**
 - **Session Manager**
 - **Device/System Metadata Collector**
+- **Logcat Collector**
 
 Первая end-to-end цель: провести одну воспроизводимую исследовательскую сессию на Android target и получить архив с исходными диагностическими данными.
 
@@ -66,6 +67,22 @@ Mobile Research — Windows-система для воспроизводимог
 - производный `02_normalized/target.json` с базовыми характеристиками target и package.
 
 Обязательные команды приводят collector к `failed`, а сбой дополнительной системной команды фиксируется внутри snapshot и не уничтожает остальные данные.
+
+## Logcat Collector
+
+Первый непрерывный collector:
+
+- стартует только в состоянии session `starting`, то есть до запуска исследуемого package;
+- пишет полный доступный `adb logcat -b all` без tag/package-фильтра;
+- использует формат `epoch` с timestamps;
+- не выполняет разрушительный `logcat -c`;
+- использует минимальный pre-roll `-T 1`, а точные границы capture фиксирует host timestamps;
+- сохраняет stdout и stderr раздельно;
+- при STOP сначала делает graceful terminate, затем kill только после grace period;
+- сохраняет уже записанный raw log даже при неожиданном завершении процесса;
+- неожиданное завершение или пустой raw log переводят collector в `failed` и помечают session как degraded.
+
+Служебная информация процесса сохраняется в `02_normalized/logcat.json`.
 
 ## CLI
 
@@ -132,7 +149,7 @@ python -m pytest -q
 
 ## Следующий этап
 
-**Logcat Collector** — первый непрерывный collector, который должен стартовать до исследуемого package и безопасно завершаться без потери уже записанного raw logcat.
+**Screen Recording Collector** — непрерывная запись экрана с chunking, безопасным STOP и сохранением уже созданных видеофрагментов при сбое.
 
 ## CI
 

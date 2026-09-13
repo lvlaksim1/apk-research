@@ -5,8 +5,8 @@
 ## Текущее состояние
 
 **Этап:** v0.1 — Research Session Core  
-**Реализовано:** ADB Target Manager, Session Manager, Device/System Metadata Collector.  
-**Следующий модуль:** Logcat Collector.
+**Реализовано:** ADB Target Manager, Session Manager, Device/System Metadata Collector, Logcat Collector.  
+**Следующий модуль:** Screen Recording Collector.
 
 ## Зафиксированные решения
 
@@ -49,12 +49,18 @@ Device/System Metadata Collector сохраняет оригинальные о�
 ### ADR-013 — Необязательные metadata-команды не рушат snapshot
 Обязательные источники (`getprop`, package dump, package paths, clock) должны быть получены полностью. Сбой дополнительной команды (`uname`, SELinux, display metadata и т. п.) фиксируется в raw/normalized данных, но сам collector остаётся успешным.
 
+### ADR-014 — Logcat buffer не очищается
+Logcat Collector не использует `logcat -c`, поскольку очистка уничтожает состояние Android и особенно нежелательна для будущего Physical Device backend. Collector использует минимальный pre-roll `-T 1`; точные временные границы задаются host timestamps, а raw поток сохраняется без необратимой фильтрации.
+
+### ADR-015 — STOP collector является двухступенчатым
+Непрерывный collector сначала получает graceful terminate и grace period. Только если процесс не завершился, выполняется kill. Forced kill фиксируется в metadata, но сам по себе не делает уже записанный evidence невалидным.
+
 ## Порядок реализации v0.1
 
 1. **ADB Target Manager — реализован.**
 2. **Session Manager и state machine — реализован.**
 3. **Device/system metadata collector — реализован.**
-4. Logcat collector.
+4. **Logcat collector — реализован.**
 5. Screen recording collector.
 6. Raw network collector.
 7. Export/checksum subsystem.
