@@ -6,6 +6,7 @@ on:
       - "src/mobile_research/**"
       - "packaging/**"
       - "pyproject.toml"
+      - "tests/**"
       - ".github/workflows/desktop-build.yml"
   pull_request:
     paths:
