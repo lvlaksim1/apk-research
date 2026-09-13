@@ -131,7 +131,7 @@ class DeviceMetadataCollector:
 
             target_started = self.adb.get_utc_time(serial)
             getprop = self.adb.get_all_properties(serial)
-            package_dump = self.adb.get_package_dump(serial, package_name)
+            package_dump = self._capture_package_dump(serial, package_name)
             package_paths = self.adb.get_package_paths(serial, package_name)
 
             system_text, optional_errors = self._capture_optional_system(serial)
@@ -229,6 +229,70 @@ class DeviceMetadataCollector:
             raise MetadataCollectorError(
                 f"Device metadata capture failed: {message}"
             ) from exc
+
+    def _capture_package_dump(
+        self,
+        serial: str,
+        package_name: str,
+    ) -> str:
+        remote_dir = (
+            f"/data/local/tmp/mobile-research/{self.session.session_id}"
+        )
+        remote_path = f"{remote_dir}/package-dump.txt"
+        temporary = (
+            self.session.paths.raw_device / "package.remote.tmp"
+        )
+
+        try:
+            self.adb.make_remote_directory(
+                serial,
+                remote_dir,
+            )
+            try:
+                self.adb.remove_remote_file(
+                    serial,
+                    remote_path,
+                )
+            except AdbError:
+                pass
+
+            self.adb.capture_shell_output_to_file(
+                serial,
+                remote_path,
+                "dumpsys",
+                "package",
+                package_name,
+                timeout=60.0,
+            )
+            self.adb.pull_file(
+                serial,
+                remote_path,
+                temporary,
+                timeout=120.0,
+            )
+
+            if not temporary.is_file():
+                raise MetadataCollectorError(
+                    "Package dump was not pulled from Android"
+                )
+            if temporary.stat().st_size == 0:
+                raise MetadataCollectorError(
+                    "Package dump captured on Android is empty"
+                )
+
+            return temporary.read_text(
+                encoding="utf-8",
+                errors="replace",
+            )
+        finally:
+            temporary.unlink(missing_ok=True)
+            try:
+                self.adb.remove_remote_file(
+                    serial,
+                    remote_path,
+                )
+            except AdbError:
+                pass
 
     def _capture_optional_system(
         self,

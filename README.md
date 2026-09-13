@@ -64,7 +64,7 @@ Mobile Research — Windows-система для воспроизводимог
 Первый реальный evidence collector сохраняет:
 
 - полный raw `getprop`;
-- raw `dumpsys package <package>`;
+- raw `dumpsys package <package>`; для больших package dumps Android сначала пишет полный вывод во временный session-файл на target, после чего Mobile Research переносит его через `adb pull`;
 - raw пути APK из `pm path`;
 - системный snapshot: `id`, `uname -a`, SELinux, размер и плотность экрана;
 - target/host clock markers вокруг snapshot;

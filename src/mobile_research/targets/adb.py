@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import shutil
 import subprocess
 from dataclasses import asdict, dataclass
@@ -555,6 +556,35 @@ class AdbClient:
         self.ensure_ready(serial)
         self._run_checked(
             ["-s", serial, "shell", "mkdir", "-p", remote_path]
+        )
+
+    def capture_shell_output_to_file(
+        self,
+        serial: str,
+        remote_path: str,
+        *arguments: str,
+        timeout: float = 60.0,
+    ) -> None:
+        remote_path = validate_remote_research_path(remote_path)
+        if not arguments:
+            raise ValueError("At least one remote command argument is required")
+        self.ensure_ready(serial)
+
+        shell_command = (
+            shlex.join(arguments)
+            + " >"
+            + shlex.quote(remote_path)
+        )
+        self._run_checked(
+            [
+                "-s",
+                serial,
+                "shell",
+                "sh",
+                "-c",
+                shell_command,
+            ],
+            timeout=timeout,
         )
 
     def pull_file(

@@ -586,3 +586,58 @@ def test_package_check_returns_false_for_missing_package() -> None:
         "emulator-5554",
         "com.example.missing",
     ) is False
+
+
+def test_capture_shell_output_to_remote_file() -> None:
+    responses = {
+        ("devices", "-l"): _completed(
+            "List of devices attached\n"
+            "emulator-5554 device model:sdk_gphone transport_id:1\n"
+        ),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "sh",
+            "-c",
+            (
+                "dumpsys package com.example.app "
+                ">/data/local/tmp/mobile-research/"
+                "session-1/package-dump.txt"
+            ),
+        ): _completed(),
+    }
+
+    def runner(
+        arguments: Sequence[str],
+        timeout: float,
+    ) -> subprocess.CompletedProcess[str]:
+        return responses[tuple(arguments)]
+
+    client = AdbClient(Path("adb"), runner=runner)
+    client.capture_shell_output_to_file(
+        "emulator-5554",
+        (
+            "/data/local/tmp/mobile-research/"
+            "session-1/package-dump.txt"
+        ),
+        "dumpsys",
+        "package",
+        "com.example.app",
+    )
+
+
+def test_capture_shell_output_rejects_remote_escape() -> None:
+    client = AdbClient(
+        Path("adb"),
+        runner=lambda args, timeout: _completed(),
+    )
+
+    with pytest.raises(ValueError):
+        client.capture_shell_output_to_file(
+            "emulator-5554",
+            "/data/local/tmp/mobile-research/../escape.txt",
+            "dumpsys",
+            "package",
+            "com.example.app",
+        )

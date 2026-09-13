@@ -27,6 +27,17 @@ class FakeAdb:
     def __init__(self) -> None:
         self.optional_failures: set[str] = set()
         self.installed = True
+        self.remote_dirs: list[str] = []
+        self.removed: list[str] = []
+        self.captured_commands: list[tuple[str, ...]] = []
+        self.package_dump = (
+            "Packages:\n"
+            "  Package [com.example.app]\n"
+            "    versionCode=123 minSdk=28 targetSdk=35\n"
+            "    versionName=1.2.3\n"
+            "    firstInstallTime=2026-09-13 17:00:00\n"
+            "    lastUpdateTime=2026-09-13 17:30:00\n"
+        )
 
     def ensure_ready(self, serial: str) -> None:
         assert serial == "emulator-5554"
@@ -49,18 +60,45 @@ class FakeAdb:
             "[ro.build.fingerprint]: [example/fingerprint]\n"
         )
 
-    def get_package_dump(self, serial: str, package_name: str) -> str:
-        return (
-            "Packages:\n"
-            "  Package [com.example.app]\n"
-            "    versionCode=123 minSdk=28 targetSdk=35\n"
-            "    versionName=1.2.3\n"
-            "    firstInstallTime=2026-09-13 17:00:00\n"
-            "    lastUpdateTime=2026-09-13 17:30:00\n"
-        )
-
     def get_package_paths(self, serial: str, package_name: str) -> str:
         return "package:/data/app/example/base.apk\n"
+
+    def make_remote_directory(
+        self,
+        serial: str,
+        remote_path: str,
+    ) -> None:
+        self.remote_dirs.append(remote_path)
+
+    def capture_shell_output_to_file(
+        self,
+        serial: str,
+        remote_path: str,
+        *arguments: str,
+        timeout: float = 60.0,
+    ) -> None:
+        self.captured_commands.append(tuple(arguments))
+
+    def pull_file(
+        self,
+        serial: str,
+        remote_path: str,
+        local_path: Path,
+        *,
+        timeout: float = 120.0,
+    ) -> None:
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        local_path.write_text(
+            self.package_dump,
+            encoding="utf-8",
+        )
+
+    def remove_remote_file(
+        self,
+        serial: str,
+        remote_path: str,
+    ) -> None:
+        self.removed.append(remote_path)
 
     def shell_output(self, serial: str, *arguments: str, timeout: float = 10.0) -> str:
         label = " ".join(arguments)
@@ -111,6 +149,14 @@ def test_metadata_collector_writes_raw_and_normalized_files(
     assert normalized["package"]["version_code"] == "123"
     assert normalized["package"]["paths"] == [
         "/data/app/example/base.apk"
+    ]
+    assert (
+        "dumpsys",
+        "package",
+        "com.example.app",
+    ) in collector.adb.captured_commands
+    assert collector.adb.remote_dirs == [
+        "/data/local/tmp/mobile-research/metadata-session"
     ]
 
     manifest = session.manifest
@@ -188,3 +234,33 @@ def test_metadata_collector_cannot_run_twice_in_same_session(
             session,
             clock=TestClock(),
         ).collect()
+
+
+def test_large_package_dump_uses_remote_file_transport(
+    tmp_path: Path,
+) -> None:
+    session = create_session(tmp_path)
+    adb = FakeAdb()
+    adb.package_dump = (
+        "Packages:\n"
+        "  Package [com.example.app]\n"
+        "    versionCode=123\n"
+        "    versionName=1.2.3\n"
+        + ("X" * 250_000)
+        + "\n"
+    )
+
+    result = DeviceMetadataCollector(
+        adb,
+        session,
+        clock=TestClock(),
+    ).collect()
+
+    package_file = (
+        session.paths.raw_device / "package.txt"
+    )
+    assert result.status == "completed"
+    assert package_file.stat().st_size > 250_000
+    assert adb.captured_commands == [
+        ("dumpsys", "package", "com.example.app")
+    ]

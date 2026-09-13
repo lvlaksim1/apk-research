@@ -119,3 +119,7 @@ Health-check фиксирует деградацию, но остальные so
 ## Правило изменения архитектуры
 
 Изменения RAW evidence contract, target abstraction, session state machine или Research ZIP сначала фиксируются здесь или в отдельной спецификации, затем реализуются.
+
+
+### ADR-030 — Крупные Android dumps не идут через capture_output
+Полный `dumpsys package` может быть достаточно большим, чтобы текстовый ADB transport завершился нестабильно. Collector направляет stdout команды во временный файл под `/data/local/tmp/mobile-research/<session-id>/`, переносит его через `adb pull`, затем удаляет remote-файл best-effort. Это сохраняет полный raw dump и избегает зависимости от объёма stdout.
