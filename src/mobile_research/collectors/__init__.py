@@ -14,6 +14,7 @@ from .screen_recording import (
     ScreenRecordingCollector,
     ScreenRecordingCollectorError,
     ScreenRecordingResult,
+    inspect_screenrecord_timing,
 )
 from .raw_network import (
     RawNetworkCollector,
@@ -33,6 +34,7 @@ __all__ = [
     "ScreenRecordingCollector",
     "ScreenRecordingCollectorError",
     "ScreenRecordingResult",
+    "inspect_screenrecord_timing",
     "RawNetworkCollector",
     "RawNetworkCollectorError",
     "RawNetworkPreflight",

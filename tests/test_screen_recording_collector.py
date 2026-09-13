@@ -10,6 +10,7 @@ import pytest
 from mobile_research.collectors import (
     ScreenRecordingCollector,
     ScreenRecordingCollectorError,
+    inspect_screenrecord_timing,
 )
 from mobile_research.session import SessionManager
 
@@ -387,3 +388,47 @@ def test_stop_detects_process_that_failed_before_stop(
     assert (
         session.paths.raw_screen / "screen-0001.mp4"
     ).is_file()
+
+
+
+def test_winscope_v2_timing_is_extracted(tmp_path: Path) -> None:
+    path = tmp_path / "screen.mp4"
+    magic = b"#VV1NSC0PET1ME2#"
+    version = (2).to_bytes(4, "little")
+    realtime_to_elapsed = (
+        1_700_000_000_000_000_000
+    ).to_bytes(8, "little", signed=True)
+    frame_count = (3).to_bytes(4, "little")
+    frames = b"".join(
+        value.to_bytes(8, "little")
+        for value in (
+            10_000_000_000,
+            10_500_000_000,
+            12_000_000_000,
+        )
+    )
+    path.write_bytes(
+        b"fake-mp4-prefix"
+        + magic
+        + version
+        + realtime_to_elapsed
+        + frame_count
+        + frames
+    )
+
+    timing = inspect_screenrecord_timing(path)
+
+    assert timing is not None
+    assert timing["source"] == "winscope-v2"
+    assert timing["version"] == 2
+    assert timing["frame_count"] == 3
+    assert timing["frame_span_seconds"] == 2.0
+    assert timing["first_frame_utc"].endswith("Z")
+    assert timing["last_frame_utc"].endswith("Z")
+
+
+def test_winscope_timing_absent_returns_none(tmp_path: Path) -> None:
+    path = tmp_path / "screen.mp4"
+    path.write_bytes(b"not-a-screenrecord-file" * 4)
+
+    assert inspect_screenrecord_timing(path) is None

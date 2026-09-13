@@ -100,7 +100,8 @@ Mobile Research — Windows-система для воспроизводимог
 - STOP пытается послать адресный SIGINT PID нашего `screenrecord`;
 - затем используется terminate → grace period → kill как fallback;
 - пустой, неперенесённый или аварийно завершившийся chunk делает collector `failed`, сохраняя предыдущие chunks;
-- `02_normalized/screen.json` содержит хронологию chunks, команды, return codes, remote PID, timestamps и размеры.
+- `02_normalized/screen.json` содержит хронологию chunks, команды, return codes, remote PID, timestamps и размеры;
+- если Android `screenrecord` содержит Winscope-v2 metadata track, collector извлекает frame count и абсолютные UTC timestamps первого/последнего кадра без изменения raw MP4.
 
 ## Raw Network Collector
 
@@ -147,6 +148,14 @@ Artifacts:
 3. проверка полного checksum coverage;
 4. повторный SHA-256 каждого файла уже из ZIP;
 5. проверка terminal status и session ID в архивном manifest.
+
+Для `complete` архивов доступен дополнительный semantic audit:
+- обязательные collectors действительно `completed`, session не degraded;
+- lifecycle events присутствуют и идут в правильном порядке;
+- host/target clock skew контролируется;
+- PCAP и logcat по timestamps перекрывают запуск package;
+- raw package launch содержит `Status: ok`;
+- screen evidence использует встроенные Android screenrecord Winscope-v2 frame timestamps для привязки кадров к абсолютному UTC.
 
 Архив сначала создаётся как temporary file и заменяет destination только после успешной проверки.
 
@@ -205,6 +214,7 @@ mobile-research metadata-collect "C:\path\to\session" --json
 mobile-research session-status "C:\path\to\session" --json
 mobile-research session-export "C:\path\to\session" --json
 mobile-research research-zip-verify "C:\path\to\session.research.zip" --json
+mobile-research research-zip-audit "C:\path\to\session.research.zip" --json
 
 mobile-research run emulator-5554 com.example.app
 ```

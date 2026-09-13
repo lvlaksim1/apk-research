@@ -123,3 +123,10 @@ Health-check фиксирует деградацию, но остальные so
 
 ### ADR-030 — Крупные Android dumps не идут через capture_output
 Полный `dumpsys package` может быть достаточно большим, чтобы текстовый ADB transport завершился нестабильно. Collector направляет stdout команды во временный файл под `/data/local/tmp/mobile-research/<session-id>/`, переносит его через `adb pull`, затем удаляет remote-файл best-effort. Это сохраняет полный raw dump и избегает зависимости от объёма stdout.
+
+
+### ADR-031 — Screen timing берётся из встроенного Winscope metadata, а не из MP4 duration
+Современный Android `screenrecord` пишет data-track `#VV1NSC0PET1ME2#` с elapsed frame timestamps и realtime-to-elapsed offset. Статичный экран может не генерировать новые frames, поэтому playback duration MP4 не обязан совпадать с wall-clock длительностью collector process. Mobile Research сохраняет raw MP4 без изменений и извлекает только summary первого/последнего frame UTC и frame count в `screen.json`.
+
+### ADR-032 — Первый релиз требует semantic audit, а не только ZIP integrity
+CRC/SHA-256 доказывают целостность архива, но не достаточность evidence. Release acceptance дополнительно проверяет lifecycle order, collector statuses, clock skew, временное покрытие logcat/PCAP, package launch и screen frame timing. Формально валидный, но семантически неполный Research ZIP не проходит release gate.

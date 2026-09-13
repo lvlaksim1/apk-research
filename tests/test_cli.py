@@ -106,3 +106,16 @@ def test_parser_run() -> None:
     assert args.screen_chunk_seconds == 120
     assert args.health_interval == 2.5
     assert args.json is True
+
+
+
+def test_parser_research_zip_audit() -> None:
+    parser = cli._build_parser()
+
+    args = parser.parse_args(
+        ["research-zip-audit", "result.zip", "--json"]
+    )
+
+    assert args.command == "research-zip-audit"
+    assert args.archive == Path("result.zip")
+    assert args.json is True

@@ -10,6 +10,7 @@ from typing import Any
 from mobile_research.collectors import DeviceMetadataCollector, MetadataCollectorError
 from mobile_research.export import (
     ExportError,
+    audit_complete_research_zip,
     export_research_zip,
     verify_research_zip,
 )
@@ -104,6 +105,15 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     verify_parser.add_argument("archive", type=Path)
     verify_parser.add_argument("--json", action="store_true")
+
+    audit_parser = subparsers.add_parser(
+        "research-zip-audit",
+        help=(
+            "Perform semantic/timeline audit of a complete Research ZIP."
+        ),
+    )
+    audit_parser.add_argument("archive", type=Path)
+    audit_parser.add_argument("--json", action="store_true")
 
     run_parser = subparsers.add_parser(
         "run",
@@ -313,6 +323,33 @@ def _research_zip_verify_command(
     return 0
 
 
+def _research_zip_audit_command(
+    archive: Path,
+    as_json: bool,
+) -> int:
+    result = audit_complete_research_zip(archive)
+
+    if as_json:
+        _print_json(result.to_dict())
+    else:
+        print(f"archive: {result.archive}")
+        print(f"session_id: {result.session_id}")
+        print(f"package: {result.package}")
+        print(f"packet_count: {result.packet_count}")
+        print(f"logcat_entries: {result.logcat_entries}")
+        print(f"screen_frames: {result.screen_frames}")
+        print(
+            "max_clock_skew_seconds: "
+            f"{result.max_clock_skew_seconds:.3f}"
+        )
+        print(
+            "screen_last_frame_gap_seconds: "
+            f"{result.screen_last_frame_gap_seconds:.3f}"
+        )
+
+    return 0
+
+
 def _run_command(
     client: AdbClient,
     serial: str,
@@ -378,6 +415,11 @@ def main(argv: list[str] | None = None) -> int:
             )
         if args.command == "research-zip-verify":
             return _research_zip_verify_command(
+                args.archive,
+                args.json,
+            )
+        if args.command == "research-zip-audit":
+            return _research_zip_audit_command(
                 args.archive,
                 args.json,
             )

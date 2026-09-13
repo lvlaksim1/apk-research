@@ -5,7 +5,10 @@ import sys
 import time
 from pathlib import Path
 
-from mobile_research.export import verify_research_zip
+from mobile_research.export import (
+    audit_complete_research_zip,
+    verify_research_zip,
+)
 from mobile_research.orchestrator import OrchestratorError, ResearchOrchestrator
 from mobile_research.targets import AdbClient, AdbError
 
@@ -74,7 +77,7 @@ def main() -> int:
                 "ping",
                 "-c",
                 "2",
-                "8.8.8.8",
+                "10.0.2.2",
                 timeout=20.0,
             )
             print(json.dumps({
@@ -89,7 +92,22 @@ def main() -> int:
                 "error": str(exc),
             }, ensure_ascii=False))
 
-        time.sleep(3)
+        time.sleep(1)
+
+        client.shell_output(
+            SERIAL,
+            "input",
+            "keyevent",
+            "3",
+        )
+        time.sleep(1)
+        client.launch_package(SERIAL, package_name)
+        print(json.dumps({
+            "event": "screen_activity_probe",
+            "status": "ok",
+        }, ensure_ascii=False))
+        time.sleep(1)
+
         health = orchestrator.health_check()
         print(json.dumps({"event": "health", **health.to_dict()}, ensure_ascii=False))
 
@@ -106,6 +124,19 @@ def main() -> int:
             )
         if not verification.valid:
             raise RuntimeError("Research ZIP verification failed")
+
+        audit = audit_complete_research_zip(result.archive)
+        print(json.dumps({
+            "event": "semantic_audit",
+            **audit.to_dict(),
+        }, ensure_ascii=False))
+
+        if audit.screen_last_frame_gap_seconds > 4.0:
+            raise RuntimeError(
+                "Screen frame evidence did not reach the controlled "
+                "late-session UI activity: "
+                f"gap={audit.screen_last_frame_gap_seconds:.3f}s"
+            )
 
         return 0
     except OrchestratorError as exc:

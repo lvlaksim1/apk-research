@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import mmap
 import os
+import struct
 import subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -59,6 +61,100 @@ def _iso_utc(value: datetime) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _iso_unix_ns(value: int) -> str:
+    seconds, nanoseconds = divmod(value, 1_000_000_000)
+    timestamp = datetime.fromtimestamp(
+        seconds,
+        tz=timezone.utc,
+    ).replace(microsecond=nanoseconds // 1000)
+    return _iso_utc(timestamp)
+
+
+_WINSCOPE_V2_MAGIC = b"#VV1NSC0PET1ME2#"
+
+
+def inspect_screenrecord_timing(
+    path: Path,
+) -> dict[str, object] | None:
+    """Read Android screenrecord Winscope v2 timing metadata.
+
+    Modern Android screenrecord embeds absolute frame timing in an MP4 data
+    track. The video payload may contain long periods with no new display
+    frames, so this metadata is a better correlation source than MP4 playback
+    duration alone.
+    """
+
+    size = path.stat().st_size if path.exists() else 0
+    minimum = len(_WINSCOPE_V2_MAGIC) + 4 + 8 + 4 + 8
+    if size < minimum:
+        return None
+
+    with path.open("rb") as handle:
+        with mmap.mmap(
+            handle.fileno(),
+            length=0,
+            access=mmap.ACCESS_READ,
+        ) as mapping:
+            offset = mapping.find(_WINSCOPE_V2_MAGIC)
+            if offset < 0:
+                return None
+
+            cursor = offset + len(_WINSCOPE_V2_MAGIC)
+            version = struct.unpack_from("<I", mapping, cursor)[0]
+            cursor += 4
+            if version != 2:
+                return None
+
+            realtime_to_elapsed_ns = struct.unpack_from(
+                "<q",
+                mapping,
+                cursor,
+            )[0]
+            cursor += 8
+            frame_count = struct.unpack_from(
+                "<I",
+                mapping,
+                cursor,
+            )[0]
+            cursor += 4
+
+            if frame_count <= 0 or frame_count > 10_000_000:
+                return None
+
+            payload_end = cursor + frame_count * 8
+            if payload_end > size:
+                return None
+
+            first_elapsed_ns = struct.unpack_from(
+                "<Q",
+                mapping,
+                cursor,
+            )[0]
+            last_elapsed_ns = struct.unpack_from(
+                "<Q",
+                mapping,
+                cursor + (frame_count - 1) * 8,
+            )[0]
+
+    first_realtime_ns = (
+        realtime_to_elapsed_ns + first_elapsed_ns
+    )
+    last_realtime_ns = (
+        realtime_to_elapsed_ns + last_elapsed_ns
+    )
+
+    return {
+        "source": "winscope-v2",
+        "version": version,
+        "frame_count": frame_count,
+        "first_frame_utc": _iso_unix_ns(first_realtime_ns),
+        "last_frame_utc": _iso_unix_ns(last_realtime_ns),
+        "frame_span_seconds": (
+            last_elapsed_ns - first_elapsed_ns
+        ) / 1_000_000_000,
+    }
 
 
 def _write_json_atomic(path: Path, value: dict[str, object]) -> None:
@@ -477,6 +573,19 @@ class ScreenRecordingCollector:
 
         size = local_path.stat().st_size if local_path.exists() else 0
         chunk["bytes"] = size
+
+        if size > 0:
+            try:
+                chunk["frame_timing"] = (
+                    inspect_screenrecord_timing(local_path)
+                )
+            except (OSError, ValueError, struct.error) as exc:
+                chunk["frame_timing"] = None
+                chunk["frame_timing_error"] = (
+                    str(exc) or exc.__class__.__name__
+                )
+        else:
+            chunk["frame_timing"] = None
 
         valid_video = size > 0
         valid_exit = expected_stop or returncode == 0
