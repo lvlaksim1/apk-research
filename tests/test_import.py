@@ -1,4 +1,4 @@
 def test_package_import() -> None:
     import mobile_research
 
-    assert mobile_research.__version__ == "0.1.0.dev0"
+    assert mobile_research.__version__ == "0.1.0"
