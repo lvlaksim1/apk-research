@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import struct
 import subprocess
 from dataclasses import asdict, dataclass
@@ -192,6 +193,8 @@ class RawNetworkCollector:
         self._stderr: BinaryIO | None = None
         self._command: list[str] | None = None
         self._remote_pid: int | None = None
+        self._remote_dir: str | None = None
+        self._remote_stderr_path: str | None = None
         self._started_utc: str | None = None
         self._stopped_utc: str | None = None
         self._stop_requested = False
@@ -314,11 +317,42 @@ class RawNetworkCollector:
         except AdbError:
             existing_pids = set()
 
-        self._command = [
-            str(self.adb.adb_path),
-            "-s",
-            serial,
-            "exec-out",
+        self._remote_dir = (
+            f"/data/local/tmp/mobile-research/{self.session.session_id}"
+        )
+        self._remote_stderr_path = (
+            f"{self._remote_dir}/tcpdump.stderr.txt"
+        )
+        try:
+            self.adb.make_remote_directory(
+                serial,
+                self._remote_dir,
+            )
+            try:
+                self.adb.remove_remote_file(
+                    serial,
+                    self._remote_stderr_path,
+                )
+            except AdbError:
+                pass
+        except AdbError as exc:
+            self._close_files()
+            message = (
+                "Unable to prepare tcpdump diagnostic path: "
+                f"{exc}"
+            )
+            self._record_failure(message)
+            self._stopped_utc = _iso_utc(self.clock())
+            self._write_metadata(
+                status="failed",
+                error=message,
+                returncode=None,
+                pcap_format=None,
+            )
+            self._finished = True
+            raise RawNetworkCollectorError(message) from exc
+
+        tcpdump_arguments = [
             preflight.tcpdump_path,
             "-i",
             "any",
@@ -328,6 +362,20 @@ class RawNetworkCollector:
             "-U",
             "-w",
             "-",
+        ]
+        shell_command = (
+            shlex.join(tcpdump_arguments)
+            + " 2>"
+            + shlex.quote(self._remote_stderr_path)
+        )
+        self._command = [
+            str(self.adb.adb_path),
+            "-s",
+            serial,
+            "exec-out",
+            "sh",
+            "-c",
+            shell_command,
         ]
 
         self._write_metadata(
@@ -345,6 +393,7 @@ class RawNetworkCollector:
             )
         except Exception as exc:
             self._close_files()
+            self._collect_remote_stderr()
             message = str(exc) or exc.__class__.__name__
             self._record_failure(message)
             self._stopped_utc = _iso_utc(self.clock())
@@ -360,6 +409,7 @@ class RawNetworkCollector:
         returncode = self._process.poll()
         if returncode is not None:
             self._close_files()
+            self._collect_remote_stderr()
             message = (
                 "tcpdump exited immediately with return code "
                 f"{returncode}"
@@ -403,6 +453,7 @@ class RawNetworkCollector:
             return True
 
         self._close_files()
+        self._collect_remote_stderr()
         message = (
             "tcpdump exited unexpectedly with return code "
             f"{returncode}"
@@ -487,6 +538,7 @@ class RawNetworkCollector:
                         ) from exc
 
         self._close_files()
+        self._collect_remote_stderr()
         self._stopped_utc = _iso_utc(self.clock())
 
         pcap_format: str | None = None
@@ -552,6 +604,50 @@ class RawNetworkCollector:
             )
         except AdbError:
             pass
+
+    def _collect_remote_stderr(self) -> None:
+        if (
+            self._preflight is None
+            or self._remote_stderr_path is None
+        ):
+            return
+
+        local_path = (
+            self.session.paths.root / self.STDERR_ARTIFACT
+        )
+        temporary = local_path.with_name(
+            local_path.name + ".remote.tmp"
+        )
+
+        try:
+            self.adb.pull_file(
+                self._preflight.serial,
+                self._remote_stderr_path,
+                temporary,
+                timeout=30.0,
+            )
+        except AdbError as exc:
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            with local_path.open("ab") as handle:
+                handle.write(
+                    (
+                        "[mobile-research] unable to retrieve "
+                        f"remote tcpdump stderr: {exc}\n"
+                    ).encode("utf-8", errors="replace")
+                )
+        else:
+            if temporary.exists():
+                with local_path.open("ab") as destination:
+                    destination.write(temporary.read_bytes())
+        finally:
+            temporary.unlink(missing_ok=True)
+            try:
+                self.adb.remove_remote_file(
+                    self._preflight.serial,
+                    self._remote_stderr_path,
+                )
+            except AdbError:
+                pass
 
     def _record_failure(self, message: str) -> None:
         if self._failure_recorded:

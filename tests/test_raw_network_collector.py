@@ -90,6 +90,12 @@ class FakeAdb:
         self.remote_pid = 5000
         self.process: FakeProcess | None = None
         self.signals: list[tuple[int, int]] = []
+        self.remote_dirs: list[str] = []
+        self.removed: list[str] = []
+        self.remote_stderr = (
+            b"tcpdump: listening on any, "
+            b"link-type LINUX_SLL2\n"
+        )
 
     def ensure_ready(self, serial: str) -> None:
         assert serial == "emulator-5554"
@@ -116,6 +122,31 @@ class FakeAdb:
         process_name: str,
     ) -> list[int]:
         return [] if self.before_spawn else [self.remote_pid]
+
+    def make_remote_directory(
+        self,
+        serial: str,
+        remote_path: str,
+    ) -> None:
+        self.remote_dirs.append(remote_path)
+
+    def pull_file(
+        self,
+        serial: str,
+        remote_path: str,
+        local_path: Path,
+        *,
+        timeout: float = 120.0,
+    ) -> None:
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        local_path.write_bytes(self.remote_stderr)
+
+    def remove_remote_file(
+        self,
+        serial: str,
+        remote_path: str,
+    ) -> None:
+        self.removed.append(remote_path)
 
     def send_signal(
         self,
@@ -201,15 +232,13 @@ def test_raw_network_graceful_stop(tmp_path: Path) -> None:
         "-s",
         "emulator-5554",
         "exec-out",
-        "tcpdump",
-        "-i",
-        "any",
-        "-p",
-        "-s",
-        "0",
-        "-U",
-        "-w",
-        "-",
+        "sh",
+        "-c",
+        (
+            "tcpdump -i any -p -s 0 -U -w - "
+            "2>/data/local/tmp/mobile-research/"
+            "network-session/tcpdump.stderr.txt"
+        ),
     ]
 
     session.mark_active()
@@ -223,6 +252,14 @@ def test_raw_network_graceful_stop(tmp_path: Path) -> None:
     assert result.pcap_format == "pcap-le-microsecond"
     assert adb.signals == [(5000, 2)]
     assert session.degraded is False
+
+    pcap_path = session.paths.raw_network / "traffic.pcap"
+    assert pcap_path.read_bytes()[:4] == b"\xd4\xc3\xb2\xa1"
+
+    stderr_path = (
+        session.paths.raw_network / "tcpdump.stderr.txt"
+    )
+    assert stderr_path.read_bytes() == adb.remote_stderr
 
     state = session.manifest["collectors"]["raw_network"]
     assert state["status"] == "completed"

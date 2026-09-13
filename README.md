@@ -110,8 +110,8 @@ Mobile Research — Windows-система для воспроизводимог
 - preflight проверяет `uid=0` и наличие usable `tcpdump`;
 - запускает `tcpdump -i any -p -s 0 -U -w -`;
 - бинарный PCAP идёт напрямую через `adb exec-out` в Windows;
+- stderr `tcpdump` на Android перенаправляется в отдельный temporary-файл и после STOP переносится в `tcpdump.stderr.txt`, чтобы диагностический текст не мог загрязнить бинарный PCAP;
 - proxy/MITM не участвуют в capture;
-- stderr `tcpdump` сохраняется отдельно;
 - STOP сначала пытается послать SIGINT remote PID `tcpdump`, затем использует terminate/kill fallback;
 - итоговый `traffic.pcap` проверяется по PCAP magic/version;
 - неожиданное завершение процесса или невалидный PCAP делают session degraded, но уже записанные bytes сохраняются.
