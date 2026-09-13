@@ -13,6 +13,7 @@ Mobile Research — Windows-система для воспроизводимог
 - **Device/System Metadata Collector**
 - **Logcat Collector**
 - **Screen Recording Collector**
+- **Raw Network Collector**
 
 Первая end-to-end цель: провести одну воспроизводимую исследовательскую сессию на Android target и получить архив с исходными диагностическими данными.
 
@@ -99,6 +100,30 @@ Mobile Research — Windows-система для воспроизводимог
 - пустой, неперенесённый или аварийно завершившийся chunk делает collector `failed`, сохраняя предыдущие chunks;
 - `02_normalized/screen.json` содержит хронологию chunks, команды, return codes, remote PID, timestamps и размеры.
 
+## Raw Network Collector
+
+Для reference target **AVD-RESEARCH** реализован backend `adb-tcpdump`:
+
+- требует AOSP research image с root ADB;
+- preflight проверяет `uid=0` и наличие usable `tcpdump`;
+- запускает `tcpdump -i any -p -s 0 -U -w -`;
+- бинарный PCAP идёт напрямую через `adb exec-out` в Windows;
+- proxy/MITM не участвуют в capture;
+- stderr `tcpdump` сохраняется отдельно;
+- STOP сначала пытается послать SIGINT remote PID `tcpdump`, затем использует terminate/kill fallback;
+- итоговый `traffic.pcap` проверяется по PCAP magic/version;
+- неожиданное завершение процесса или невалидный PCAP делают session degraded, но уже записанные bytes сохраняются.
+
+Artifacts:
+
+```text
+01_raw/network/traffic.pcap
+01_raw/network/tcpdump.stderr.txt
+02_normalized/network.json
+```
+
+Этот backend намеренно относится только к AVD-RESEARCH v0.1. AVD-PLAY и Physical Device получат отдельные capture backends позднее.
+
 ## CLI
 
 ```powershell
@@ -164,7 +189,7 @@ python -m pytest -q
 
 ## Следующий этап
 
-**Raw Network Collector** — обязательный packet capture, независимый от будущего MITM/HTTP-декодирования.
+**Export/Checksum subsystem** — SHA-256 evidence, валидация обязательных artifacts и формирование Research ZIP.
 
 ## CI
 

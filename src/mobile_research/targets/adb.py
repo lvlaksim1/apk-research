@@ -411,6 +411,59 @@ class AdbClient:
             "+%Y-%m-%dT%H:%M:%SZ",
         )
 
+    def get_uid(self, serial: str) -> int:
+        self.ensure_ready(serial)
+        value = self._shell_value(serial, "id", "-u")
+        try:
+            return int(value)
+        except ValueError as exc:
+            raise AdbError(
+                f"Unable to parse Android uid for {serial}: {value!r}"
+            ) from exc
+
+    def probe_executable(
+        self,
+        serial: str,
+        candidates: Sequence[str],
+        *,
+        version_arguments: Sequence[str] = ("--version",),
+    ) -> tuple[str, str]:
+        self.ensure_ready(serial)
+
+        diagnostics: list[str] = []
+        for candidate in candidates:
+            try:
+                result = self._run_checked(
+                    [
+                        "-s",
+                        serial,
+                        "shell",
+                        candidate,
+                        *version_arguments,
+                    ]
+                )
+            except AdbCommandError as exc:
+                diagnostics.append(
+                    f"{candidate}: exit {exc.returncode}"
+                )
+                continue
+
+            version_text = (
+                (result.stdout or "").strip()
+                or (result.stderr or "").strip()
+            )
+            return candidate, version_text
+
+        raise AdbError(
+            "No usable executable found. Tried: "
+            + ", ".join(candidates)
+            + (
+                "; diagnostics: " + "; ".join(diagnostics)
+                if diagnostics
+                else ""
+            )
+        )
+
     def make_remote_directory(self, serial: str, remote_path: str) -> None:
         remote_path = validate_remote_research_path(remote_path)
         self.ensure_ready(serial)

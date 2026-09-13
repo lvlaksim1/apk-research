@@ -15,6 +15,13 @@ from .screen_recording import (
     ScreenRecordingCollectorError,
     ScreenRecordingResult,
 )
+from .raw_network import (
+    RawNetworkCollector,
+    RawNetworkCollectorError,
+    RawNetworkPreflight,
+    RawNetworkResult,
+    inspect_pcap,
+)
 
 __all__ = [
     "DeviceMetadataCollector",
@@ -26,4 +33,9 @@ __all__ = [
     "ScreenRecordingCollector",
     "ScreenRecordingCollectorError",
     "ScreenRecordingResult",
+    "RawNetworkCollector",
+    "RawNetworkCollectorError",
+    "RawNetworkPreflight",
+    "RawNetworkResult",
+    "inspect_pcap",
 ]

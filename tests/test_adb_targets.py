@@ -380,3 +380,87 @@ def test_remote_research_path_rejects_escape() -> None:
             "emulator-5554",
             "/data/local/tmp/mobile-research/../escape",
         )
+
+
+def test_get_uid_and_probe_executable() -> None:
+    responses = {
+        ("devices", "-l"): _completed(
+            "List of devices attached\n"
+            "emulator-5554 device model:sdk_gphone transport_id:1\n"
+        ),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "id",
+            "-u",
+        ): _completed("0\n"),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "tcpdump",
+            "--version",
+        ): _completed(
+            stdout="tcpdump version 4.99.5\n"
+        ),
+    }
+
+    def runner(
+        arguments: Sequence[str],
+        timeout: float,
+    ) -> subprocess.CompletedProcess[str]:
+        return responses[tuple(arguments)]
+
+    client = AdbClient(Path("adb"), runner=runner)
+
+    assert client.get_uid("emulator-5554") == 0
+    path, version = client.probe_executable(
+        "emulator-5554",
+        ("tcpdump",),
+    )
+    assert path == "tcpdump"
+    assert version == "tcpdump version 4.99.5"
+
+
+def test_probe_executable_falls_back_to_next_candidate() -> None:
+    responses = {
+        ("devices", "-l"): _completed(
+            "List of devices attached\n"
+            "emulator-5554 device model:sdk_gphone transport_id:1\n"
+        ),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "tcpdump",
+            "--version",
+        ): _completed(
+            stderr="not found\n",
+            returncode=127,
+        ),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "/system/xbin/tcpdump",
+            "--version",
+        ): _completed(
+            stdout="tcpdump version 4.99.5\n"
+        ),
+    }
+
+    def runner(
+        arguments: Sequence[str],
+        timeout: float,
+    ) -> subprocess.CompletedProcess[str]:
+        return responses[tuple(arguments)]
+
+    client = AdbClient(Path("adb"), runner=runner)
+
+    path, version = client.probe_executable(
+        "emulator-5554",
+        ("tcpdump", "/system/xbin/tcpdump"),
+    )
+    assert path == "/system/xbin/tcpdump"
+    assert version == "tcpdump version 4.99.5"
