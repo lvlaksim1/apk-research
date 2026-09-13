@@ -121,10 +121,9 @@ def inspect_pcap(path: Path) -> tuple[str, int]:
     """Validate a classic PCAP file and return format plus byte size."""
 
     size = path.stat().st_size if path.exists() else 0
-    if size <= 24:
+    if size < 24:
         raise RawNetworkCollectorError(
-            "PCAP artifact does not contain captured packets: "
-            f"{size} bytes"
+            f"PCAP artifact is too small: {size} bytes"
         )
 
     with path.open("rb") as handle:
@@ -144,6 +143,12 @@ def inspect_pcap(path: Path) -> tuple[str, int]:
     if major != 2 or minor != 4:
         raise RawNetworkCollectorError(
             f"Unexpected PCAP version: {major}.{minor}"
+        )
+
+    if size == 24:
+        raise RawNetworkCollectorError(
+            "PCAP artifact does not contain captured packets: "
+            f"{size} bytes"
         )
 
     return pcap_format, size
