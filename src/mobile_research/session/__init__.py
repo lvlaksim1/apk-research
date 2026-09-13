@@ -7,6 +7,7 @@ from .core import (
     SessionManager,
     SessionPaths,
     SessionStatus,
+    TERMINAL_STATUSES,
     default_runtime_root,
     generate_session_id,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "SessionManager",
     "SessionPaths",
     "SessionStatus",
+    "TERMINAL_STATUSES",
     "default_runtime_root",
     "generate_session_id",
 ]
