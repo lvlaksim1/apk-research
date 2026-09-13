@@ -51,8 +51,17 @@ jobs:
       - name: Standalone self-test
         shell: pwsh
         run: |
-          $process = Start-Process -FilePath "dist\MobileResearch\MobileResearch.exe" -ArgumentList "--self-test" -Wait -PassThru
+          $exe = "dist\MobileResearch\MobileResearch.exe"
+          $process = Start-Process -FilePath $exe -ArgumentList "--self-test" -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Standalone self-test failed: $($process.ExitCode)" }
+
+      - name: Standalone GUI smoke-test
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $exe = "dist\MobileResearch\MobileResearch.exe"
+          $process = Start-Process -FilePath $exe -ArgumentList "--gui-smoke-test" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Standalone GUI smoke-test failed: $($process.ExitCode)" }
 
       - name: Install Inno Setup
         shell: pwsh
@@ -67,6 +76,30 @@ jobs:
           $version = $Matches[1]
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" packaging\mobile-research.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Install built package and smoke-test installed app
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:RUNNER_TEMP "MobileResearchInstalled"
+          $installer = (Resolve-Path "installer\MobileResearchSetup.exe").Path
+          $process = Start-Process -FilePath $installer -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/SP-",
+            "/DIR=$installDir"
+          ) -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+
+          $installedExe = Join-Path $installDir "MobileResearch.exe"
+          if (-not (Test-Path $installedExe)) { throw "Installed executable not found" }
+
+          $process = Start-Process -FilePath $installedExe -ArgumentList "--self-test" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installed self-test failed: $($process.ExitCode)" }
+
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $process = Start-Process -FilePath $installedExe -ArgumentList "--gui-smoke-test" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installed GUI smoke-test failed: $($process.ExitCode)" }
 
       - name: Hash installer
         shell: pwsh

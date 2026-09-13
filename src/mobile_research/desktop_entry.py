@@ -1,6 +1,23 @@
 from __future__ import annotations
 
+import os
 import sys
+
+
+def _gui_smoke_test() -> int:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+    from PySide6.QtWidgets import QApplication
+
+    from mobile_research.desktop.main_window import MainWindow
+
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    window.show()
+    app.processEvents()
+    window.close()
+    app.processEvents()
+    return 0
 
 
 def main() -> int:
@@ -14,6 +31,9 @@ def main() -> int:
         print(f"Mobile Research {__version__}")
         print(manager.paths.root)
         return 0
+
+    if "--gui-smoke-test" in sys.argv:
+        return _gui_smoke_test()
 
     from mobile_research.desktop.app import (
         main as desktop_main,
