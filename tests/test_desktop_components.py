@@ -7,6 +7,7 @@ from mobile_research.desktop.android_runtime import (
 )
 from mobile_research.desktop.components import (
     ComponentManager,
+    repository_base_url,
     select_archive_from_repository_xml,
 )
 
@@ -79,3 +80,12 @@ def test_software_emulator_command_uses_unaccelerated_mode(
     assert command[command.index("-accel") + 1] == "off"
     assert "-gpu" in command
     assert command[command.index("-gpu") + 1] == "swiftshader"
+
+
+def test_repository_base_url_follows_metadata_directory() -> None:
+    assert repository_base_url(
+        "https://dl.google.com/android/repository/sys-img/android/sys-img2-3.xml"
+    ) == (
+        "https://dl.google.com/android/repository/"
+        "sys-img/android/"
+    )

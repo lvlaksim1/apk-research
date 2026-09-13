@@ -93,6 +93,15 @@ def default_component_root() -> Path:
     return Path.home() / ".mobile-research" / "components"
 
 
+def repository_base_url(repository_url: str) -> str:
+    """Return the directory used to resolve relative SDK archive URLs."""
+
+    return urllib.parse.urljoin(
+        repository_url,
+        "./",
+    )
+
+
 def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
@@ -258,21 +267,33 @@ class ComponentManager:
                 repository_xml,
                 "platform-tools",
                 host_os="windows",
+                base_url=repository_base_url(
+                    ANDROID_REPOSITORY_XML
+                ),
             ),
             select_archive_from_repository_xml(
                 repository_xml,
                 "emulator",
                 host_os="windows",
+                base_url=repository_base_url(
+                    ANDROID_REPOSITORY_XML
+                ),
             ),
             select_archive_from_repository_xml(
                 repository_xml,
                 BUILD_TOOLS_PACKAGE,
                 host_os="windows",
+                base_url=repository_base_url(
+                    ANDROID_REPOSITORY_XML
+                ),
             ),
             select_archive_from_repository_xml(
                 system_image_xml,
                 SYSTEM_IMAGE_PACKAGE,
                 host_os="windows",
+                base_url=repository_base_url(
+                    ANDROID_SYSTEM_IMAGE_XML
+                ),
             ),
         ]
 
@@ -432,6 +453,9 @@ class ComponentManager:
             xml,
             package_path,
             host_os="windows",
+            base_url=repository_base_url(
+                repository_url
+            ),
         )
         cache_name = Path(
             urllib.parse.urlparse(archive.url).path
