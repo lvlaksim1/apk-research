@@ -1,8 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from pathlib import Path
+
+project_root = Path(SPECPATH).parent
+source_root = project_root / "src"
+entry_script = source_root / "mobile_research" / "desktop_entry.py"
+
 a = Analysis(
-    ["src/mobile_research/desktop_entry.py"],
-    pathex=["src"],
+    [str(entry_script)],
+    pathex=[str(source_root)],
     binaries=[],
     datas=[],
     hiddenimports=[],
