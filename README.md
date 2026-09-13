@@ -14,6 +14,7 @@ Mobile Research — Windows-система для воспроизводимог
 - **Logcat Collector**
 - **Screen Recording Collector**
 - **Raw Network Collector**
+- **Export / Checksums / Research ZIP**
 
 Первая end-to-end цель: провести одну воспроизводимую исследовательскую сессию на Android target и получить архив с исходными диагностическими данными.
 
@@ -124,6 +125,30 @@ Artifacts:
 
 Этот backend намеренно относится только к AVD-RESEARCH v0.1. AVD-PLAY и Physical Device получат отдельные capture backends позднее.
 
+## Export / Checksums / Research ZIP
+
+Терминальная session (`complete`, `partial` или `failed`) может быть экспортирована в самопроверяемый Research ZIP.
+
+Перед экспортом:
+
+- `complete` session обязана иметь все 4 обязательных collectors в статусе `completed`;
+- проверяются обязательные raw artifacts и хотя бы один MP4 chunk;
+- `partial/failed` session экспортируется даже при недостающих evidence, а проблемы сохраняются в результате validation;
+- все реально существующие файлы session, включая незарегистрированные partial tails, сохраняются в ZIP;
+- временные `*.tmp` не экспортируются.
+
+`00_manifest/checksums.sha256` содержит SHA-256 всех экспортируемых файлов, кроме самого checksum-файла, включая `session.json`.
+
+После создания ZIP автоматически выполняются:
+
+1. CRC-проверка ZIP;
+2. проверка безопасных и уникальных entry paths;
+3. проверка полного checksum coverage;
+4. повторный SHA-256 каждого файла уже из ZIP;
+5. проверка terminal status и session ID в архивном manifest.
+
+Архив сначала создаётся как temporary file и заменяет destination только после успешной проверки.
+
 ## CLI
 
 ```powershell
@@ -135,6 +160,8 @@ mobile-research package-check emulator-5554 com.example.app
 mobile-research session-create emulator-5554 com.example.app --json
 mobile-research metadata-collect "C:\path\to\session" --json
 mobile-research session-status "C:\path\to\session" --json
+mobile-research session-export "C:\path\to\session" --json
+mobile-research research-zip-verify "C:\path\to\session.research.zip" --json
 ```
 
 То же без установленного entry point:
@@ -189,7 +216,7 @@ python -m pytest -q
 
 ## Следующий этап
 
-**Export/Checksum subsystem** — SHA-256 evidence, валидация обязательных artifacts и формирование Research ZIP.
+**End-to-end Session Orchestrator** — единая команда preflight → collectors → launch package → health checks → STOP → Research ZIP.
 
 ## CI
 

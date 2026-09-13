@@ -5,8 +5,8 @@
 ## Текущее состояние
 
 **Этап:** v0.1 — Research Session Core  
-**Реализовано:** ADB Target Manager, Session Manager, Device/System Metadata Collector, Logcat Collector, Screen Recording Collector, Raw Network Collector.  
-**Следующий модуль:** Export/Checksum subsystem.
+**Реализовано:** ADB Target Manager, Session Manager, Device/System Metadata Collector, Logcat Collector, Screen Recording Collector, Raw Network Collector, Export/Checksum subsystem.  
+**Следующий модуль:** End-to-end Session Orchestrator и acceptance test.
 
 ## Зафиксированные решения
 
@@ -73,6 +73,15 @@ Screen Recording Collector не создаёт один монолитный ф�
 ### ADR-021 — Network backend является target-specific
 `adb-tcpdump` — backend только для AVD-RESEARCH. AVD-PLAY и Physical Device не должны искусственно наследовать требование root/tcpdump; для них будут отдельные backend implementations за общей collector abstraction.
 
+### ADR-022 — Checksums покрывают весь экспортируемый payload
+`checksums.sha256` хеширует все файлы Research ZIP, кроме самого checksum-файла. В scope входят manifest, raw, normalized и сохранившиеся незарегистрированные partial artifacts. Это позволяет проверять архив независимо от исходной runtime-папки.
+
+### ADR-023 — Complete и partial имеют разную строгость export validation
+`complete` не экспортируется при отсутствии обязательного collector/evidence. `partial` и `failed` экспортируются с validation warnings, поскольку сохранение неполных evidence важнее формальной полноты.
+
+### ADR-024 — Research ZIP проверяется после упаковки
+Успех export означает не факт закрытия ZipFile, а успешную повторную проверку CRC, entry safety, checksum coverage и SHA-256 непосредственно из временного ZIP. Только после этого temporary archive атомарно заменяет destination.
+
 ## Порядок реализации v0.1
 
 1. **ADB Target Manager — реализован.**
@@ -81,7 +90,7 @@ Screen Recording Collector не создаёт один монолитный ф�
 4. **Logcat collector — реализован.**
 5. **Screen recording collector — реализован.**
 6. **Raw network collector — реализован.**
-7. Export/checksum subsystem.
+7. **Export/checksum subsystem — реализован.**
 8. End-to-end acceptance test.
 
 ## Будущие направления

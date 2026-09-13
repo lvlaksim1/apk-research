@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from mobile_research.collectors import DeviceMetadataCollector, MetadataCollectorError
+from mobile_research.export import (
+    ExportError,
+    export_research_zip,
+    verify_research_zip,
+)
 from mobile_research.session import SessionError, SessionManager
 from mobile_research.targets import AdbClient, AdbError
 
@@ -75,6 +80,29 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     metadata_parser.add_argument("session_root", type=Path)
     metadata_parser.add_argument("--json", action="store_true")
+
+    export_parser = subparsers.add_parser(
+        "session-export",
+        help="Validate a terminal session and create a verified Research ZIP.",
+    )
+    export_parser.add_argument("session_root", type=Path)
+    export_parser.add_argument(
+        "--output",
+        type=Path,
+        help=(
+            "Destination ZIP. Defaults to <session-id>.research.zip "
+            "beside the session directory."
+        ),
+    )
+    export_parser.add_argument("--overwrite", action="store_true")
+    export_parser.add_argument("--json", action="store_true")
+
+    verify_parser = subparsers.add_parser(
+        "research-zip-verify",
+        help="Verify CRC, checksum coverage, and SHA-256 inside a Research ZIP.",
+    )
+    verify_parser.add_argument("archive", type=Path)
+    verify_parser.add_argument("--json", action="store_true")
 
     return parser
 
@@ -212,6 +240,54 @@ def _metadata_collect_command(
     return 0
 
 
+def _session_export_command(
+    session_root: Path,
+    output: Path | None,
+    overwrite: bool,
+    as_json: bool,
+) -> int:
+    manager = SessionManager.load(session_root)
+    result = export_research_zip(
+        manager,
+        output,
+        overwrite=overwrite,
+    )
+
+    if as_json:
+        _print_json(result.to_dict())
+    else:
+        print(f"archive: {result.archive}")
+        print(f"session_id: {result.session_id}")
+        print(f"session_status: {result.session_status}")
+        print(f"files: {result.file_count}")
+        print(f"checksums: {result.checksum_entries}")
+        print(
+            "validation_issues: "
+            f"{len(result.validation.issues)}"
+        )
+
+    return 0
+
+
+def _research_zip_verify_command(
+    archive: Path,
+    as_json: bool,
+) -> int:
+    result = verify_research_zip(archive)
+
+    if as_json:
+        _print_json(result.to_dict())
+    else:
+        print(f"archive: {result.archive}")
+        print(f"valid: {result.valid}")
+        print(f"session_id: {result.session_id}")
+        print(f"session_status: {result.session_status}")
+        print(f"files: {result.file_count}")
+        print(f"checksums: {result.checksum_entries}")
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -220,6 +296,18 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "session-status":
             return _session_status_command(
                 args.session_root,
+                args.json,
+            )
+        if args.command == "session-export":
+            return _session_export_command(
+                args.session_root,
+                args.output,
+                args.overwrite,
+                args.json,
+            )
+        if args.command == "research-zip-verify":
+            return _research_zip_verify_command(
+                args.archive,
                 args.json,
             )
 
@@ -251,7 +339,13 @@ def main(argv: list[str] | None = None) -> int:
                 args.root,
                 args.json,
             )
-    except (AdbError, MetadataCollectorError, SessionError, ValueError) as exc:
+    except (
+        AdbError,
+        ExportError,
+        MetadataCollectorError,
+        SessionError,
+        ValueError,
+    ) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
