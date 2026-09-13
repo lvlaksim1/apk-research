@@ -16,6 +16,8 @@ jobs:
   avd-research:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    env:
+      ANDROID_AVD_HOME: ${{ github.workspace }}/.android/avd
 
     steps:
       - name: Checkout
@@ -53,9 +55,12 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          mkdir -p "$ANDROID_AVD_HOME"
           AVDMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name avdmanager | sort | tail -n 1)"
           test -n "$AVDMANAGER"
           echo no | "$AVDMANAGER" create avd --force --name mobile_research_api35 --package "system-images;android-35;aosp_atd;x86_64"
+          "$ANDROID_HOME/emulator/emulator" -list-avds
+          find "$ANDROID_AVD_HOME" -maxdepth 2 -type f -print
 
       - name: Start AVD-RESEARCH
         shell: bash
