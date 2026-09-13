@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Runtime data
+sessions/
+runtime/
+temp/
+tmp/
+
+# Research input/output artifacts
+*.apk
+*.apks
+*.aab
+*.pcap
+*.pcapng
+research-*.zip
+*-research.zip
+
+# Secrets / local configuration
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
