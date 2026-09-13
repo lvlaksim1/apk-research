@@ -63,3 +63,19 @@ def test_avd_profile_is_private_to_mobile_research(
         "image.sysdir.1=system-images\\android-35\\default\\x86_64\\"
         in config
     )
+
+
+def test_software_emulator_command_uses_unaccelerated_mode(
+    tmp_path: Path,
+) -> None:
+    from mobile_research.desktop.android_runtime import AndroidRuntime
+
+    manager = ComponentManager(tmp_path)
+    runtime = AndroidRuntime(manager)
+    runtime._software_acceleration = True
+    command = runtime._emulator_command()
+
+    assert "-accel" in command
+    assert command[command.index("-accel") + 1] == "off"
+    assert "-gpu" in command
+    assert command[command.index("-gpu") + 1] == "swiftshader"

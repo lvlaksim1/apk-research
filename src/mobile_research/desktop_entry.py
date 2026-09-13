@@ -35,6 +35,13 @@ def main() -> int:
     if "--gui-smoke-test" in sys.argv:
         return _gui_smoke_test()
 
+    if "--runtime-acceptance" in sys.argv:
+        from mobile_research.desktop.runtime_acceptance import (
+            run_runtime_acceptance,
+        )
+
+        return run_runtime_acceptance()
+
     from mobile_research.desktop.app import (
         main as desktop_main,
     )

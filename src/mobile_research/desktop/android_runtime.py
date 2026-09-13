@@ -49,6 +49,7 @@ class AndroidRuntime:
         self.components = components or ComponentManager()
         self.process: subprocess.Popen[bytes] | None = None
         self._process_lock = threading.Lock()
+        self._software_acceleration = False
 
     @property
     def paths(self):
@@ -322,18 +323,7 @@ class AndroidRuntime:
             exist_ok=True,
         )
         log_handle = log_path.open("ab")
-        command = [
-            str(self.paths.emulator),
-            f"@{AVD_NAME}",
-            "-port",
-            str(self.PORT),
-            "-no-window",
-            "-gpu",
-            "swiftshader_indirect",
-            "-no-snapshot",
-            "-noaudio",
-            "-no-boot-anim",
-        ]
+        command = self._emulator_command()
         creation_flags = getattr(
             subprocess,
             "CREATE_NO_WINDOW",
@@ -362,11 +352,42 @@ class AndroidRuntime:
         with self._process_lock:
             self.process = process
 
+    def _emulator_command(self) -> list[str]:
+        command = [
+            str(self.paths.emulator),
+            f"@{AVD_NAME}",
+            "-port",
+            str(self.PORT),
+            "-no-window",
+            "-gpu",
+            "swiftshader",
+            "-no-snapshot",
+            "-noaudio",
+            "-no-boot-anim",
+        ]
+        if self._software_acceleration:
+            command.extend(
+                [
+                    "-accel",
+                    "off",
+                    "-cores",
+                    "2",
+                    "-memory",
+                    "2048",
+                ]
+            )
+        return command
+
     def _wait_for_boot(
         self,
         progress: RuntimeProgress | None,
     ) -> None:
-        deadline = time.monotonic() + 240.0
+        boot_timeout = (
+            900.0
+            if self._software_acceleration
+            else 240.0
+        )
+        deadline = time.monotonic() + boot_timeout
         while time.monotonic() < deadline:
             self._ensure_process_alive()
             if self._device_online():
@@ -399,7 +420,8 @@ class AndroidRuntime:
             )
             time.sleep(2.0)
         raise AndroidRuntimeError(
-            "Android Emulator не загрузился за 240 секунд"
+            "Android Emulator не загрузился за "
+            f"{int(boot_timeout)} секунд"
         )
 
     def _ensure_root(
@@ -456,6 +478,15 @@ class AndroidRuntime:
         )
 
     def _check_acceleration(self) -> None:
+        if (
+            os.environ.get(
+                "MOBILE_RESEARCH_SOFTWARE_EMULATOR"
+            )
+            == "1"
+        ):
+            self._software_acceleration = True
+            return
+
         result = self._run(
             [
                 str(self.paths.emulator),
@@ -465,6 +496,7 @@ class AndroidRuntime:
             check=False,
         )
         if result.returncode == 0:
+            self._software_acceleration = False
             return
 
         if os.name == "nt":
@@ -478,6 +510,7 @@ class AndroidRuntime:
                 check=False,
             )
             if result.returncode == 0:
+                self._software_acceleration = False
                 return
 
         detail = (

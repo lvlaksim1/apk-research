@@ -116,3 +116,75 @@ jobs:
           path: |
             installer/MobileResearchSetup.exe
             installer/SHA256SUMS.txt
+
+
+  windows-runtime-acceptance:
+    needs: build-windows-desktop
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Download tested installer
+        uses: actions/download-artifact@v4
+        with:
+          name: mobile-research-windows-desktop
+          path: installer
+
+      - name: Show free disk space
+        shell: pwsh
+        run: Get-PSDrive -PSProvider FileSystem | Format-Table -AutoSize
+
+      - name: Install Mobile Research
+        shell: pwsh
+        run: |
+          $installDir = Join-Path $env:RUNNER_TEMP "MobileResearchRuntime"
+          $installer = (Resolve-Path "installer\MobileResearchSetup.exe").Path
+          $process = Start-Process -FilePath $installer -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/SP-",
+            "/DIR=$installDir"
+          ) -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          "MOBILE_RESEARCH_INSTALLED_EXE=$installDir\MobileResearch.exe" >> $env:GITHUB_ENV
+
+      - name: Run clean Windows managed-Android acceptance
+        shell: pwsh
+        env:
+          MOBILE_RESEARCH_SOFTWARE_EMULATOR: "1"
+        run: |
+          $acceptanceRoot = Join-Path $env:RUNNER_TEMP "MobileResearchAcceptance"
+          $componentRoot = Join-Path $acceptanceRoot "components"
+          $resultPath = Join-Path $acceptanceRoot "result.json"
+          $localAppData = Join-Path $acceptanceRoot "localappdata"
+
+          New-Item -ItemType Directory -Force $acceptanceRoot | Out-Null
+          New-Item -ItemType Directory -Force $localAppData | Out-Null
+
+          $env:MOBILE_RESEARCH_COMPONENT_ROOT = $componentRoot
+          $env:MOBILE_RESEARCH_ACCEPTANCE_ROOT = $acceptanceRoot
+          $env:MOBILE_RESEARCH_ACCEPTANCE_RESULT = $resultPath
+          $env:LOCALAPPDATA = $localAppData
+
+          $process = Start-Process -FilePath $env:MOBILE_RESEARCH_INSTALLED_EXE -ArgumentList "--runtime-acceptance" -Wait -PassThru
+          if (Test-Path $resultPath) {
+            Get-Content $resultPath
+          }
+          if ($process.ExitCode -ne 0) {
+            throw "Windows managed-Android acceptance failed: $($process.ExitCode)"
+          }
+
+      - name: Upload Windows runtime acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-research-windows-runtime-acceptance
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/MobileResearchAcceptance/result.json
+            ${{ runner.temp }}/MobileResearchAcceptance/acceptance.log
+            ${{ runner.temp }}/MobileResearchAcceptance/android.png
+            ${{ runner.temp }}/MobileResearchAcceptance/windows-runtime.research.zip
+            ${{ runner.temp }}/MobileResearchAcceptance/components/emulator.log
