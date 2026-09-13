@@ -556,3 +556,33 @@ def test_launch_package_rejects_missing_launcher() -> None:
             "emulator-5554",
             "com.example.app",
         )
+
+
+def test_package_check_returns_false_for_missing_package() -> None:
+    responses = {
+        ("devices", "-l"): _completed(
+            "List of devices attached\n"
+            "emulator-5554 device model:sdk_gphone transport_id:1\n"
+        ),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "pm",
+            "path",
+            "com.example.missing",
+        ): _completed(returncode=1),
+    }
+
+    def runner(
+        arguments: Sequence[str],
+        timeout: float,
+    ) -> subprocess.CompletedProcess[str]:
+        return responses[tuple(arguments)]
+
+    client = AdbClient(Path("adb"), runner=runner)
+
+    assert client.is_package_installed(
+        "emulator-5554",
+        "com.example.missing",
+    ) is False

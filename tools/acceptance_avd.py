@@ -11,20 +11,53 @@ from mobile_research.targets import AdbClient, AdbError
 
 
 SERIAL = "emulator-5554"
-PACKAGE = "com.android.settings"
+PACKAGE_CANDIDATES = (
+    "com.android.settings",
+    "com.android.launcher3",
+    "com.android.dialer",
+    "com.android.contacts",
+)
 OUTPUT_ROOT = Path("acceptance-output").resolve()
 SESSION_ROOT = OUTPUT_ROOT / "sessions"
 ARCHIVE = OUTPUT_ROOT / "mobile-research-acceptance.research.zip"
 
 
+def select_package(client: AdbClient) -> str:
+    diagnostics: list[str] = []
+
+    for package_name in PACKAGE_CANDIDATES:
+        try:
+            if not client.is_package_installed(SERIAL, package_name):
+                diagnostics.append(f"{package_name}: not installed")
+                continue
+            component = client.resolve_launch_activity(
+                SERIAL,
+                package_name,
+            )
+            print(json.dumps({
+                "event": "acceptance_target_selected",
+                "package": package_name,
+                "component": component,
+            }, ensure_ascii=False))
+            return package_name
+        except AdbError as exc:
+            diagnostics.append(f"{package_name}: {exc}")
+
+    raise RuntimeError(
+        "No launchable acceptance package found: "
+        + "; ".join(diagnostics)
+    )
+
+
 def main() -> int:
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     client = AdbClient.from_environment()
+    package_name = select_package(client)
 
     orchestrator = ResearchOrchestrator(
         client,
         SERIAL,
-        PACKAGE,
+        package_name,
         runtime_root=SESSION_ROOT,
         output_path=ARCHIVE,
         overwrite_output=True,

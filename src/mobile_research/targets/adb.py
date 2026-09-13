@@ -380,9 +380,26 @@ class AdbClient:
         self.ensure_ready(serial)
         package_name = validate_package_name(package_name)
 
-        result = self._run_checked(
-            ["-s", serial, "shell", "pm", "path", package_name]
-        )
+        arguments = [
+            "-s",
+            serial,
+            "shell",
+            "pm",
+            "path",
+            package_name,
+        ]
+        result = self._runner(arguments, 10.0)
+
+        if result.returncode == 1:
+            return False
+        if result.returncode != 0:
+            raise AdbCommandError(
+                [str(self.adb_path), *arguments],
+                result.returncode,
+                result.stdout or "",
+                result.stderr or "",
+            )
+
         return any(
             line.strip().startswith("package:")
             for line in (result.stdout or "").splitlines()

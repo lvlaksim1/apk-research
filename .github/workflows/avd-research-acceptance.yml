@@ -39,7 +39,7 @@ jobs:
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n 1)"
           test -n "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platform-tools" "emulator" "system-images;android-35;aosp_atd;x86_64"
+          "$SDKMANAGER" "platform-tools" "emulator" "system-images;android-35;default;x86_64"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           echo "$ANDROID_HOME/emulator" >> "$GITHUB_PATH"
 
@@ -58,7 +58,7 @@ jobs:
           mkdir -p "$ANDROID_AVD_HOME"
           AVDMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name avdmanager | sort | tail -n 1)"
           test -n "$AVDMANAGER"
-          echo no | "$AVDMANAGER" create avd --force --name mobile_research_api35 --package "system-images;android-35;aosp_atd;x86_64"
+          echo no | "$AVDMANAGER" create avd --force --name mobile_research_api35 --package "system-images;android-35;default;x86_64"
           "$ANDROID_HOME/emulator/emulator" -list-avds
           find "$ANDROID_AVD_HOME" -maxdepth 2 -type f -print
 

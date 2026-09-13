@@ -6,13 +6,13 @@ It prioritizes reproducible diagnostics, root ADB and raw packet capture rather 
 ## v0.1 reference profile
 
 - Android API 35
-- AOSP ATD x86_64 system image
+- AOSP default x86_64 system image
 - Android Emulator
 - root ADB
 - headless software-rendered display
 - clean userdata for every automated acceptance run
 
-System image package: system-images;android-35;aosp_atd;x86_64
+System image package: system-images;android-35;default;x86_64
 
 ## Required runtime capabilities
 
@@ -24,7 +24,7 @@ The current v0.1 network backend requires a usable tcpdump executable on the tar
 
 The normal CI validates host code on windows-latest. A separate commit-triggered workflow creates a real Android Emulator on Ubuntu/KVM and executes the actual Mobile Research orchestration.
 
-The workflow uses the built-in Android Settings package com.android.settings as a synthetic target. This package is part of the AOSP image and is not stored in the repository.
+The workflow selects a launchable built-in package from the AOSP image, preferring Android Settings. No target APK or research material is stored in the repository.
 
 The acceptance sequence creates a session, captures metadata, starts logcat/screen/raw network collectors, launches Settings, performs a small Android-side network probe, runs health checks, stops collectors, exports a Research ZIP, and verifies the archive from its own contents.
 
