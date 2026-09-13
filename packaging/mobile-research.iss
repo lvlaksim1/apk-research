@@ -1,5 +1,7 @@
 #define MyAppName "Mobile Research"
-#define MyAppVersion "0.2.0-dev"
+#ifndef MyAppVersion
+#define MyAppVersion "0.2.0-dev0"
+#endif
 #define MyAppPublisher "Mobile Research"
 #define MyAppExeName "MobileResearch.exe"
 
