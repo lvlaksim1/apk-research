@@ -244,6 +244,38 @@ class ComponentManager:
         env["ANDROID_AVD_HOME"] = str(self.paths.avd_home)
         return env
 
+    def resolve_required_archives(self) -> list[ArchiveInfo]:
+        """Resolve current official Google archives required by v0.2."""
+
+        repository_xml = self._download_bytes(
+            ANDROID_REPOSITORY_XML
+        )
+        system_image_xml = self._download_bytes(
+            ANDROID_SYSTEM_IMAGE_XML
+        )
+        return [
+            select_archive_from_repository_xml(
+                repository_xml,
+                "platform-tools",
+                host_os="windows",
+            ),
+            select_archive_from_repository_xml(
+                repository_xml,
+                "emulator",
+                host_os="windows",
+            ),
+            select_archive_from_repository_xml(
+                repository_xml,
+                BUILD_TOOLS_PACKAGE,
+                host_os="windows",
+            ),
+            select_archive_from_repository_xml(
+                system_image_xml,
+                SYSTEM_IMAGE_PACKAGE,
+                host_os="windows",
+            ),
+        ]
+
     def ensure_all(
         self,
         progress: ProgressCallback | None = None,
