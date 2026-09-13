@@ -2,6 +2,27 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [Unreleased] — v0.2 Desktop Application
+
+### Added
+
+- Native Windows desktop GUI as the primary product interface.
+- Self-contained PyInstaller/Inno Setup distribution; no user-installed Python.
+- Managed private Android SDK/component store under `%LOCALAPPDATA%\MobileResearch\components`.
+- Automatic provisioning of ADB, Android Emulator, aapt2 and Android 15 API 35 AOSP image.
+- Private AVD lifecycle without Android Studio.
+- Best-effort Windows Hypervisor Platform enablement via UAC.
+- APK package detection and automatic installation.
+- Headless Android with integrated GUI framebuffer and touch/swipe/keyboard input.
+- GUI START/STOP using ResearchOrchestrator directly.
+- GUI session history, Research ZIP verify/audit and diagnostics.
+- Desktop Build workflow producing `MobileResearchSetup.exe` plus SHA-256.
+- Stable release gate extended to exact-SHA CI + AVD acceptance + Desktop Build.
+
+### Preserved
+
+- v0.1.0 raw evidence contract and complete/partial/failed semantics are unchanged.
+
 ## [0.1.0] - 2026-09-13
 
 First stable Research Session Core release.

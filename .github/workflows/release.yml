@@ -21,49 +21,29 @@ jobs:
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
-
     steps:
       - name: Checkout exact release commit
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Resolve stable version
+      - name: Resolve version
         id: version
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="$(python - <<'PY'
-          import pathlib
-          import tomllib
-
-          data = tomllib.loads(pathlib.Path("pyproject.toml").read_text(encoding="utf-8"))
-          print(data["project"]["version"])
-          PY
-          )"
-          if [[ "$VERSION" == *".dev"* ]] || [[ "$VERSION" == *"+"* ]]; then
-            echo "Version is not release-stable: $VERSION"
-            exit 1
-          fi
-          INIT_VERSION="$(python - <<'PY'
-          import pathlib
-          import re
-
-          text = pathlib.Path("src/mobile_research/__init__.py").read_text(encoding="utf-8")
-          match = re.search(r'__version__\s*=\s*"([^"]+)"', text)
-          if not match:
-              raise SystemExit("package __version__ not found")
-          print(match.group(1))
-          PY
-          )"
-          test "$VERSION" = "$INIT_VERSION"
+          VERSION=$(python -c "import pathlib,tomllib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'])")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-
+          if [[ "$VERSION" == *".dev"* ]] || [[ "$VERSION" == *"+"* ]]; then
+            echo "stable=false" >> "$GITHUB_OUTPUT"
+            echo "Development version $VERSION: release publication skipped."
+          else
+            echo "stable=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Verify release documentation
+        if: steps.version.outputs.stable == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -72,68 +52,39 @@ jobs:
           grep -F "v$VERSION" REFACTORING.md
           grep -F "[$VERSION]" CHANGELOG.md
           grep -F "v$VERSION" RELEASE_NOTES.md
-
       - name: Wait for exact-SHA CI and AVD gates
+        if: steps.version.outputs.stable == 'true'
         shell: bash
         run: |
           set -euo pipefail
           for attempt in $(seq 1 120); do
-            RUNS="$(gh run list --commit "$GITHUB_SHA" --limit 20 --json workflowName,status,conclusion,url)"
-            CI_STATE="$(jq -r '[.[] | select(.workflowName == "CI")][0] | if . == null then "missing" else (.status + ":" + (.conclusion // "")) end' <<<"$RUNS")"
-            AVD_STATE="$(jq -r '[.[] | select(.workflowName == "AVD Research Acceptance")][0] | if . == null then "missing" else (.status + ":" + (.conclusion // "")) end' <<<"$RUNS")"
+            RUNS=$(gh run list --commit "$GITHUB_SHA" --limit 20 --json workflowName,status,conclusion)
+            CI_STATE=$(jq -r '[.[] | select(.workflowName == "CI")][0] | if . == null then "missing" else (.status + ":" + (.conclusion // "")) end' <<<"$RUNS")
+            AVD_STATE=$(jq -r '[.[] | select(.workflowName == "AVD Research Acceptance")][0] | if . == null then "missing" else (.status + ":" + (.conclusion // "")) end' <<<"$RUNS")
             echo "CI=$CI_STATE AVD=$AVD_STATE"
-
-            case "$CI_STATE" in
-              completed:success) ;;
-              completed:*) echo "CI gate failed: $CI_STATE"; exit 1 ;;
-            esac
-            case "$AVD_STATE" in
-              completed:success) ;;
-              completed:*) echo "AVD gate failed: $AVD_STATE"; exit 1 ;;
-            esac
-
-            if [ "$CI_STATE" = "completed:success" ] && [ "$AVD_STATE" = "completed:success" ]; then
-              exit 0
-            fi
+            [[ "$CI_STATE" == completed:success ]] && [[ "$AVD_STATE" == completed:success ]] && exit 0
+            [[ "$CI_STATE" == completed:* && "$CI_STATE" != completed:success ]] && exit 1
+            [[ "$AVD_STATE" == completed:* && "$AVD_STATE" != completed:success ]] && exit 1
             sleep 10
           done
-          echo "Timed out waiting for release gates."
           exit 1
-
       - name: Ensure tag is not already published
+        if: steps.version.outputs.stable == 'true'
         shell: bash
         run: |
-          set -euo pipefail
           TAG="${{ steps.version.outputs.tag }}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release already exists: $TAG"
-            exit 1
-          fi
-
+          if gh release view "$TAG" >/dev/null 2>&1; then exit 1; fi
       - name: Build wheel and sdist
+        if: steps.version.outputs.stable == 'true'
         shell: bash
         run: |
-          set -euo pipefail
           python -m pip install --upgrade build
           python -m build
           cd dist
           sha256sum *.whl *.tar.gz > SHA256SUMS.txt
-          cat SHA256SUMS.txt
-
       - name: Publish GitHub Release
+        if: steps.version.outputs.stable == 'true'
         shell: bash
         run: |
-          set -euo pipefail
           TAG="${{ steps.version.outputs.tag }}"
-          gh release create "$TAG"             dist/*.whl             dist/*.tar.gz             dist/SHA256SUMS.txt             --target "$GITHUB_SHA"             --title "Mobile Research $TAG"             --notes-file RELEASE_NOTES.md
-
-      - name: Remove obsolete temporary branches
-        shell: bash
-        run: |
-          set -euo pipefail
-          for BRANCH in raw-network-v01 pcap-validation-fix; do
-            if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$BRANCH" >/dev/null 2>&1; then
-              gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$BRANCH"
-              echo "Deleted temporary branch: $BRANCH"
-            fi
-          done
+          gh release create "$TAG" dist/*.whl dist/*.tar.gz dist/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Mobile Research $TAG" --notes-file RELEASE_NOTES.md

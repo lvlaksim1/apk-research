@@ -4,10 +4,10 @@
 
 ## Текущее состояние
 
-**Этап:** v0.1.0 — Research Session Core release baseline  
-**Реализовано:** ADB Target Manager, Session Manager, Device/System Metadata Collector, Logcat Collector, Screen Recording Collector, Raw Network Collector, Export/Checksum subsystem, semantic Research ZIP audit, End-to-end Session Orchestrator и автоматический real AVD-RESEARCH acceptance.  
-**Release gate:** два последовательных real AVD `complete` подтверждены до release freeze; exact release commit повторно проходит Windows CI + real AVD acceptance перед публикацией.  
-**Следующий этап:** v0.2.
+**Этап:** v0.2.0.dev0 — Desktop Application.  
+**Stable baseline:** v0.1.0 Research Session Core.  
+**Реализуется:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, desktop build/release gates.  
+**Принцип:** v0.1.0 raw evidence contract не ослабляется.
 
 ## Зафиксированные решения
 
@@ -143,3 +143,22 @@ v0.1.0 публикует wheel и sdist, собранные из release commit
 
 ### ADR-035 — Release docs являются обязательной частью release commit
 Release workflow проверяет, что `README.md`, `REFACTORING.md`, `CHANGELOG.md` и `RELEASE_NOTES.md` содержат выпускаемую версию. Публикация блокируется, если release documentation не синхронизирована с `pyproject.toml`.
+
+
+### ADR-036 — Desktop GUI является основной границей продукта
+Начиная с v0.2 штатный пользовательский интерфейс — `MobileResearch.exe`. CLI сохраняется только для разработки и диагностики. GUI вызывает core classes напрямую и не является текстовой оболочкой над CLI.
+
+### ADR-037 — Пользователь не устанавливает Python
+Desktop distribution собирается PyInstaller и устанавливается через Inno Setup. Python runtime и Qt входят в Mobile Research. Пользовательский компьютер не требует Python/pip/venv.
+
+### ADR-038 — Android runtime принадлежит Mobile Research
+ADB, Android Emulator, build-tools и system image не считаются внешними пользовательскими зависимостями. Mobile Research загружает официальные Google packages и хранит их в собственном каталоге `%LOCALAPPDATA%\MobileResearch\components`.
+
+### ADR-039 — Android Studio не является зависимостью
+Private AVD создаётся программой напрямую из managed system image/config. Android Studio и ручной AVD Manager пользователю не нужны.
+
+### ADR-040 — Android отображается внутри GUI
+Google Emulator запускается headless. Mobile Research получает framebuffer через ADB и передаёт input обратно через `input tap/swipe/text/keyevent`. Это отделяет UX от внешнего окна emulator и позволяет позже заменить framebuffer transport без изменения пользовательского контракта.
+
+### ADR-041 — Stable desktop release публикует installer
+Начиная с v0.2 основным release asset является `MobileResearchSetup.exe` + SHA-256. Stable publication требует exact-SHA Windows CI, real AVD acceptance и Desktop Build.

@@ -4,16 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mobile-research"
-version = "0.1.0"
-description = "Windows-controlled research environment for reproducible Android application network analysis"
+version = "0.2.0.dev0"
+description = "Self-contained Windows desktop environment for reproducible Android application research"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
 
 [project.scripts]
 mobile-research = "mobile_research.cli:main"
+mobile-research-gui = "mobile_research.desktop_entry:main"
 
 [project.optional-dependencies]
+desktop = [
+    "PySide6-Essentials>=6.8,<7",
+]
+build = [
+    "PyInstaller>=6.10,<7",
+]
 dev = [
     "pytest>=8.0",
 ]

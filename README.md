@@ -1,5 +1,17 @@
 # Mobile Research
 
+## v0.2.0.dev0 — Desktop Application
+
+После стабильного v0.1.0 проект перешёл к полноценному Windows-приложению.
+Штатный пользовательский сценарий v0.2 не требует Python, PowerShell, Android Studio, отдельного ADB или ручного AVD.
+Mobile Research сама управляет Android-компонентами, устанавливает APK, показывает Android внутри GUI и запускает существующее research core кнопками START/STOP.
+
+Desktop Build собирает автономный MobileResearchSetup.exe. Android SDK/Emulator/system image загружаются самой программой в %LOCALAPPDATA%\MobileResearch\components после одноразового принятия Android SDK License Agreement.
+
+Подробный desktop contract: docs/V0.2_DESKTOP.md.
+
+## Stable core baseline
+
 Mobile Research — Windows-система для воспроизводимого исследования сетевой активности Android-приложений в управляемой исследовательской среде.
 
 ## Статус
