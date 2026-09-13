@@ -6,9 +6,12 @@ Mobile Research — Windows-система для воспроизводимог
 
 Проект находится на этапе **v0.1 — Research Session Core**.
 
-Реализован первый функциональный модуль: **ADB Target Manager**.
+Реализованы:
 
-Первая end-to-end цель проекта: провести одну воспроизводимую исследовательскую сессию на Android target и получить архив с исходными диагностическими данными.
+- **ADB Target Manager**
+- **Session Manager**
+
+Первая end-to-end цель: провести одну воспроизводимую исследовательскую сессию на Android target и получить архив с исходными диагностическими данными.
 
 ## Архитектурные принципы
 
@@ -20,27 +23,46 @@ Mobile Research — Windows-система для воспроизводимог
 - Android Research Agent не является обязательной частью архитектуры и в v0.1 отсутствует.
 - GUI, MITM, статический анализ APK, AVD-PLAY и Physical Device не входят в v0.1.
 
-## Реализовано
-
-### ADB Target Manager
+## ADB Target Manager
 
 Умеет:
 
 - находить ADB через явный путь, PATH, ANDROID_SDK_ROOT, ANDROID_HOME или стандартный Windows Android SDK path;
 - перечислять targets из `adb devices -l`;
 - сохранять состояния `device`, `offline`, `unauthorized`;
-- определять emulator/physical для готового target;
+- определять emulator/physical;
 - получать Android release, SDK level, manufacturer, model, ABI, build fingerprint и текущий root status;
-- проверять наличие package на target;
-- выдавать данные в обычном или JSON-формате.
+- проверять наличие package;
+- отдавать данные как текст или JSON.
 
-Примеры:
+## Session Manager
+
+Умеет:
+
+- создавать уникальную runtime-сессию;
+- создавать стабильную структуру каталогов `00_manifest/01_raw/02_normalized`;
+- вести атомарно записываемый `session.json`;
+- контролировать допустимые переходы state machine;
+- сохранять историю переходов с UTC timestamps;
+- регистрировать collectors и artifacts;
+- запрещать artifact paths, выходящие за пределы session root;
+- сохранять non-fatal ошибки без остановки активной записи;
+- завершать degraded-сессию как `partial`;
+- завершать fatal-сессию как `failed`;
+- загружать уже существующую сессию после перезапуска процесса.
+
+Важное правило: non-fatal collector failure во время `active` помечает сессию как degraded, но не уничтожает уже собираемые evidence. После штатного STOP итог становится `partial`.
+
+## CLI
 
 ```powershell
 mobile-research targets
 mobile-research targets --json
 mobile-research target-info emulator-5554 --json
 mobile-research package-check emulator-5554 com.example.app
+
+mobile-research session-create emulator-5554 com.example.app --json
+mobile-research session-status "C:\path\to\session" --json
 ```
 
 То же без установленного entry point:
@@ -81,24 +103,12 @@ Research ZIP
 
 Архитектурные решения: [REFACTORING.md](REFACTORING.md).
 
-## Структура
-
-```text
-src/mobile_research/
-├── targets/
-├── session/
-├── collectors/
-└── export/
-```
-
 ## Среда разработки
 
 - Windows — целевая host-платформа.
 - Python >= 3.11.
 - Android Debug Bridge (ADB) — внешняя runtime-зависимость.
 - На первом этапе интерфейс — CLI.
-
-Установка для разработки:
 
 ```powershell
 python -m pip install -e ".[dev]"
@@ -107,7 +117,7 @@ python -m pytest -q
 
 ## Следующий этап
 
-**Session Manager**: session ID, state machine, runtime layout, manifest и безопасное завершение/сохранение partial session.
+**Device/System Metadata Collector**, который наполнит `01_raw/device/` исходными данными target/package и зарегистрирует их в Session Manager.
 
 ## CI
 

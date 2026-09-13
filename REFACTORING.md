@@ -5,8 +5,8 @@
 ## Текущее состояние
 
 **Этап:** v0.1 — Research Session Core  
-**Реализовано:** ADB Target Manager.  
-**Следующий модуль:** Session Manager.
+**Реализовано:** ADB Target Manager, Session Manager.  
+**Следующий модуль:** Device/System Metadata Collector.
 
 ## Зафиксированные решения
 
@@ -37,10 +37,16 @@ Raw evidence сохраняется до интерпретации. Для се
 ### ADR-009 — ADB вызывается без локального shell
 Target Manager передаёт аргументы ADB напрямую в subprocess. Package name валидируется до remote shell command.
 
+### ADR-010 — Degraded не является отдельным runtime state
+Collector failure во время ACTIVE не переводит state machine сразу в терминальный `partial`. Session Manager сохраняет `status=active` и `degraded=true`, чтобы остальные collectors продолжали работу. После STOP деградированная сессия завершается как `partial`.
+
+### ADR-011 — Manifest записывается атомарно
+Каждое изменение session metadata записывается через временный файл и `os.replace`, чтобы аварийное завершение процесса не оставляло наполовину записанный JSON.
+
 ## Порядок реализации v0.1
 
 1. **ADB Target Manager — реализован.**
-2. Session Manager и state machine.
+2. **Session Manager и state machine — реализован.**
 3. Device/system metadata collector.
 4. Logcat collector.
 5. Screen recording collector.

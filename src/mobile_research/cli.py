@@ -4,8 +4,10 @@ import argparse
 import json
 import sys
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
+from mobile_research.session import SessionError, SessionManager
 from mobile_research.targets import AdbClient, AdbError
 
 
@@ -45,6 +47,26 @@ def _build_parser() -> argparse.ArgumentParser:
     package_parser.add_argument("serial")
     package_parser.add_argument("package")
     package_parser.add_argument("--json", action="store_true")
+
+    session_parser = subparsers.add_parser(
+        "session-create",
+        help="Create a Research Session for a ready target and installed package.",
+    )
+    session_parser.add_argument("serial")
+    session_parser.add_argument("package")
+    session_parser.add_argument(
+        "--root",
+        type=Path,
+        help="Runtime sessions root. Defaults to Mobile Research local app data.",
+    )
+    session_parser.add_argument("--json", action="store_true")
+
+    status_parser = subparsers.add_parser(
+        "session-status",
+        help="Read a Research Session manifest from disk.",
+    )
+    status_parser.add_argument("session_root", type=Path)
+    status_parser.add_argument("--json", action="store_true")
 
     return parser
 
@@ -108,11 +130,71 @@ def _package_check_command(
     return 0 if installed else 1
 
 
+def _session_create_command(
+    client: AdbClient,
+    serial: str,
+    package_name: str,
+    root: Path | None,
+    as_json: bool,
+) -> int:
+    details = client.get_target_details(serial)
+    if not client.is_package_installed(serial, package_name):
+        raise SessionError(
+            f"Package {package_name!r} is not installed on target {serial}"
+        )
+
+    manager = SessionManager.create(
+        root,
+        target=details.to_dict(),
+        package={"name": package_name},
+    )
+
+    result = {
+        "session_id": manager.session_id,
+        "status": manager.status.value,
+        "session_root": str(manager.paths.root),
+        "manifest": str(manager.paths.manifest),
+    }
+
+    if as_json:
+        _print_json(result)
+    else:
+        print(f"session_id: {result['session_id']}")
+        print(f"status: {result['status']}")
+        print(f"session_root: {result['session_root']}")
+        print(f"manifest: {result['manifest']}")
+
+    return 0
+
+
+def _session_status_command(
+    session_root: Path,
+    as_json: bool,
+) -> int:
+    manager = SessionManager.load(session_root)
+
+    if as_json:
+        _print_json(manager.manifest)
+    else:
+        print(f"session_id: {manager.session_id}")
+        print(f"status: {manager.status.value}")
+        print(f"degraded: {manager.degraded}")
+        print(f"manifest: {manager.paths.manifest}")
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "session-status":
+            return _session_status_command(
+                args.session_root,
+                args.json,
+            )
+
         client = AdbClient.from_environment(args.adb)
 
         if args.command == "targets":
@@ -126,7 +208,15 @@ def main(argv: list[str] | None = None) -> int:
                 args.package,
                 args.json,
             )
-    except (AdbError, ValueError) as exc:
+        if args.command == "session-create":
+            return _session_create_command(
+                client,
+                args.serial,
+                args.package,
+                args.root,
+                args.json,
+            )
+    except (AdbError, SessionError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
