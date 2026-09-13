@@ -5,8 +5,8 @@
 ## Текущее состояние
 
 **Этап:** v0.1 — Research Session Core  
-**Реализовано:** ADB Target Manager, Session Manager, Device/System Metadata Collector, Logcat Collector, Screen Recording Collector, Raw Network Collector, Export/Checksum subsystem.  
-**Следующий модуль:** End-to-end Session Orchestrator и acceptance test.
+**Реализовано:** ADB Target Manager, Session Manager, Device/System Metadata Collector, Logcat Collector, Screen Recording Collector, Raw Network Collector, Export/Checksum subsystem, End-to-end Session Orchestrator.  
+**Следующий этап:** реальный AVD-RESEARCH acceptance run.
 
 ## Зафиксированные решения
 
@@ -82,6 +82,15 @@ Screen Recording Collector не создаёт один монолитный ф�
 ### ADR-024 — Research ZIP проверяется после упаковки
 Успех export означает не факт закрытия ZipFile, а успешную повторную проверку CRC, entry safety, checksum coverage и SHA-256 непосредственно из временного ZIP. Только после этого temporary archive атомарно заменяет destination.
 
+### ADR-025 — Orchestrator не поглощает collectors
+End-to-end слой отвечает только за порядок lifecycle, health checks, package launch, failure propagation и export. Capture-логика остаётся внутри самостоятельных collectors и может тестироваться независимо.
+
+### ADR-026 — Collector failure во время ACTIVE не останавливает исследование
+Health-check фиксирует деградацию, но остальные sources продолжают capture. Пользователь завершает эксперимент явно; итоговый session status становится `partial`.
+
+### ADR-027 — Startup failure после создания session также является evidence
+Если preflight/start/package launch падает после создания runtime session, orchestrator переводит её в `failed`, best-effort останавливает уже запущенные collectors и пытается сформировать failed Research ZIP вместо удаления данных.
+
 ## Порядок реализации v0.1
 
 1. **ADB Target Manager — реализован.**
@@ -91,7 +100,8 @@ Screen Recording Collector не создаёт один монолитный ф�
 5. **Screen recording collector — реализован.**
 6. **Raw network collector — реализован.**
 7. **Export/checksum subsystem — реализован.**
-8. End-to-end acceptance test.
+8. **End-to-end Session Orchestrator + synthetic acceptance test — реализованы.**
+9. Real AVD-RESEARCH acceptance run.
 
 ## Будущие направления
 

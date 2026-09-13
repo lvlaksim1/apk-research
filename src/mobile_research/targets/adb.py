@@ -402,6 +402,75 @@ class AdbClient:
         package_name = validate_package_name(package_name)
         return self.shell_output(serial, "pm", "path", package_name)
 
+    def resolve_launch_activity(
+        self,
+        serial: str,
+        package_name: str,
+    ) -> str:
+        self.ensure_ready(serial)
+        package_name = validate_package_name(package_name)
+
+        output = self.shell_output(
+            serial,
+            "cmd",
+            "package",
+            "resolve-activity",
+            "--brief",
+            "-a",
+            "android.intent.action.MAIN",
+            "-c",
+            "android.intent.category.LAUNCHER",
+            package_name,
+        )
+
+        candidates = [
+            line.strip()
+            for line in output.splitlines()
+            if "/" in line and " " not in line.strip()
+        ]
+        if not candidates:
+            raise AdbError(
+                f"No launcher activity resolved for package {package_name}"
+            )
+
+        component = candidates[-1]
+        if not component.startswith(package_name + "/"):
+            raise AdbError(
+                "Resolved launcher component does not belong to package "
+                f"{package_name}: {component}"
+            )
+        return component
+
+    def launch_package(
+        self,
+        serial: str,
+        package_name: str,
+    ) -> str:
+        component = self.resolve_launch_activity(
+            serial,
+            package_name,
+        )
+        result = self._run_checked(
+            [
+                "-s",
+                serial,
+                "shell",
+                "am",
+                "start",
+                "-W",
+                "-n",
+                component,
+            ],
+            timeout=30.0,
+        )
+        output = (result.stdout or "") + (result.stderr or "")
+        if "Error:" in output:
+            raise AdbError(
+                f"Unable to launch package {package_name}: "
+                f"{output.strip()}"
+            )
+        return output
+
     def get_utc_time(self, serial: str) -> str:
         self.ensure_ready(serial)
         return self._shell_value(

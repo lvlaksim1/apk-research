@@ -464,3 +464,95 @@ def test_probe_executable_falls_back_to_next_candidate() -> None:
     )
     assert path == "/system/xbin/tcpdump"
     assert version == "tcpdump version 4.99.5"
+
+
+def test_resolve_and_launch_package() -> None:
+    responses = {
+        ("devices", "-l"): _completed(
+            "List of devices attached\n"
+            "emulator-5554 device model:sdk_gphone transport_id:1\n"
+        ),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "cmd",
+            "package",
+            "resolve-activity",
+            "--brief",
+            "-a",
+            "android.intent.action.MAIN",
+            "-c",
+            "android.intent.category.LAUNCHER",
+            "com.example.app",
+        ): _completed("com.example.app/.MainActivity\n"),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "am",
+            "start",
+            "-W",
+            "-n",
+            "com.example.app/.MainActivity",
+        ): _completed(
+            "Status: ok\n"
+            "Activity: com.example.app/.MainActivity\n"
+        ),
+    }
+
+    def runner(
+        arguments: Sequence[str],
+        timeout: float,
+    ) -> subprocess.CompletedProcess[str]:
+        return responses[tuple(arguments)]
+
+    client = AdbClient(Path("adb"), runner=runner)
+
+    assert client.resolve_launch_activity(
+        "emulator-5554",
+        "com.example.app",
+    ) == "com.example.app/.MainActivity"
+
+    output = client.launch_package(
+        "emulator-5554",
+        "com.example.app",
+    )
+    assert "Status: ok" in output
+
+
+def test_launch_package_rejects_missing_launcher() -> None:
+    responses = {
+        ("devices", "-l"): _completed(
+            "List of devices attached\n"
+            "emulator-5554 device model:sdk_gphone transport_id:1\n"
+        ),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "cmd",
+            "package",
+            "resolve-activity",
+            "--brief",
+            "-a",
+            "android.intent.action.MAIN",
+            "-c",
+            "android.intent.category.LAUNCHER",
+            "com.example.app",
+        ): _completed("No activity found\n"),
+    }
+
+    def runner(
+        arguments: Sequence[str],
+        timeout: float,
+    ) -> subprocess.CompletedProcess[str]:
+        return responses[tuple(arguments)]
+
+    client = AdbClient(Path("adb"), runner=runner)
+
+    with pytest.raises(AdbError, match="No launcher activity"):
+        client.launch_package(
+            "emulator-5554",
+            "com.example.app",
+        )

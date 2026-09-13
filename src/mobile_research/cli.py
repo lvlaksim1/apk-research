@@ -13,6 +13,7 @@ from mobile_research.export import (
     export_research_zip,
     verify_research_zip,
 )
+from mobile_research.orchestrator import OrchestratorError, ResearchOrchestrator
 from mobile_research.session import SessionError, SessionManager
 from mobile_research.targets import AdbClient, AdbError
 
@@ -103,6 +104,30 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     verify_parser.add_argument("archive", type=Path)
     verify_parser.add_argument("--json", action="store_true")
+
+    run_parser = subparsers.add_parser(
+        "run",
+        help=(
+            "Run one interactive v0.1 research session until Ctrl+C, "
+            "then export a verified Research ZIP."
+        ),
+    )
+    run_parser.add_argument("serial")
+    run_parser.add_argument("package")
+    run_parser.add_argument("--root", type=Path)
+    run_parser.add_argument("--output", type=Path)
+    run_parser.add_argument("--overwrite", action="store_true")
+    run_parser.add_argument(
+        "--screen-chunk-seconds",
+        type=int,
+        default=170,
+    )
+    run_parser.add_argument(
+        "--health-interval",
+        type=float,
+        default=1.0,
+    )
+    run_parser.add_argument("--json", action="store_true")
 
     return parser
 
@@ -288,6 +313,52 @@ def _research_zip_verify_command(
     return 0
 
 
+def _run_command(
+    client: AdbClient,
+    serial: str,
+    package_name: str,
+    root: Path | None,
+    output: Path | None,
+    overwrite: bool,
+    screen_chunk_seconds: int,
+    health_interval: float,
+    as_json: bool,
+) -> int:
+    orchestrator = ResearchOrchestrator(
+        client,
+        serial,
+        package_name,
+        runtime_root=root,
+        output_path=output,
+        overwrite_output=overwrite,
+        screen_chunk_seconds=screen_chunk_seconds,
+    )
+
+    def on_started(started) -> None:
+        if not as_json:
+            print(f"session_id: {started.session_id}")
+            print(f"session_root: {started.session_root}")
+            print("capture: active")
+            print("Press Ctrl+C to stop and export.")
+
+    result = orchestrator.run_interactive(
+        health_interval=health_interval,
+        on_started=on_started,
+    )
+
+    if as_json:
+        _print_json(result.to_dict())
+    else:
+        print(f"session_status: {result.session_status}")
+        print(f"archive: {result.archive}")
+        print(
+            "validation_issues: "
+            f"{result.validation_issues}"
+        )
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -312,6 +383,19 @@ def main(argv: list[str] | None = None) -> int:
             )
 
         client = AdbClient.from_environment(args.adb)
+
+        if args.command == "run":
+            return _run_command(
+                client,
+                args.serial,
+                args.package,
+                args.root,
+                args.output,
+                args.overwrite,
+                args.screen_chunk_seconds,
+                args.health_interval,
+                args.json,
+            )
 
         if args.command == "metadata-collect":
             return _metadata_collect_command(
@@ -343,6 +427,7 @@ def main(argv: list[str] | None = None) -> int:
         AdbError,
         ExportError,
         MetadataCollectorError,
+        OrchestratorError,
         SessionError,
         ValueError,
     ) as exc:

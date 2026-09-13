@@ -15,6 +15,7 @@ Mobile Research — Windows-система для воспроизводимог
 - **Screen Recording Collector**
 - **Raw Network Collector**
 - **Export / Checksums / Research ZIP**
+- **End-to-end Session Orchestrator**
 
 Первая end-to-end цель: провести одну воспроизводимую исследовательскую сессию на Android target и получить архив с исходными диагностическими данными.
 
@@ -149,6 +150,48 @@ Artifacts:
 
 Архив сначала создаётся как temporary file и заменяет destination только после успешной проверки.
 
+## End-to-end Session Orchestrator
+
+Команда `run` связывает реализованные компоненты в один пользовательский сценарий:
+
+```text
+target/package validation
+        ↓
+create session
+        ↓
+preflight
+        ├─ device metadata
+        └─ raw network backend
+        ↓
+starting
+        ├─ logcat
+        ├─ screen recording
+        └─ raw network
+        ↓
+active
+        ↓
+launch package
+        ↓
+health checks
+        ↓
+Ctrl+C
+        ↓
+STOP collectors
+        ↓
+complete / partial
+        ↓
+verified Research ZIP
+```
+
+Если startup уже создал session, но последующий шаг падает, orchestrator переводит session в `failed`, останавливает успевшие стартовать collectors и пытается экспортировать failed Research ZIP.
+
+Дополнительно сохраняются:
+
+- `02_normalized/session-events.jsonl` — фактические lifecycle markers с host/target timestamps;
+- `01_raw/device/package-launch.txt` — raw результат запуска Activity.
+
+Collector failure во время ACTIVE не останавливает остальные collectors: session становится degraded и после STOP завершается как `partial`.
+
 ## CLI
 
 ```powershell
@@ -162,6 +205,8 @@ mobile-research metadata-collect "C:\path\to\session" --json
 mobile-research session-status "C:\path\to\session" --json
 mobile-research session-export "C:\path\to\session" --json
 mobile-research research-zip-verify "C:\path\to\session.research.zip" --json
+
+mobile-research run emulator-5554 com.example.app
 ```
 
 То же без установленного entry point:
@@ -216,7 +261,7 @@ python -m pytest -q
 
 ## Следующий этап
 
-**End-to-end Session Orchestrator** — единая команда preflight → collectors → launch package → health checks → STOP → Research ZIP.
+**Real AVD-RESEARCH acceptance run** — запуск полного цикла на настоящем Android Emulator с root/tcpdump и проверка полученного Research ZIP.
 
 ## CI
 

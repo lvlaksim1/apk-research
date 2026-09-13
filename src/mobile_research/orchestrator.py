@@ -1,0 +1,564 @@
+from __future__ import annotations
+
+import json
+import os
+import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable, Protocol
+
+from mobile_research.collectors import (
+    DeviceMetadataCollector,
+    LogcatCollector,
+    RawNetworkCollector,
+    ScreenRecordingCollector,
+)
+from mobile_research.export import ExportResult, export_research_zip
+from mobile_research.session import (
+    SessionManager,
+    SessionStatus,
+    TERMINAL_STATUSES,
+)
+from mobile_research.targets import AdbClient, AdbError, validate_package_name
+
+Clock = Callable[[], datetime]
+
+
+class CollectorLike(Protocol):
+    def start(self) -> None: ...
+    def check_health(self) -> bool: ...
+    def stop(self, grace_period: float = 3.0) -> Any: ...
+
+
+class NetworkCollectorLike(CollectorLike, Protocol):
+    def preflight(self) -> Any: ...
+
+
+class MetadataCollectorLike(Protocol):
+    def collect(self) -> Any: ...
+
+
+MetadataFactory = Callable[
+    [AdbClient, SessionManager],
+    MetadataCollectorLike,
+]
+CollectorFactory = Callable[
+    [AdbClient, SessionManager],
+    CollectorLike,
+]
+NetworkFactory = Callable[
+    [AdbClient, SessionManager],
+    NetworkCollectorLike,
+]
+ScreenFactory = Callable[
+    [AdbClient, SessionManager, int],
+    CollectorLike,
+]
+Exporter = Callable[..., ExportResult]
+
+
+class OrchestratorError(RuntimeError):
+    """Raised when an end-to-end research session cannot proceed."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        session_root: Path | None = None,
+        archive: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.session_root = session_root
+        self.archive = archive
+
+
+@dataclass(frozen=True)
+class StartResult:
+    session_id: str
+    session_root: str
+    status: str
+    package: str
+    serial: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "session_id": self.session_id,
+            "session_root": self.session_root,
+            "status": self.status,
+            "package": self.package,
+            "serial": self.serial,
+        }
+
+
+@dataclass(frozen=True)
+class HealthResult:
+    healthy: bool
+    collector_health: dict[str, bool]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "healthy": self.healthy,
+            "collector_health": dict(self.collector_health),
+        }
+
+
+@dataclass(frozen=True)
+class StopResult:
+    session_id: str
+    session_root: str
+    session_status: str
+    archive: str
+    validation_issues: int
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "session_id": self.session_id,
+            "session_root": self.session_root,
+            "session_status": self.session_status,
+            "archive": self.archive,
+            "validation_issues": self.validation_issues,
+        }
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _iso_utc(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _metadata_factory(
+    adb: AdbClient,
+    session: SessionManager,
+) -> MetadataCollectorLike:
+    return DeviceMetadataCollector(adb, session)
+
+
+def _logcat_factory(
+    adb: AdbClient,
+    session: SessionManager,
+) -> CollectorLike:
+    return LogcatCollector(adb, session)
+
+
+def _network_factory(
+    adb: AdbClient,
+    session: SessionManager,
+) -> NetworkCollectorLike:
+    return RawNetworkCollector(adb, session)
+
+
+def _screen_factory(
+    adb: AdbClient,
+    session: SessionManager,
+    chunk_seconds: int,
+) -> CollectorLike:
+    return ScreenRecordingCollector(
+        adb,
+        session,
+        chunk_seconds=chunk_seconds,
+    )
+
+
+class ResearchOrchestrator:
+    """Coordinates one v0.1 AVD-RESEARCH session end to end."""
+
+    EVENTS_ARTIFACT = "02_normalized/session-events.jsonl"
+    LAUNCH_ARTIFACT = "01_raw/device/package-launch.txt"
+
+    def __init__(
+        self,
+        adb: AdbClient,
+        serial: str,
+        package_name: str,
+        *,
+        runtime_root: str | os.PathLike[str] | None = None,
+        output_path: str | os.PathLike[str] | None = None,
+        overwrite_output: bool = False,
+        screen_chunk_seconds: int = 170,
+        clock: Clock = _utc_now,
+        metadata_factory: MetadataFactory = _metadata_factory,
+        logcat_factory: CollectorFactory = _logcat_factory,
+        screen_factory: ScreenFactory = _screen_factory,
+        network_factory: NetworkFactory = _network_factory,
+        exporter: Exporter = export_research_zip,
+    ) -> None:
+        self.adb = adb
+        self.serial = serial.strip()
+        self.package_name = validate_package_name(package_name)
+        self.runtime_root = runtime_root
+        self.output_path = output_path
+        self.overwrite_output = overwrite_output
+        self.screen_chunk_seconds = screen_chunk_seconds
+        self.clock = clock
+
+        self.metadata_factory = metadata_factory
+        self.logcat_factory = logcat_factory
+        self.screen_factory = screen_factory
+        self.network_factory = network_factory
+        self.exporter = exporter
+
+        self.session: SessionManager | None = None
+        self.logcat: CollectorLike | None = None
+        self.screen: CollectorLike | None = None
+        self.network: NetworkCollectorLike | None = None
+        self._started_collectors: list[tuple[str, CollectorLike]] = []
+        self._event_registered = False
+        self._launch_registered = False
+
+    def start(self) -> StartResult:
+        if self.session is not None:
+            raise OrchestratorError("Research session was already created")
+
+        try:
+            details = self.adb.get_target_details(self.serial)
+            if not self.adb.is_package_installed(
+                self.serial,
+                self.package_name,
+            ):
+                raise OrchestratorError(
+                    f"Package {self.package_name!r} is not installed "
+                    f"on target {self.serial}"
+                )
+
+            self.session = SessionManager.create(
+                self.runtime_root,
+                target=details.to_dict(),
+                package={"name": self.package_name},
+            )
+            self._ensure_event_log()
+            self._event(
+                "session_created",
+                target_utc=self._target_time_best_effort(),
+            )
+
+            self.session.begin_preflight()
+            self._event("preflight_started")
+
+            metadata = self.metadata_factory(
+                self.adb,
+                self.session,
+            )
+            metadata.collect()
+            self._event("device_metadata_completed")
+
+            self.network = self.network_factory(
+                self.adb,
+                self.session,
+            )
+            network_preflight = self.network.preflight()
+            self._event(
+                "raw_network_preflight_completed",
+                details=(
+                    network_preflight.to_dict()
+                    if hasattr(network_preflight, "to_dict")
+                    else None
+                ),
+            )
+
+            self.logcat = self.logcat_factory(
+                self.adb,
+                self.session,
+            )
+            self.screen = self.screen_factory(
+                self.adb,
+                self.session,
+                self.screen_chunk_seconds,
+            )
+
+            self.session.mark_ready()
+            self._event("preflight_completed")
+
+            self.session.begin_start()
+            self._start_collector("logcat", self.logcat)
+            self._start_collector("screen_recording", self.screen)
+            self._start_collector("raw_network", self.network)
+
+            self.session.mark_active()
+            self._event(
+                "capture_active",
+                target_utc=self._target_time_best_effort(),
+            )
+
+            launch_output = self.adb.launch_package(
+                self.serial,
+                self.package_name,
+            )
+            self._write_launch_output(launch_output)
+            self._event(
+                "package_launched",
+                target_utc=self._target_time_best_effort(),
+            )
+
+            return StartResult(
+                session_id=self.session.session_id,
+                session_root=str(self.session.paths.root),
+                status=self.session.status.value,
+                package=self.package_name,
+                serial=self.serial,
+            )
+        except Exception as exc:
+            if isinstance(exc, OrchestratorError):
+                message = str(exc)
+            else:
+                message = str(exc) or exc.__class__.__name__
+
+            archive = self._abort_and_export(
+                source="orchestrator:start",
+                message=message,
+            )
+            raise OrchestratorError(
+                message,
+                session_root=(
+                    self.session.paths.root
+                    if self.session is not None
+                    else None
+                ),
+                archive=archive,
+            ) from exc
+
+    def health_check(self) -> HealthResult:
+        session = self._require_session()
+        if session.status != SessionStatus.ACTIVE:
+            raise OrchestratorError(
+                "Health check requires active session; current status is "
+                f"{session.status.value!r}"
+            )
+
+        health: dict[str, bool] = {}
+        for name, collector in self._started_collectors:
+            try:
+                healthy = collector.check_health()
+            except Exception as exc:
+                healthy = False
+                session.record_error(
+                    f"orchestrator:health:{name}",
+                    str(exc) or exc.__class__.__name__,
+                )
+            health[name] = healthy
+
+        overall = all(health.values()) if health else False
+        if not overall:
+            self._event(
+                "collector_health_degraded",
+                details={"collectors": health},
+            )
+
+        return HealthResult(
+            healthy=overall,
+            collector_health=health,
+        )
+
+    def stop_and_export(self) -> StopResult:
+        session = self._require_session()
+
+        if session.status == SessionStatus.ACTIVE:
+            self._event(
+                "stop_requested",
+                target_utc=self._target_time_best_effort(),
+            )
+            session.begin_stop()
+        elif session.status not in {
+            SessionStatus.STOPPING,
+            SessionStatus.FAILED,
+        }:
+            raise OrchestratorError(
+                "Cannot stop research session from state "
+                f"{session.status.value!r}"
+            )
+
+        self._stop_started_collectors()
+
+        if session.status == SessionStatus.STOPPING:
+            session.finish()
+
+        self._event(
+            "capture_finished",
+            target_utc=self._target_time_best_effort(),
+            details={"status": session.status.value},
+        )
+
+        export_result = self.exporter(
+            session,
+            self.output_path,
+            overwrite=self.overwrite_output,
+        )
+
+        return StopResult(
+            session_id=session.session_id,
+            session_root=str(session.paths.root),
+            session_status=session.status.value,
+            archive=export_result.archive,
+            validation_issues=len(
+                export_result.validation.issues
+            ),
+        )
+
+    def run_interactive(
+        self,
+        *,
+        health_interval: float = 1.0,
+        on_started: Callable[[StartResult], None] | None = None,
+    ) -> StopResult:
+        if health_interval <= 0:
+            raise ValueError("health_interval must be positive")
+
+        started = self.start()
+        if on_started is not None:
+            on_started(started)
+
+        try:
+            while True:
+                time.sleep(health_interval)
+                self.health_check()
+        except KeyboardInterrupt:
+            return self.stop_and_export()
+
+    def _start_collector(
+        self,
+        name: str,
+        collector: CollectorLike,
+    ) -> None:
+        collector.start()
+        self._started_collectors.append((name, collector))
+        self._event(f"{name}_started")
+
+    def _stop_started_collectors(self) -> None:
+        session = self._require_session()
+
+        for name, collector in reversed(self._started_collectors):
+            try:
+                collector.stop()
+                self._event(f"{name}_stopped")
+            except Exception as exc:
+                session.record_error(
+                    f"orchestrator:stop:{name}",
+                    str(exc) or exc.__class__.__name__,
+                )
+                self._event(
+                    f"{name}_stop_failed",
+                    details={
+                        "error": str(exc)
+                        or exc.__class__.__name__,
+                    },
+                )
+
+        self._started_collectors.clear()
+
+    def _abort_and_export(
+        self,
+        *,
+        source: str,
+        message: str,
+    ) -> str | None:
+        session = self.session
+        if session is None:
+            return None
+
+        if session.status not in TERMINAL_STATUSES:
+            try:
+                session.fail(source, message)
+            except Exception:
+                pass
+
+        try:
+            self._stop_started_collectors()
+        except Exception:
+            pass
+
+        if session.status not in TERMINAL_STATUSES:
+            return None
+
+        try:
+            result = self.exporter(
+                session,
+                self.output_path,
+                overwrite=self.overwrite_output,
+            )
+            return result.archive
+        except Exception:
+            return None
+
+    def _ensure_event_log(self) -> None:
+        session = self._require_session()
+        path = session.paths.root / self.EVENTS_ARTIFACT
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch(exist_ok=True)
+
+        if not self._event_registered:
+            session.register_artifact(
+                kind="session_events",
+                relative_path=self.EVENTS_ARTIFACT,
+                source="orchestrator",
+                raw=False,
+            )
+            self._event_registered = True
+
+    def _event(
+        self,
+        event: str,
+        *,
+        target_utc: str | None = None,
+        details: dict[str, object] | None = None,
+    ) -> None:
+        session = self._require_session()
+        self._ensure_event_log()
+
+        value: dict[str, object] = {
+            "host_utc": _iso_utc(self.clock()),
+            "target_utc": target_utc,
+            "event": event,
+        }
+        if details is not None:
+            value["details"] = details
+
+        path = session.paths.root / self.EVENTS_ARTIFACT
+        with path.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(
+                json.dumps(
+                    value,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+            )
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+
+    def _write_launch_output(self, output: str) -> None:
+        session = self._require_session()
+        path = session.paths.root / self.LAUNCH_ARTIFACT
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        with path.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(output)
+            if output and not output.endswith("\n"):
+                handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+
+        if not self._launch_registered:
+            session.register_artifact(
+                kind="package_launch",
+                relative_path=self.LAUNCH_ARTIFACT,
+                source="orchestrator",
+                raw=True,
+            )
+            self._launch_registered = True
+
+    def _target_time_best_effort(self) -> str | None:
+        try:
+            return self.adb.get_utc_time(self.serial)
+        except AdbError:
+            return None
+
+    def _require_session(self) -> SessionManager:
+        if self.session is None:
+            raise OrchestratorError(
+                "Research session has not been created"
+            )
+        return self.session

@@ -76,3 +76,33 @@ def test_parser_research_zip_verify() -> None:
     assert args.command == "research-zip-verify"
     assert args.archive == Path("result.zip")
     assert args.json is True
+
+
+def test_parser_run() -> None:
+    parser = cli._build_parser()
+
+    args = parser.parse_args(
+        [
+            "run",
+            "emulator-5554",
+            "com.example.app",
+            "--root",
+            "runtime",
+            "--output",
+            "result.zip",
+            "--screen-chunk-seconds",
+            "120",
+            "--health-interval",
+            "2.5",
+            "--json",
+        ]
+    )
+
+    assert args.command == "run"
+    assert args.serial == "emulator-5554"
+    assert args.package == "com.example.app"
+    assert args.root == Path("runtime")
+    assert args.output == Path("result.zip")
+    assert args.screen_chunk_seconds == 120
+    assert args.health_interval == 2.5
+    assert args.json is True
