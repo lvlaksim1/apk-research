@@ -1,0 +1,92 @@
+name: AVD Research Acceptance
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/mobile_research/**"
+      - "tools/acceptance_avd.py"
+      - ".github/workflows/avd-research-acceptance.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  avd-research:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Mobile Research
+        run: python -m pip install -e ".[dev]"
+
+      - name: Check KVM
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+          "$ANDROID_HOME/emulator/emulator" -accel-check
+
+      - name: Install AOSP ATD image
+        shell: bash
+        run: |
+          set -euxo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "emulator" "system-images;android-35;aosp_atd;x86_64"
+          echo no | avdmanager create avd --force --name mobile_research_api35 --package "system-images;android-35;aosp_atd;x86_64"
+
+      - name: Start AVD-RESEARCH
+        shell: bash
+        run: |
+          set -euxo pipefail
+          nohup "$ANDROID_HOME/emulator/emulator"             @mobile_research_api35             -port 5554             -no-window             -gpu swiftshader_indirect             -no-snapshot             -noaudio             -no-boot-anim             -wipe-data             > emulator.log 2>&1 &
+          echo $! > emulator.pid
+
+          adb wait-for-device
+          timeout 300 bash -c 'until [ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
+
+          adb -s emulator-5554 root
+          adb -s emulator-5554 wait-for-device
+          timeout 60 bash -c 'until [ "$(adb -s emulator-5554 shell id -u | tr -d "\r")" = "0" ]; do sleep 2; done'
+
+          adb -s emulator-5554 shell getprop ro.build.version.release
+          adb -s emulator-5554 shell getprop ro.build.fingerprint
+          adb -s emulator-5554 shell id
+          adb -s emulator-5554 shell 'tcpdump --version || /system/bin/tcpdump --version || /system/xbin/tcpdump --version || /data/local/tmp/tcpdump --version'
+
+      - name: Run real AVD acceptance
+        run: python tools/acceptance_avd.py
+
+      - name: Verify generated Research ZIP again
+        run: python -m mobile_research research-zip-verify acceptance-output/mobile-research-acceptance.research.zip --json
+
+      - name: Stop emulator
+        if: always()
+        shell: bash
+        run: |
+          adb -s emulator-5554 emu kill || true
+          if [ -f emulator.pid ]; then
+            kill "$(cat emulator.pid)" || true
+          fi
+
+      - name: Upload acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: avd-research-acceptance
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            emulator.log
+            acceptance-output/**
