@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.7.6 — correct DWM source HWND + real-time touch.  
-**Stable baseline:** v0.7.6 Desktop Application.  
+**Этап:** v0.7.7 — atomic Android lifecycle + orphan recovery.  
+**Stable baseline:** v0.7.7 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -274,3 +274,13 @@ DWM thumbnail композитится в top-level HWND и не являетс�
 
 ### ADR-072 — DWM source выбирается по identity, а не только по PID ancestry
 Реальный тест v0.7.5 выявил race: STARTUPINFO/SW_HIDE скрывал главное окно Emulator, а `find_emulator_window(require_visible=False)` мог выбрать другой top-level Qt/helper HWND того же процесса/descendant process. DWM тогда композитил белую helper surface, а настоящее окно Emulator оставалось отдельно. v0.7.6 отменяет hidden process startup и снова ищет visible top-level source. Среди кандидатов приоритетный pool формируется только из окон, title которых содержит `Android Emulator` или имя managed AVD; PID ancestry используется лишь как дополнительный сигнал. После точной идентификации source мгновенно скрывается, позиционируется за Mobile Research и показывается через `SW_SHOWNOACTIVATE` до DWM registration. Это сохраняет нормальную GPU surface и одновременно сокращает видимую startup-вспышку.
+
+
+### ADR-073 — Reset не удаляет userdata работающего/завершающегося AVD
+Реальный тест v0.7.6 выявил race: `reset_userdata()` вызывал `stop()`, после чего `ComponentManager.reset_avd_userdata()` сразу удалял содержимое AVD. Launcher Emulator мог уже изменить состояние, но qemu child и single-instance lock ещё оставались живы. v0.7.7 отказывается от ручного удаления runtime AVD-файлов. Reset сначала полностью завершает managed AVD, затем создаёт persistent marker `reset-userdata.pending`. Следующий owned boot получает официальный параметр `-wipe-data`; marker удаляется только после успешного boot. Это сохраняет reset intent через рестарт приложения и исключает удаление файлов под живым Emulator.
+
+### ADR-074 — Mobile Research владеет единственным экземпляром private AVD
+Private AVD `mobile_research_api35` не должен переживать процесс Mobile Research. `stop()` теперь ждёт ADB offline и завершение launcher; на Windows после grace period дополнительно завершаются только `emulator.exe`/`qemu-system-*.exe`, command line которых содержит имя private AVD. При startup online `emulator-5554` без owned Popen считается orphan предыдущего crash и сначала завершается. Это предотвращает `Another emulator instance is running` без вмешательства в любые сторонние Android Emulator пользователя.
+
+### ADR-075 — Reset инвалидирует display/controller state
+DWM thumbnail, native-display flag и framebuffer state относятся к конкретному Emulator process lifetime. Reset/repair теперь сначала detach DWM, затем `suspend_display()`: native flag=false, screen worker stop, latest frame очищен. После wipe package state также сбрасывается, потому что APK физически больше не установлен. Нельзя переносить display/package state через уничтожение AVD.

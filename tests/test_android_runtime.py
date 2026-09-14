@@ -526,3 +526,129 @@ def test_windows_boot_falls_back_across_embedded_gpu_modes(
         "completed",
     ]
     assert runtime.native_display_supported is False
+
+
+
+def test_reset_userdata_uses_persistent_wipe_marker(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+
+    monkeypatch.setattr(
+        runtime,
+        "stop",
+        lambda: None,
+    )
+
+    runtime.reset_userdata()
+
+    assert runtime._wipe_marker.is_file()
+
+    runtime._grpc_port = 8554
+    command = runtime._emulator_command()
+    assert "-wipe-data" in command
+
+
+def test_successful_boot_clears_wipe_marker(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+    runtime._wipe_marker.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    runtime._wipe_marker.write_text(
+        "pending",
+        encoding="utf-8",
+    )
+    runtime._software_acceleration = False
+
+    monkeypatch.setattr(
+        runtime,
+        "_is_windows",
+        lambda: False,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_start_emulator",
+        lambda progress: None,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_wait_for_boot",
+        lambda progress: None,
+    )
+
+    runtime._boot_managed_emulator(None)
+
+    assert not runtime._wipe_marker.exists()
+
+
+def test_ensure_ready_terminates_unowned_online_emulator(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+
+    online = [True, False]
+    recovered = []
+    booted = []
+
+    monkeypatch.setattr(
+        runtime.components,
+        "ensure_all",
+        lambda progress=None: manager.state(),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_check_acceleration",
+        lambda progress=None: None,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_device_online",
+        lambda: online.pop(0) if online else False,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_terminate_orphaned_managed_emulator",
+        lambda: recovered.append(True),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_recover_stale_managed_emulator",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_boot_managed_emulator",
+        lambda progress, display_ready=None: booted.append(True),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_ensure_root",
+        lambda progress=None: None,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_normalize_initial_orientation",
+        lambda progress=None: None,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_ensure_live_transport",
+        lambda progress=None: None,
+    )
+
+    runtime.ensure_ready()
+
+    assert recovered == [True]
+    assert booted == [True]

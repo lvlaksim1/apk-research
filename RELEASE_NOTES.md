@@ -1,46 +1,47 @@
-# Mobile Research v0.7.6
+# Mobile Research v0.7.7
 
-v0.7.6 fixes the DWM regression seen in the v0.7.5 real-PC test while keeping the new real-time swipe behavior.
+v0.7.7 fixes the reset/crash/orphan-Emulator sequence found in the real-PC v0.7.6 test.
 
-## What failed in v0.7.5
+## Root cause
 
-Launching Android Emulator with a hidden Windows startup state changed the top-level-window discovery race.
+The old reset implementation did:
 
-The Emulator process owns several Qt/helper top-level HWNDs. Because Mobile Research allowed hidden windows during discovery, it could select a helper HWND by process ancestry before the real user-facing Emulator window became visible.
+1. request Emulator shutdown;
+2. wait only briefly for the launcher process;
+3. immediately delete AVD userdata files.
 
-The result matched the test exactly:
+Android Emulator can keep qemu child processes and AVD locks alive after the launcher changes state. This allowed reset to race the still-running Emulator.
 
-- the real Android Emulator remained visible as a separate window;
-- DWM was attached to the wrong source HWND;
-- the Android panel inside Mobile Research showed a blank/white surface.
+The next launch then failed with:
 
-## v0.7.6 source selection
+`Another emulator instance is running. Please close it...`
 
-The DWM source is again discovered from visible top-level windows.
+At the same time DWM/controller state was not explicitly invalidated, so the UI could keep referring to a dead source HWND and stale display state.
 
-Candidate selection now explicitly prefers windows whose title identifies:
+## Atomic clean reset
 
-- Android Emulator;
-- or the managed AVD name.
+Reset now performs a controlled transaction:
 
-A same-process helper window can no longer win merely because it is larger.
+1. detach DWM and suspend frame publishing;
+2. close gRPC;
+3. request `adb emu kill`;
+4. wait for ADB to go offline and the owned launcher to exit;
+5. on Windows, terminate only residual emulator/qemu processes whose command line belongs to the private `mobile_research_api35` AVD;
+6. write a persistent `reset-userdata.pending` marker;
+7. clear the installed package state.
 
-Once the exact Emulator HWND is found:
+No live AVD files are manually deleted.
 
-1. Mobile Research briefly hides that confirmed HWND;
-2. applies TOOLWINDOW / removes APPWINDOW;
-3. places it fully behind the Mobile Research window;
-4. shows it again without activation;
-5. registers the DWM thumbnail.
+On the next managed boot Mobile Research adds the official Emulator `-wipe-data` flag. The marker is removed only after Android boots successfully, so the reset remains pending even if Mobile Research is closed in between.
 
-This keeps the proven working GPU/DWM behavior from v0.7.4 while reducing the initial standalone flash without hiding the process before its real window can be identified.
+## Recovery after an earlier crash
 
-## Input
+If Mobile Research starts and sees `emulator-5554` online but has no process owned by the current application instance, it treats that Emulator as an orphan left by a prior crash.
 
-The v0.7.5 real-time touch path is unchanged:
+The private orphan is stopped first, then a fresh owned Emulator is started. This automatically repairs the exact state produced by the v0.7.6 test and prevents the AVD single-instance lock from poisoning later launches.
 
-- mouse down → touch DOWN;
-- movement → streamed MOVE;
-- mouse release → UP.
+## Display state
 
-The research evidence pipeline and fallback transports are unchanged.
+Reset and component repair explicitly invalidate DWM/controller display state and stale frames. The UI reports Android as reset and requires the APK to be installed again before research can start.
+
+The v0.7.5 real-time touch DOWN/MOVE/UP behavior is unchanged.

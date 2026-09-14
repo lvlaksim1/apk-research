@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mobile-research"
-version = "0.7.6"
+version = "0.7.7"
 description = "Self-contained Windows desktop environment for reproducible Android application research"
 readme = "README.md"
 requires-python = ">=3.11"

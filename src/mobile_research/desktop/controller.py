@@ -38,6 +38,7 @@ class DesktopController(QObject):
     archiveInspection = Signal(dict)
     diagnosticsReady = Signal(dict)
     nativeDisplayAvailable = Signal(dict)
+    androidReset = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -149,6 +150,14 @@ class DesktopController(QObject):
         self._thread(
             self._diagnostics_worker
         )
+
+    def suspend_display(self) -> None:
+        self._native_display_attached = False
+        self._stop_screen.set()
+        with self._frame_lock:
+            self._latest_frame = None
+            self._latest_frame_id += 1
+            self._published_frame_id = self._latest_frame_id
 
     def reset_android(self) -> None:
         self._thread(
@@ -528,11 +537,14 @@ class DesktopController(QObject):
     def _reset_android_worker(self) -> None:
         try:
             self._set_busy(True)
-            self._stop_screen.set()
+            self.suspend_display()
             self.runtime.reset_userdata()
+            self.package_name = None
+            self.androidReset.emit()
             self.log.emit(
-                "Android userdata очищены. "
-                "Следующий запуск будет чистым."
+                "Research Android полностью остановлен. "
+                "При следующем запуске Emulator выполнит "
+                "штатный wipe-data и создаст чистую среду."
             )
             self.environmentReady.emit(
                 self.runtime.diagnostics()
@@ -548,7 +560,7 @@ class DesktopController(QObject):
     def _repair_components_worker(self) -> None:
         try:
             self._set_busy(True)
-            self._stop_screen.set()
+            self.suspend_display()
             self.runtime.stop()
             self.runtime.components.remove_all()
             self.package_name = None

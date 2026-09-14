@@ -663,6 +663,9 @@ class MainWindow(QMainWindow):
         c.nativeDisplayAvailable.connect(
             self._on_native_display_available
         )
+        c.androidReset.connect(
+            self._on_android_reset
+        )
         self.tabs.currentChanged.connect(
             self._on_tab_changed
         )
@@ -990,6 +993,39 @@ class MainWindow(QMainWindow):
             "DWM live Android Emulator подключён "
             "без SetParent"
         )
+
+    def _on_android_reset(self) -> None:
+        self.android_view.detach_native()
+        self.controller.suspend_display()
+        self.package_label.setText(
+            "Package: не установлен"
+        )
+        self.status_package.setText("○ APK")
+        self.status_package.setStyleSheet("")
+        self.start_button.setEnabled(False)
+        self.status_android.setText(
+            "● Android-компоненты готовы"
+        )
+        self.status_android.setStyleSheet(
+            "color: #238636;"
+        )
+        self.status_adb.setText(
+            "● ADB установлен"
+        )
+        self.status_adb.setStyleSheet(
+            "color: #238636;"
+        )
+        self.status_root.setText("○ Root")
+        self.status_root.setStyleSheet("")
+        self.status_network.setText("○ PCAP")
+        self.status_network.setStyleSheet("")
+        self.android_hint.setText(
+            "Android сброшен • следующий запуск будет чистым"
+        )
+        self.global_status.setText(
+            "Android сброшен в чистое состояние"
+        )
+        self.global_status.setStyleSheet("")
 
     def _on_native_display_failed(
         self,
@@ -1479,6 +1515,8 @@ class MainWindow(QMainWindow):
             response
             == QMessageBox.StandardButton.Yes
         ):
+            self.android_view.detach_native()
+            self.controller.suspend_display()
             self.controller.reset_android()
 
     def _repair_components(self) -> None:
@@ -1504,6 +1542,8 @@ class MainWindow(QMainWindow):
             response
             == QMessageBox.StandardButton.Yes
         ):
+            self.android_view.detach_native()
+            self.controller.suspend_display()
             self.controller.repair_components()
 
     @staticmethod

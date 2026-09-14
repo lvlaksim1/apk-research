@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.7.7 — Atomic reset + orphan recovery
+
+Сброс Android теперь является безопасной транзакцией: DWM отключается, private AVD полностью завершается, остаточные процессы именно `mobile_research_api35` при необходимости принудительно убираются, а чистое состояние создаётся штатным Emulator `-wipe-data` при следующем запуске. Persistent marker переживает перезапуск программы. Если после аварии остался запущенный private Emulator, Mobile Research автоматически обнаруживает и завершает его до нового запуска, устраняя `Another emulator instance is running`.
+
 ## v0.7.6 — Correct DWM source HWND
 
 Исправлена регрессия v0.7.5: скрытый старт процесса позволял выбрать Qt helper HWND вместо настоящего окна Android Emulator, из-за чего отдельный Emulator оставался на рабочем столе, а DWM внутри Mobile Research был белым. Теперь выбирается строго идентифицированное окно Android Emulator/AVD; только после его обнаружения оно кратко скрывается, ставится за Mobile Research, показывается без активации и подключается к DWM. Потоковый DOWN/MOVE/UP свайп сохранён.
@@ -91,7 +95,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.7.6 — Desktop Application** — self-contained Windows release с covered-source DWM live, строгой идентификацией настоящего Android Emulator HWND и потоковым gRPC touch DOWN/MOVE/UP. Source скрывается только после точного обнаружения, затем сразу размещается за Mobile Research. gRPC/MMAP остаётся fallback.
+**v0.7.7 — Desktop Application** — self-contained Windows release с covered-source DWM live, real-time gRPC touch и атомарным lifecycle private Android: безопасный reset через persistent `-wipe-data`, гарантированное завершение qemu/emulator и автоматическое восстановление после orphaned AVD предыдущего crash. gRPC/MMAP остаётся fallback.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

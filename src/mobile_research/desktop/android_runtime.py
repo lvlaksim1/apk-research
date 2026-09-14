@@ -93,6 +93,10 @@ class AndroidRuntime:
         return self.components.paths
 
     @property
+    def _wipe_marker(self) -> Path:
+        return self.paths.root / "reset-userdata.pending"
+
+    @property
     def native_display_supported(self) -> bool:
         return (
             self._is_windows()
@@ -123,7 +127,23 @@ class AndroidRuntime:
             None,
         )
         self._check_acceleration(progress)
-        if not self._device_online():
+
+        device_online = self._device_online()
+        current_owned = self.emulator_pid > 0
+        if device_online and not current_owned:
+            self._emit(
+                progress,
+                "Обнаружен оставшийся экземпляр "
+                "Research Android после предыдущего запуска. "
+                "Безопасное завершение…",
+                None,
+                None,
+            )
+            self._terminate_orphaned_managed_emulator()
+            device_online = self._device_online()
+
+        if not device_online:
+            self._recover_stale_managed_emulator()
             self._boot_managed_emulator(
                 progress,
                 display_ready,
@@ -274,6 +294,11 @@ class AndroidRuntime:
                     ),
                 }
             )
+            if self._wipe_marker.exists():
+                self._wipe_marker.unlink(
+                    missing_ok=True
+                )
+
             if self._is_windows():
                 if display_mode == "dwm-live":
                     message = (
@@ -589,8 +614,14 @@ class AndroidRuntime:
         )
 
     def stop(self) -> None:
+        """Stop the private managed AVD and wait until its lock is released."""
+
         self._drop_grpc_client()
         self._grpc_port = None
+
+        with self._process_lock:
+            process = self.process
+
         if self.paths.adb.is_file():
             try:
                 self._run(
@@ -606,22 +637,143 @@ class AndroidRuntime:
                 )
             except Exception:
                 pass
-        with self._process_lock:
-            process = self.process
-            self.process = None
+
+        deadline = time.monotonic() + 12.0
+        while time.monotonic() < deadline:
+            process_done = (
+                process is None
+                or process.poll() is not None
+            )
+            device_done = not self._device_online()
+            if process_done and device_done:
+                break
+            time.sleep(0.25)
+
         if process is not None and process.poll() is None:
             try:
                 process.terminate()
-                process.wait(timeout=5)
+                process.wait(timeout=3.0)
             except Exception:
                 try:
                     process.kill()
+                    process.wait(timeout=3.0)
                 except Exception:
                     pass
 
+        # emulator.exe may spawn qemu children that outlive the launcher.
+        # Kill only Mobile Research's private AVD, never unrelated emulators.
+        if self._is_windows():
+            self._terminate_windows_managed_processes()
+
+        self._wait_managed_emulator_gone(
+            timeout=12.0
+        )
+
+        with self._process_lock:
+            self.process = None
+
     def reset_userdata(self) -> None:
+        """Schedule an official Emulator wipe after a fully completed stop."""
+
         self.stop()
-        self.components.reset_avd_userdata()
+        self.paths.root.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+        self._wipe_marker.write_text(
+            "wipe on next managed boot\n",
+            encoding="utf-8",
+        )
+
+    def _wait_managed_emulator_gone(
+        self,
+        *,
+        timeout: float,
+    ) -> None:
+        deadline = time.monotonic() + max(
+            0.0,
+            float(timeout),
+        )
+        while time.monotonic() < deadline:
+            if not self._device_online():
+                return
+            time.sleep(0.25)
+
+    def _terminate_orphaned_managed_emulator(self) -> None:
+        if self.paths.adb.is_file():
+            try:
+                self._run(
+                    [
+                        str(self.paths.adb),
+                        "-s",
+                        self.SERIAL,
+                        "emu",
+                        "kill",
+                    ],
+                    timeout=10.0,
+                    check=False,
+                )
+            except Exception:
+                pass
+        if self._is_windows():
+            self._terminate_windows_managed_processes()
+        self._wait_managed_emulator_gone(
+            timeout=12.0
+        )
+
+    def _recover_stale_managed_emulator(self) -> None:
+        """Remove an orphaned private AVD before a new owned launch."""
+
+        if not self._is_windows():
+            return
+        self._terminate_windows_managed_processes()
+        # Android Emulator can keep the AVD lock for a short time after the
+        # process exits. Give Windows a bounded settle interval.
+        time.sleep(0.4)
+
+    def _terminate_windows_managed_processes(self) -> None:
+        if not self._is_windows():
+            return
+        avd = AVD_NAME.replace("'", "''")
+        script = (
+            "$ErrorActionPreference='SilentlyContinue';"
+            f"$avd='{avd}';"
+            "$targets=Get-CimInstance Win32_Process | "
+            "Where-Object {"
+            "($_.Name -ieq 'emulator.exe' -or "
+            "$_.Name -like 'qemu-system-*.exe') -and "
+            "$_.CommandLine -like ('*'+$avd+'*')"
+            "};"
+            "foreach($p in $targets){"
+            "Stop-Process -Id $p.ProcessId -Force "
+            "-ErrorAction SilentlyContinue"
+            "};"
+        )
+        creation_flags = getattr(
+            subprocess,
+            "CREATE_NO_WINDOW",
+            0,
+        )
+        try:
+            subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    script,
+                ],
+                timeout=15.0,
+                check=False,
+                capture_output=True,
+                creationflags=creation_flags,
+            )
+        except (
+            OSError,
+            subprocess.TimeoutExpired,
+        ):
+            pass
 
     def diagnostics(self) -> dict[str, object]:
         state = self.components.state()
@@ -844,6 +996,9 @@ class AndroidRuntime:
             "-crash-report-mode",
             "disabled",
         ]
+
+        if self._wipe_marker.exists():
+            command.append("-wipe-data")
 
         if (
             self._is_windows()

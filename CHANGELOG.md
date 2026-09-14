@@ -2,6 +2,23 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.7.7] - 2026-09-15
+
+### Atomic Android reset and orphan recovery
+
+- Reworked “Сбросить Android в чистое состояние” so it no longer deletes live AVD files immediately after requesting Emulator shutdown.
+- Reset now fully stops the private managed AVD, writes a persistent reset marker, and performs the official Android Emulator `-wipe-data` operation on the next owned boot.
+- The reset marker survives an application restart and is removed only after a successful Emulator boot.
+- Emulator shutdown now waits for ADB to go offline and the owned launcher to exit; on Windows any remaining `emulator.exe` / `qemu-system-*.exe` processes are force-terminated only when their command line belongs to `mobile_research_api35`.
+- Startup detects an online Emulator that is not owned by the current Mobile Research process (for example after a prior crash), terminates that orphaned private AVD, then starts a fresh owned instance. This directly prevents `Another emulator instance is running`.
+
+### Display/controller reset consistency
+
+- Reset and component repair now detach DWM before stopping Android and explicitly invalidate the controller’s native-display state.
+- Screen-frame state is cleared during display suspension so stale frames cannot be published after reset.
+- Reset clears the installed-package state and disables research start until the APK is installed again.
+- Added a dedicated reset-complete UI state instead of leaving the interface reporting a live/rooted Android after the Emulator has been destroyed.
+
 ## [0.7.6] - 2026-09-15
 
 ### DWM source-window identity fix
