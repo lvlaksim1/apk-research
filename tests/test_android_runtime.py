@@ -290,3 +290,21 @@ def test_whpx_enablement_uses_one_uac_and_only_required_feature(
     assert "HypervisorPlatform" in script
     assert "VirtualMachinePlatform" not in script
     assert "hypervisorlaunchtype Auto" in script
+
+
+
+def test_emulator_command_uses_auto_gpu_and_grpc(
+    tmp_path,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+    runtime._grpc_port = 8554
+
+    command = runtime._emulator_command()
+
+    gpu_index = command.index("-gpu")
+    grpc_index = command.index("-grpc")
+    assert command[gpu_index + 1] == "auto"
+    assert command[grpc_index + 1] == "8554"
+    assert "swiftshader" not in command
