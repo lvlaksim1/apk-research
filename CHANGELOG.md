@@ -2,6 +2,22 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.7.5] - 2026-09-15
+
+### Real-time touch drag
+
+- Mouse interaction in the Android panel now maps directly to the Emulator touch lifecycle: mouse press → touch DOWN, mouse movement → streamed touch MOVE, mouse release → touch UP.
+- MOVE events are emitted continuously while dragging, throttled to approximately 80 Hz to avoid input-queue backlog while preserving native-feeling motion.
+- The final drag position is always sent before UP, so scrolling tracks the cursor instead of executing only after mouse release.
+- Drag coordinates are clamped to the Android display rectangle, allowing a gesture to finish correctly even when the pointer reaches or slightly crosses an edge.
+- The existing wheel swipe path and ADB fallback remain available.
+
+### Startup flash suppression
+
+- The Windows DWM-live Emulator process is now launched with STARTUPINFO/SW_HIDE where supported.
+- DWM source discovery accepts the initially hidden top-level Emulator window, positions it behind Mobile Research, and only then shows it without activation.
+- Initial HWND polling was reduced from 15 ms to 5 ms as an additional guard for Emulator builds that partially ignore the Windows startup show state.
+
 ## [0.7.4] - 2026-09-15
 
 ### Covered DWM source window

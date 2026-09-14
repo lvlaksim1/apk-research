@@ -128,3 +128,40 @@ def test_reverse_rotation_mapping_is_normalized() -> None:
     assert map_display_ratio_to_input(
         0.25, 0.20, 1000, 2000, 2
     ) == (750, 1600)
+
+
+
+def test_continuous_touch_states_use_stream_queue(monkeypatch) -> None:
+    from mobile_research.desktop.emulator_grpc import EmulatorGrpcClient
+
+    client = EmulatorGrpcClient(8554)
+    queued = []
+
+    monkeypatch.setattr(
+        client,
+        "_queue_input_event",
+        lambda event: queued.append(event) or True,
+    )
+
+    client.touch_down(10, 20)
+    client.touch_move(30, 40)
+    client.touch_up(50, 60)
+
+    pressures = [
+        item.touch_event.touches[0].pressure
+        for item in queued
+    ]
+    coords = [
+        (
+            item.touch_event.touches[0].x,
+            item.touch_event.touches[0].y,
+        )
+        for item in queued
+    ]
+    assert pressures == [1, 1, 0]
+    assert coords == [
+        (10, 20),
+        (30, 40),
+        (50, 60),
+    ]
+    client.close()

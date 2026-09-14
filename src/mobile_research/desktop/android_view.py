@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 from PySide6.QtCore import QPoint, QRect, Qt, Signal
 from PySide6.QtGui import (
     QImage,
@@ -31,6 +33,9 @@ class AndroidView(QLabel):
         int,
         int,
     )
+    touchDownRequested = Signal(int, int)
+    touchMoveRequested = Signal(int, int)
+    touchUpRequested = Signal(int, int)
     keyRequested = Signal(int)
     textRequested = Signal(str)
     nativeAttached = Signal(dict)
@@ -74,6 +79,9 @@ class AndroidView(QLabel):
         self._frame_owner = None
         self._display_rect = QRect()
         self._press_pos: QPoint | None = None
+        self._drag_active = False
+        self._last_drag_point: tuple[int, int] | None = None
+        self._last_drag_emit_ns = 0
         self._source_width = 0
         self._source_height = 0
         self._input_width = 0
@@ -268,13 +276,54 @@ class AndroidView(QLabel):
             event.button()
             == Qt.MouseButton.LeftButton
         ):
-            self._press_pos = (
-                event.position().toPoint()
-            )
-            self.setFocus(
-                Qt.FocusReason.MouseFocusReason
-            )
+            point = event.position().toPoint()
+            android = self._map_to_android(point)
+            if android is not None:
+                self._press_pos = point
+                self._drag_active = True
+                self._last_drag_point = android
+                self._last_drag_emit_ns = (
+                    time.monotonic_ns()
+                )
+                self.setFocus(
+                    Qt.FocusReason.MouseFocusReason
+                )
+                self.touchDownRequested.emit(
+                    android[0],
+                    android[1],
+                )
+                event.accept()
+                return
         super().mousePressEvent(event)
+
+    def mouseMoveEvent(
+        self,
+        event: QMouseEvent,
+    ) -> None:  # noqa: N802
+        if not self._drag_active:
+            super().mouseMoveEvent(event)
+            return
+
+        android = self._map_to_android_clamped(
+            event.position().toPoint()
+        )
+        if android is None:
+            return
+
+        now_ns = time.monotonic_ns()
+        changed = android != self._last_drag_point
+        elapsed_ns = now_ns - self._last_drag_emit_ns
+        if (
+            changed
+            and elapsed_ns >= 12_000_000
+        ):
+            self._last_drag_point = android
+            self._last_drag_emit_ns = now_ns
+            self.touchMoveRequested.emit(
+                android[0],
+                android[1],
+            )
+        event.accept()
 
     def mouseReleaseEvent(
         self,
@@ -283,36 +332,30 @@ class AndroidView(QLabel):
         if (
             event.button()
             != Qt.MouseButton.LeftButton
-            or self._press_pos is None
+            or not self._drag_active
         ):
             super().mouseReleaseEvent(event)
             return
 
-        start = self._map_to_android(
-            self._press_pos
-        )
-        end = self._map_to_android(
+        android = self._map_to_android_clamped(
             event.position().toPoint()
         )
         self._press_pos = None
-        if start is None or end is None:
-            return
-
-        dx = abs(end[0] - start[0])
-        dy = abs(end[1] - start[1])
-        if dx < 12 and dy < 12:
-            self.tapRequested.emit(
-                end[0],
-                end[1],
+        self._drag_active = False
+        if android is None:
+            android = self._last_drag_point
+        if android is not None:
+            if android != self._last_drag_point:
+                self.touchMoveRequested.emit(
+                    android[0],
+                    android[1],
+                )
+            self.touchUpRequested.emit(
+                android[0],
+                android[1],
             )
-        else:
-            self.swipeRequested.emit(
-                start[0],
-                start[1],
-                end[0],
-                end[1],
-                250,
-            )
+        self._last_drag_point = None
+        event.accept()
 
     def wheelEvent(
         self,
@@ -460,11 +503,40 @@ class AndroidView(QLabel):
             or not self._display_rect.contains(point)
         ):
             return None
+        return self._map_to_android_clamped(
+            point
+        )
+
+    def _map_to_android_clamped(
+        self,
+        point: QPoint,
+    ) -> tuple[int, int] | None:
+        if (
+            self._input_width <= 0
+            or self._input_height <= 0
+            or self._display_rect.width() <= 0
+            or self._display_rect.height() <= 0
+        ):
+            return None
+        x = min(
+            self._display_rect.right(),
+            max(
+                self._display_rect.left(),
+                point.x(),
+            ),
+        )
+        y = min(
+            self._display_rect.bottom(),
+            max(
+                self._display_rect.top(),
+                point.y(),
+            ),
+        )
         x_ratio = (
-            point.x() - self._display_rect.x()
+            x - self._display_rect.x()
         ) / self._display_rect.width()
         y_ratio = (
-            point.y() - self._display_rect.y()
+            y - self._display_rect.y()
         ) / self._display_rect.height()
         return map_display_ratio_to_input(
             x_ratio,

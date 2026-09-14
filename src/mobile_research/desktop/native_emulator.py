@@ -487,7 +487,7 @@ class NativeEmulatorEmbedder(QObject):
         self._presentation_visible = True
         self._source_hidden_for_minimize = False
         self._timer = QTimer(self)
-        self._timer.setInterval(15)
+        self._timer.setInterval(5)
         self._timer.timeout.connect(self._poll)
 
     @property
@@ -519,7 +519,7 @@ class NativeEmulatorEmbedder(QObject):
             + max(1.0, float(timeout))
         )
         self.host.window().winId()
-        self._timer.setInterval(15)
+        self._timer.setInterval(5)
         self._timer.start()
         self._poll()
 
@@ -587,7 +587,7 @@ class NativeEmulatorEmbedder(QObject):
         found = find_emulator_window(
             self._root_pid,
             self._avd_name,
-            require_visible=True,
+            require_visible=False,
         )
         if found is not None:
             hwnd, details = found

@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.7.4 — covered-source DWM live Emulator.  
-**Stable baseline:** v0.7.4 Desktop Application.  
+**Этап:** v0.7.5 — real-time touch + startup flash suppression.  
+**Stable baseline:** v0.7.5 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -263,3 +263,10 @@ v0.3.0 выполнял bytes → QImage.copy → mirrored image → QPixmap →
 
 ### ADR-069 — DWM thumbnail visibility управляется выбранной Qt-вкладкой
 DWM thumbnail композитится в top-level HWND и не является дочерним Qt widget, поэтому QTabWidget не может автоматически clip/hide его. Начиная с v0.7.4 `tabs.currentChanged` явно переключает `DWM_THUMBNAIL_PROPERTIES.fVisible`: только индекс вкладки Исследование имеет visible=true. Это исключает наложение Android изображения поверх Настроек, Диагностики, Истории и Результатов.
+
+
+### ADR-070 — Pointer drag передаётся как реальный touch lifecycle
+Прежний AndroidView отправлял swipe только в `mouseReleaseEvent`, поэтому Android не получал движения до отпускания кнопки. Начиная с v0.7.5 mouse press немедленно создаёт gRPC touch DOWN, mouse move во время удержания генерирует последовательность MOVE с pressure=1, а release отправляет финальный MOVE и UP с pressure=0. MOVE ограничен интервалом 12 ms (~83 Hz), чтобы не создавать backlog на высокочастотной мыши. Controller и AndroidRuntime получили отдельные `touch_down/touch_move/touch_up`; EmulatorGrpcClient отправляет их в уже существующий persistent `streamInputEvent`. ADB fallback при отсутствии gRPC по-прежнему сводит жест к tap/swipe на release.
+
+### ADR-071 — DWM source создаётся скрытым и показывается только после установки z-order
+Даже 15-ms polling оставлял короткую вспышку standalone Emulator до того, как source HWND успевал оказаться за Mobile Research. В DWM-live Windows launch v0.7.5 передаёт `STARTUPINFO.dwFlags |= STARTF_USESHOWWINDOW` и `wShowWindow=SW_HIDE`. NativeEmulatorEmbedder ищет top-level source независимо от текущего visibility, устанавливает TOOLWINDOW/z-order/geometry за Mobile Research и только затем показывает source через `SW_SHOWNOACTIVATE`. Discovery polling сокращён до 5 ms для Emulator builds, которые частично игнорируют startup show state.

@@ -607,6 +607,15 @@ class MainWindow(QMainWindow):
         self.android_view.swipeRequested.connect(
             c.swipe
         )
+        self.android_view.touchDownRequested.connect(
+            c.touch_down
+        )
+        self.android_view.touchMoveRequested.connect(
+            c.touch_move
+        )
+        self.android_view.touchUpRequested.connect(
+            c.touch_up
+        )
         self.android_view.keyRequested.connect(
             c.keyevent
         )

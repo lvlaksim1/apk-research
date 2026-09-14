@@ -84,6 +84,9 @@ class AndroidRuntime:
         self._display_mode = "headless"
         self._startup_attempts: list[dict[str, object]] = []
         self._last_emulator_command: list[str] = []
+        self._fallback_touch_start: (
+            tuple[int, int, float] | None
+        ) = None
 
     @property
     def paths(self):
@@ -436,6 +439,65 @@ class AndroidRuntime:
                 )
             stop_event.wait(0.12)
 
+    def touch_down(self, x: int, y: int) -> None:
+        self._fallback_touch_start = (
+            int(x),
+            int(y),
+            time.perf_counter(),
+        )
+        client = self._get_grpc_client()
+        if client is not None:
+            try:
+                client.touch_down(x, y)
+                return
+            except Exception:
+                self._grpc_input_failures += 1
+
+    def touch_move(self, x: int, y: int) -> None:
+        client = self._get_grpc_client()
+        if client is not None:
+            try:
+                client.touch_move(x, y)
+                return
+            except Exception:
+                self._grpc_input_failures += 1
+
+    def touch_up(self, x: int, y: int) -> None:
+        start = self._fallback_touch_start
+        self._fallback_touch_start = None
+        client = self._get_grpc_client()
+        if client is not None:
+            try:
+                client.touch_up(x, y)
+                return
+            except Exception:
+                self._grpc_input_failures += 1
+        if start is None:
+            self.tap(x, y)
+            return
+        x1, y1, started = start
+        duration_ms = max(
+            1,
+            int(
+                (time.perf_counter() - started)
+                * 1000
+            ),
+        )
+        dx = abs(int(x) - x1)
+        dy = abs(int(y) - y1)
+        if dx < 12 and dy < 12:
+            self.tap(x, y)
+            return
+        self._adb_shell(
+            "input",
+            "swipe",
+            str(max(0, x1)),
+            str(max(0, y1)),
+            str(max(0, x)),
+            str(max(0, y)),
+            str(duration_ms),
+        )
+
     def tap(self, x: int, y: int) -> None:
         client = self._get_grpc_client()
         if client is not None:
@@ -739,14 +801,32 @@ class AndroidRuntime:
             "CREATE_NO_WINDOW",
             0,
         )
+        startupinfo = None
+        if (
+            self._is_windows()
+            and self._display_mode == "dwm-live"
+            and hasattr(subprocess, "STARTUPINFO")
+        ):
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= getattr(
+                subprocess,
+                "STARTF_USESHOWWINDOW",
+                1,
+            )
+            startupinfo.wShowWindow = 0  # SW_HIDE
+        popen_kwargs = {
+            "stdin": subprocess.DEVNULL,
+            "stdout": log_handle,
+            "stderr": subprocess.STDOUT,
+            "env": self.components.environment(),
+            "creationflags": creation_flags,
+        }
+        if startupinfo is not None:
+            popen_kwargs["startupinfo"] = startupinfo
         try:
             process = subprocess.Popen(
                 command,
-                stdin=subprocess.DEVNULL,
-                stdout=log_handle,
-                stderr=subprocess.STDOUT,
-                env=self.components.environment(),
-                creationflags=creation_flags,
+                **popen_kwargs,
             )
         except OSError as exc:
             log_handle.close()

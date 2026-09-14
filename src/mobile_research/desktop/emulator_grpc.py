@@ -333,6 +333,48 @@ class EmulatorGrpcClient:
             timeout=timeout,
         )
 
+    def touch_down(self, x: int, y: int) -> None:
+        self._send_touch_state(
+            x,
+            y,
+            pressure=1,
+        )
+
+    def touch_move(self, x: int, y: int) -> None:
+        self._send_touch_state(
+            x,
+            y,
+            pressure=1,
+        )
+
+    def touch_up(self, x: int, y: int) -> None:
+        self._send_touch_state(
+            x,
+            y,
+            pressure=0,
+        )
+
+    def _send_touch_state(
+        self,
+        x: int,
+        y: int,
+        *,
+        pressure: int,
+    ) -> None:
+        event = self._touch_event(
+            x,
+            y,
+            pressure=pressure,
+        )
+        if self._queue_input_event(
+            self._wrap_touch(event)
+        ):
+            return
+        self._send_touch(
+            event,
+            timeout=2.0,
+        )
+
     def tap(self, x: int, y: int) -> None:
         down = self._touch_event(x, y, pressure=1)
         up = self._touch_event(x, y, pressure=0)

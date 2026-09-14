@@ -160,6 +160,27 @@ class DesktopController(QObject):
             self._repair_components_worker
         )
 
+    def touch_down(self, x: int, y: int) -> None:
+        self._queue_input(
+            "touch_down",
+            x,
+            y,
+        )
+
+    def touch_move(self, x: int, y: int) -> None:
+        self._queue_input(
+            "touch_move",
+            x,
+            y,
+        )
+
+    def touch_up(self, x: int, y: int) -> None:
+        self._queue_input(
+            "touch_up",
+            x,
+            y,
+        )
+
     def tap(self, x: int, y: int) -> None:
         self._queue_input(
             "tap",
