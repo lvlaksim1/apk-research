@@ -13,6 +13,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
+    QComboBox,
     QFileDialog,
     QGridLayout,
     QGroupBox,
@@ -261,6 +262,30 @@ class MainWindow(QMainWindow):
             "3. Исследование"
         )
         run_layout = QVBoxLayout(run_group)
+        launch_label = QLabel("Запуск приложения")
+        self.launch_mode = QComboBox()
+        self.launch_mode.addItem(
+            "Чистый запуск (рекомендуется)",
+            "clean",
+        )
+        self.launch_mode.addItem(
+            "Продолжить текущее состояние",
+            "continue",
+        )
+        saved_launch_mode = self.settings.value(
+            "research/launch_mode",
+            "clean",
+        )
+        launch_index = self.launch_mode.findData(
+            saved_launch_mode
+        )
+        if launch_index >= 0:
+            self.launch_mode.setCurrentIndex(
+                launch_index
+            )
+        run_layout.addWidget(launch_label)
+        run_layout.addWidget(self.launch_mode)
+
         self.start_button = QPushButton(
             "НАЧАТЬ ИССЛЕДОВАНИЕ"
         )
@@ -566,7 +591,7 @@ class MainWindow(QMainWindow):
             self._prepare_environment
         )
         self.start_button.clicked.connect(
-            c.start_research
+            self._start_research
         )
         self.stop_button.clicked.connect(
             c.stop_research
@@ -656,6 +681,21 @@ class MainWindow(QMainWindow):
         )
         self.repair_components_button.clicked.connect(
             self._repair_components
+        )
+
+    def _start_research(self) -> None:
+        launch_mode = str(
+            self.launch_mode.currentData()
+            or "clean"
+        )
+        self.settings.setValue(
+            "research/launch_mode",
+            launch_mode,
+        )
+        self.controller.start_research(
+            clean_launch=(
+                launch_mode == "clean"
+            )
         )
 
     def _choose_apk(self) -> None:
