@@ -21,8 +21,8 @@ def main() -> int:
     try:
         client.wait_ready(timeout=15.0)
         stream = client.stream_frames(
-            width=360,
-            height=640,
+            width=405,
+            height=720,
             timeout=15.0,
         )
         frame = next(stream)
@@ -33,6 +33,12 @@ def main() -> int:
         ):
             raise RuntimeError(
                 "gRPC screenshot was empty"
+            )
+
+        if frame.transport != "grpc-mmap":
+            raise RuntimeError(
+                "Expected grpc-mmap framebuffer, got "
+                + frame.transport
             )
 
         client.tap(
