@@ -6,6 +6,7 @@ All notable Mobile Research changes are recorded here.
 
 ### Changed
 
+- Package metadata preflight no longer destroys an otherwise viable research session when a full Package Manager dump stalls. Mobile Research now waits for Package Manager handlers, uses bounded primary/fallback dump commands, and continues with degraded metadata so logcat/screen/PCAP can still be captured; the final session is `partial` rather than falsely `complete`.
 - Windows desktop runtime now requires the Microsoft Windows Hypervisor Platform (WHPX) instead of accepting AEHD/GVM as an equivalent Windows hypervisor.
 - Runtime acceptance can require a packaged/frozen executable, exact installed executable path, a clean managed-component root and verified WHPX.
 

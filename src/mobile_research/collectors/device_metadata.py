@@ -131,7 +131,22 @@ class DeviceMetadataCollector:
 
             target_started = self.adb.get_utc_time(serial)
             getprop = self.adb.get_all_properties(serial)
-            package_dump = self._capture_package_dump(serial, package_name)
+            (
+                package_dump,
+                package_dump_complete,
+                package_dump_method,
+                package_dump_errors,
+            ) = self._capture_package_dump(
+                serial,
+                package_name,
+            )
+            if not package_dump_complete:
+                self.session.record_error(
+                    "collector:device_metadata:package_dump",
+                    "Full package dump unavailable; research continues "
+                    "with degraded package metadata. "
+                    + "; ".join(package_dump_errors),
+                )
             package_paths = self.adb.get_package_paths(serial, package_name)
 
             system_text, optional_errors = self._capture_optional_system(serial)
@@ -178,6 +193,9 @@ class DeviceMetadataCollector:
                 target_started=target_started,
                 target_finished=target_finished,
                 optional_errors=optional_errors,
+                package_dump_complete=package_dump_complete,
+                package_dump_method=package_dump_method,
+                package_dump_errors=package_dump_errors,
             )
             normalized_path = "02_normalized/target.json"
             _write_text_atomic(
@@ -230,11 +248,51 @@ class DeviceMetadataCollector:
                 f"Device metadata capture failed: {message}"
             ) from exc
 
+    def _wait_for_package_manager_idle(
+        self,
+        serial: str,
+    ) -> list[str]:
+        errors: list[str] = []
+        commands = (
+            (
+                "package-handler",
+                (
+                    "cmd",
+                    "package",
+                    "wait-for-handler",
+                    "--timeout",
+                    "10000",
+                ),
+            ),
+            (
+                "package-background-handler",
+                (
+                    "cmd",
+                    "package",
+                    "wait-for-background-handler",
+                    "--timeout",
+                    "10000",
+                ),
+            ),
+        )
+        for label, arguments in commands:
+            try:
+                self.adb.shell_output(
+                    serial,
+                    *arguments,
+                    timeout=15.0,
+                )
+            except AdbError as exc:
+                errors.append(
+                    f"{label}: {str(exc) or exc.__class__.__name__}"
+                )
+        return errors
+
     def _capture_package_dump(
         self,
         serial: str,
         package_name: str,
-    ) -> str:
+    ) -> tuple[str, bool, str, list[str]]:
         remote_dir = (
             f"/data/local/tmp/mobile-research/{self.session.session_id}"
         )
@@ -242,47 +300,113 @@ class DeviceMetadataCollector:
         temporary = (
             self.session.paths.raw_device / "package.remote.tmp"
         )
+        errors = self._wait_for_package_manager_idle(serial)
+        attempts = (
+            (
+                "dumpsys-package",
+                (
+                    "dumpsys",
+                    "-t",
+                    "30",
+                    "package",
+                    package_name,
+                ),
+                40.0,
+            ),
+            (
+                "cmd-package-dump-package",
+                (
+                    "timeout",
+                    "30s",
+                    "cmd",
+                    "package",
+                    "dump-package",
+                    package_name,
+                ),
+                40.0,
+            ),
+        )
+
+        self.adb.make_remote_directory(
+            serial,
+            remote_dir,
+        )
 
         try:
-            self.adb.make_remote_directory(
-                serial,
-                remote_dir,
-            )
-            try:
-                self.adb.remove_remote_file(
-                    serial,
-                    remote_path,
-                )
-            except AdbError:
-                pass
+            for method, arguments, timeout in attempts:
+                temporary.unlink(missing_ok=True)
+                try:
+                    self.adb.remove_remote_file(
+                        serial,
+                        remote_path,
+                    )
+                except AdbError:
+                    pass
 
-            self.adb.capture_shell_output_to_file(
-                serial,
-                remote_path,
-                "dumpsys",
-                "package",
-                package_name,
-                timeout=60.0,
-            )
-            self.adb.pull_file(
-                serial,
-                remote_path,
-                temporary,
-                timeout=120.0,
-            )
+                try:
+                    self.adb.capture_shell_output_to_file(
+                        serial,
+                        remote_path,
+                        *arguments,
+                        timeout=timeout,
+                    )
+                    self.adb.pull_file(
+                        serial,
+                        remote_path,
+                        temporary,
+                        timeout=60.0,
+                    )
+                except AdbError as exc:
+                    errors.append(
+                        f"{method}: {str(exc) or exc.__class__.__name__}"
+                    )
+                    continue
 
-            if not temporary.is_file():
-                raise MetadataCollectorError(
-                    "Package dump was not pulled from Android"
+                if not temporary.is_file():
+                    errors.append(
+                        f"{method}: package dump was not pulled"
+                    )
+                    continue
+                if temporary.stat().st_size == 0:
+                    errors.append(
+                        f"{method}: package dump is empty"
+                    )
+                    continue
+
+                text = temporary.read_text(
+                    encoding="utf-8",
+                    errors="replace",
                 )
-            if temporary.stat().st_size == 0:
-                raise MetadataCollectorError(
-                    "Package dump captured on Android is empty"
+                upper = text.upper()
+                if (
+                    "DUMP TIMEOUT" in upper
+                    or "FAILURE DUMPING SERVICE" in upper
+                ):
+                    errors.append(
+                        f"{method}: Android reported an incomplete dump"
+                    )
+                    continue
+
+                return (
+                    text,
+                    True,
+                    method,
+                    errors,
                 )
 
-            return temporary.read_text(
-                encoding="utf-8",
-                errors="replace",
+            diagnostic = (
+                "PACKAGE DUMP UNAVAILABLE\n"
+                "The full Package Manager dump could not be captured.\n"
+                "Other device metadata and research collectors were allowed "
+                "to continue.\n"
+                + "\n".join(f"- {item}" for item in errors)
+                + "\n"
+            )
+            return (
+                diagnostic,
+                False,
+                "unavailable",
+                errors,
             )
         finally:
             temporary.unlink(missing_ok=True)
@@ -335,6 +459,9 @@ class DeviceMetadataCollector:
         target_started: str,
         target_finished: str,
         optional_errors: list[dict[str, str]],
+        package_dump_complete: bool,
+        package_dump_method: str,
+        package_dump_errors: list[str],
     ) -> dict[str, object]:
         properties = _parse_getprop(getprop)
         version_code = _search_group(_VERSION_CODE_RE, package_dump)
@@ -377,6 +504,11 @@ class DeviceMetadataCollector:
                 "target_started_utc": target_started,
                 "target_finished_utc": target_finished,
                 "host_finished_utc": host_finished,
+            },
+            "package_dump": {
+                "complete": package_dump_complete,
+                "method": package_dump_method,
+                "attempt_errors": list(package_dump_errors),
             },
             "optional_command_errors": optional_errors,
         }

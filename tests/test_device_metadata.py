@@ -30,6 +30,8 @@ class FakeAdb:
         self.remote_dirs: list[str] = []
         self.removed: list[str] = []
         self.captured_commands: list[tuple[str, ...]] = []
+        self.capture_failures: set[tuple[str, ...]] = set()
+        self.shell_commands: list[tuple[str, ...]] = []
         self.package_dump = (
             "Packages:\n"
             "  Package [com.example.app]\n"
@@ -77,7 +79,15 @@ class FakeAdb:
         *arguments: str,
         timeout: float = 60.0,
     ) -> None:
-        self.captured_commands.append(tuple(arguments))
+        command = tuple(arguments)
+        self.captured_commands.append(command)
+        if command in self.capture_failures:
+            from mobile_research.targets import AdbError
+
+            raise AdbError(
+                "simulated package dump timeout: "
+                + " ".join(command)
+            )
 
     def pull_file(
         self,
@@ -101,6 +111,7 @@ class FakeAdb:
         self.removed.append(remote_path)
 
     def shell_output(self, serial: str, *arguments: str, timeout: float = 10.0) -> str:
+        self.shell_commands.append(tuple(arguments))
         label = " ".join(arguments)
         if arguments and arguments[0] in self.optional_failures:
             from mobile_research.targets import AdbError
@@ -152,6 +163,8 @@ def test_metadata_collector_writes_raw_and_normalized_files(
     ]
     assert (
         "dumpsys",
+        "-t",
+        "30",
         "package",
         "com.example.app",
     ) in collector.adb.captured_commands
@@ -262,5 +275,121 @@ def test_large_package_dump_uses_remote_file_transport(
     assert result.status == "completed"
     assert package_file.stat().st_size > 250_000
     assert adb.captured_commands == [
-        ("dumpsys", "package", "com.example.app")
+        (
+            "dumpsys",
+            "-t",
+            "30",
+            "package",
+            "com.example.app",
+        )
     ]
+
+
+
+def test_package_dump_timeout_uses_bounded_fallback(
+    tmp_path: Path,
+) -> None:
+    session = create_session(tmp_path)
+    adb = FakeAdb()
+    primary = (
+        "dumpsys",
+        "-t",
+        "30",
+        "package",
+        "com.example.app",
+    )
+    fallback = (
+        "timeout",
+        "30s",
+        "cmd",
+        "package",
+        "dump-package",
+        "com.example.app",
+    )
+    adb.capture_failures.add(primary)
+
+    result = DeviceMetadataCollector(
+        adb,
+        session,
+        clock=TestClock(),
+    ).collect()
+
+    assert result.status == "completed"
+    assert adb.captured_commands == [
+        primary,
+        fallback,
+    ]
+    assert session.degraded is False
+
+    normalized = json.loads(
+        (
+            session.paths.normalized_dir
+            / "target.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert normalized["package_dump"]["complete"] is True
+    assert (
+        normalized["package_dump"]["method"]
+        == "cmd-package-dump-package"
+    )
+
+
+def test_package_dump_failure_degrades_but_does_not_abort_metadata(
+    tmp_path: Path,
+) -> None:
+    session = create_session(tmp_path)
+    adb = FakeAdb()
+    primary = (
+        "dumpsys",
+        "-t",
+        "30",
+        "package",
+        "com.example.app",
+    )
+    fallback = (
+        "timeout",
+        "30s",
+        "cmd",
+        "package",
+        "dump-package",
+        "com.example.app",
+    )
+    adb.capture_failures.update(
+        {
+            primary,
+            fallback,
+        }
+    )
+
+    result = DeviceMetadataCollector(
+        adb,
+        session,
+        clock=TestClock(),
+    ).collect()
+
+    assert result.status == "completed"
+    assert session.degraded is True
+    state = session.manifest["collectors"]["device_metadata"]
+    assert state["status"] == "completed"
+    assert any(
+        error["source"]
+        == "collector:device_metadata:package_dump"
+        for error in session.manifest["errors"]
+    )
+
+    package_text = (
+        session.paths.raw_device
+        / "package.txt"
+    ).read_text(encoding="utf-8")
+    assert package_text.startswith(
+        "PACKAGE DUMP UNAVAILABLE"
+    )
+
+    normalized = json.loads(
+        (
+            session.paths.normalized_dir
+            / "target.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert normalized["package_dump"]["complete"] is False
+    assert normalized["package_dump"]["method"] == "unavailable"
