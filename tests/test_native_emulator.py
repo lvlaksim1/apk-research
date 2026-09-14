@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication, QWidget
 
 from mobile_research.desktop.native_emulator import (
     _fit_rect,
+    _offscreen_position,
     _phone_content_size,
     find_emulator_window,
     windows_native_embedding_available,
@@ -28,6 +29,19 @@ def test_fit_rect_preserves_source_aspect() -> None:
         450,
         800,
     ) == (275, 0, 450, 800)
+
+
+def test_offscreen_position_is_beyond_complete_virtual_desktop() -> None:
+    x, y = _offscreen_position(
+        -1920,
+        -200,
+        5760,
+        1440,
+        500,
+        900,
+    )
+    assert x > (-1920 + 5760)
+    assert -200 <= y <= (-200 + 1440)
 
 
 @pytest.mark.skipif(

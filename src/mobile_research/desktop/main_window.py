@@ -95,8 +95,11 @@ class MainWindow(QMainWindow):
             )
             event.ignore()
             return
-        self.android_view.detach_native()
+        # Keep the DWM thumbnail registered until the source Emulator
+        # process has stopped. Unregistering first would briefly reveal
+        # the off-screen standalone source window during shutdown.
         self.controller.close()
+        self.android_view.detach_native()
         event.accept()
 
     def _build_ui(self) -> None:
@@ -867,7 +870,7 @@ class MainWindow(QMainWindow):
             )
             suffix = ""
             if self.android_view.native_active:
-                suffix += " • native"
+                suffix += " • DWM live"
             elif transport_name:
                 suffix += f" • {transport_name}"
             if gpu_mode:

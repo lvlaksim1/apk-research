@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.7.2 — DWM live Emulator composition.  
-**Stable baseline:** v0.7.2 Desktop Application.  
+**Этап:** v0.7.3 — single-window DWM live Emulator.  
+**Stable baseline:** v0.7.3 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -252,3 +252,7 @@ v0.3.0 выполнял bytes → QImage.copy → mirrored image → QPixmap →
 
 ### ADR-066 — Release-candidate artifact определяется release commit contract
 Попытка определять release-candidate сравнением версии с parent через `git show` оказалась ненадёжной в GitHub Actions checkout и дала false negative для v0.7.1. Поскольку проект уже имеет формальный commit-driven release contract, временный `mobile-research-windows-desktop` artifact создаётся только на push в main, если head commit message начинается с `Release Mobile Research v`. Обычные коммиты не создают installer artifacts. Release workflow по-прежнему удаляет этот однодневный artifact сразу после публикации.
+
+
+### ADR-067 — DWM source window постоянно исключено из пользовательского desktop UX
+Реальный тест v0.7.2 подтвердил плавность DWM live, но показал, что однократного `SetWindowPos` недостаточно: Qt/Emulator позднее меняет geometry и source window снова появляется на рабочем столе. v0.7.3 сохраняет source как visible/non-minimized top-level GPU window, но каждые 100 ms перемещает его полностью за правую границу всего Windows virtual desktop. Дополнительно source получает `WS_EX_TOOLWINDOW` и теряет `WS_EX_APPWINDOW`, поэтому не участвует в taskbar/Alt+Tab. Это не меняет parent, размер или GPU surface. При shutdown порядок строго обратный прежнему: сначала `runtime.stop()` завершает Emulator при ещё зарегистрированном DWM thumbnail, затем thumbnail удаляется. Это исключает вспышку standalone окна при закрытии Mobile Research.

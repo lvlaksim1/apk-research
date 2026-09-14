@@ -1,53 +1,33 @@
-# Mobile Research v0.7.2
+# Mobile Research v0.7.3
 
-v0.7.2 replaces cross-process `SetParent` embedding with DWM live composition, includes the Win32 thumbnail-handle correction, and uses the corrected ephemeral-installer release workflow.
+v0.7.3 completes the single-window DWM live UX.
 
-The real-PC v0.6.0 test proved that Mobile Research could find and re-parent the correct standalone Android Emulator window, but the Emulator GPU surface stopped rendering after the parent change. The original standalone window rendered normally again when Mobile Research closed. This release therefore removes `SetParent` from the active display architecture.
+The v0.7.2 real-PC test confirmed that DWM live composition is smooth and correctly synchronized, but the original standalone Emulator window remained visible. The reason was that Mobile Research moved it off-screen only once; Android Emulator/Qt later restored or adjusted its geometry during boot.
 
-## DWM live presentation
+## Single visible application window
 
-The primary Windows path is now:
+The Emulator remains a real visible/non-minimized top-level GPU window for DWM, but Mobile Research now treats it as an internal source window:
 
-`Android Emulator standalone GPU window → Windows DWM → Mobile Research Android panel`
+- the source is moved completely beyond the full Windows virtual desktop;
+- the position is re-enforced every 100 ms, so later Qt geometry changes cannot bring it back;
+- the source is marked TOOLWINDOW and APPWINDOW is removed, keeping it out of Alt+Tab/taskbar;
+- DWM continues rendering the live GPU surface into the Android panel;
+- the source is never re-parented, hidden or minimized.
 
-The Emulator remains a normal top-level Qt/GPU window. Mobile Research registers a DWM thumbnail relationship using its own top-level window as the destination and the Emulator top-level window as the source. The live destination rectangle is aligned to the Android panel.
+Window discovery uses a 15 ms polling interval during startup to minimize any initial standalone-window flash.
 
-No Android frame is copied by Python or QPainter in DWM mode.
+## Shutdown
 
-## Source-window handling
+The shutdown order is now:
 
-After DWM registration and the first successful thumbnail update:
+1. stop the Android Emulator while the DWM live relationship is still active;
+2. unregister the DWM thumbnail;
+3. close Mobile Research.
 
-- the standalone Emulator window is moved outside the visible virtual desktop;
-- it is not hidden or minimized, so DWM can continue composing it;
-- it is not re-parented;
-- it is not restored during Mobile Research shutdown, preventing the second-window flash seen in v0.6.0.
+This prevents the standalone Emulator window from becoming visible for a moment when Mobile Research closes.
 
-The Emulator side toolbar is cropped from the source rectangle when the phone content aspect can be inferred.
+## Input and fallback
 
-## Input
+Input still uses the Emulator gRPC stream. If DWM live is unavailable, the existing gRPC/MMAP → gRPC bytes → ADB fallback remains unchanged.
 
-Mouse, swipe, keyboard and text input remain on the existing persistent Emulator gRPC control stream. Presentation and input are therefore independent.
-
-## Fallback
-
-If DWM composition, source-window discovery or thumbnail registration fails, Mobile Research automatically keeps using:
-
-1. gRPC/MMAP framebuffer;
-2. gRPC bytes;
-3. ADB screenshot/input fallback.
-
-The evidence pipeline is unchanged.
-
-## Research core
-
-No evidence collector is replaced or weakened:
-
-- ADB target management;
-- root;
-- raw PCAP/tcpdump;
-- logcat;
-- screen recording;
-- package metadata;
-- Research ZIP;
-- semantic audit.
+The research evidence pipeline is unchanged.

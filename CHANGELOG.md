@@ -2,6 +2,17 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.7.3] - 2026-09-15
+
+### Single-window DWM UX
+
+- The standalone Android Emulator source window is now continuously kept outside the entire Windows virtual desktop instead of being moved only once. This prevents the Emulator from reappearing when Qt changes/restores its geometry later in the boot sequence.
+- The source top-level window is marked as a tool window and has APPWINDOW removed, keeping it out of Alt+Tab/taskbar while preserving the visible/non-minimized state required by DWM composition.
+- DWM destination geometry and source-window suppression are maintained every 100 ms while live mode is active.
+- Initial source-window discovery now polls every 15 ms to minimize any startup flash before the window is moved off-screen.
+- Shutdown order is reversed: Mobile Research stops the Emulator process while the DWM thumbnail is still registered, and only then unregisters DWM. This removes the second-window flash observed when closing v0.7.2.
+- No SetParent, hiding, minimizing, or framebuffer copy is used in DWM live mode.
+
 ## [0.7.2] - 2026-09-15
 
 ### Release workflow

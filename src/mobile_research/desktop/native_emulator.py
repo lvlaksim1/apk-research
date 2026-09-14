@@ -20,11 +20,21 @@ if WINDOWS:
     INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
 
     SW_HIDE = 0
+
+    GWL_EXSTYLE = -20
+    WS_EX_TOOLWINDOW = 0x00000080
+    WS_EX_APPWINDOW = 0x00040000
+
     SWP_NOSIZE = 0x0001
+    SWP_NOMOVE = 0x0002
     SWP_NOZORDER = 0x0004
     SWP_NOACTIVATE = 0x0010
+    SWP_FRAMECHANGED = 0x0020
 
     SM_XVIRTUALSCREEN = 76
+    SM_YVIRTUALSCREEN = 77
+    SM_CXVIRTUALSCREEN = 78
+    SM_CYVIRTUALSCREEN = 79
 
     DWM_TNP_RECTDESTINATION = 0x00000001
     DWM_TNP_RECTSOURCE = 0x00000002
@@ -144,6 +154,28 @@ if WINDOWS:
     user32.SetWindowPos.restype = wintypes.BOOL
     user32.GetSystemMetrics.argtypes = [ctypes.c_int]
     user32.GetSystemMetrics.restype = ctypes.c_int
+
+    _get_window_long = getattr(
+        user32,
+        "GetWindowLongPtrW",
+        user32.GetWindowLongW,
+    )
+    _set_window_long = getattr(
+        user32,
+        "SetWindowLongPtrW",
+        user32.SetWindowLongW,
+    )
+    _get_window_long.argtypes = [
+        wintypes.HWND,
+        ctypes.c_int,
+    ]
+    _get_window_long.restype = ctypes.c_ssize_t
+    _set_window_long.argtypes = [
+        wintypes.HWND,
+        ctypes.c_int,
+        ctypes.c_ssize_t,
+    ]
+    _set_window_long.restype = ctypes.c_ssize_t
 
     dwmapi.DwmIsCompositionEnabled.argtypes = [
         ctypes.POINTER(wintypes.BOOL),
@@ -284,6 +316,34 @@ def _phone_content_size(
     return width, height
 
 
+def _offscreen_position(
+    virtual_left: int,
+    virtual_top: int,
+    virtual_width: int,
+    virtual_height: int,
+    window_width: int,
+    window_height: int,
+) -> tuple[int, int]:
+    """Place a source window fully outside the complete virtual desktop."""
+
+    margin = 512
+    x = (
+        int(virtual_left)
+        + max(1, int(virtual_width))
+        + margin
+    )
+    available_height = max(1, int(virtual_height))
+    y = int(virtual_top) + max(
+        0,
+        (
+            available_height
+            - max(1, int(window_height))
+        )
+        // 2,
+    )
+    return x, y
+
+
 def _fit_rect(
     width: int,
     height: int,
@@ -418,7 +478,7 @@ class NativeEmulatorEmbedder(QObject):
         self._source_width = 0
         self._source_height = 0
         self._timer = QTimer(self)
-        self._timer.setInterval(50)
+        self._timer.setInterval(15)
         self._timer.timeout.connect(self._poll)
 
     @property
@@ -450,6 +510,7 @@ class NativeEmulatorEmbedder(QObject):
             + max(1.0, float(timeout))
         )
         self.host.window().winId()
+        self._timer.setInterval(15)
         self._timer.start()
         self._poll()
 
@@ -484,7 +545,18 @@ class NativeEmulatorEmbedder(QObject):
 
     def _poll(self) -> None:
         if self.active:
-            self._timer.stop()
+            try:
+                self._maintain_source_window()
+                self._update_thumbnail()
+            except Exception as exc:
+                self._fail(
+                    "DWM live maintenance failed: "
+                    + (
+                        str(exc)
+                        or exc.__class__.__name__
+                    )
+                    + "; используется framebuffer fallback"
+                )
             return
 
         found = find_emulator_window(
@@ -495,6 +567,7 @@ class NativeEmulatorEmbedder(QObject):
         if found is not None:
             hwnd, details = found
             try:
+                self._prepare_source_window(hwnd)
                 self._register_thumbnail(hwnd)
             except Exception as exc:
                 try:
@@ -529,7 +602,7 @@ class NativeEmulatorEmbedder(QObject):
                     else 1080
                 ),
             }
-            self._timer.stop()
+            self._timer.setInterval(100)
             self.attached.emit(details)
             return
 
@@ -584,7 +657,7 @@ class NativeEmulatorEmbedder(QObject):
         self.thumbnail = int(thumbnail.value or 0)
         try:
             self._update_thumbnail()
-            self._move_source_offscreen()
+            self._maintain_source_window()
         except Exception:
             try:
                 dwmapi.DwmUnregisterThumbnail(thumbnail)
@@ -649,27 +722,107 @@ class NativeEmulatorEmbedder(QObject):
                 f"0x{int(hr) & 0xffffffff:08x}"
             )
 
-    def _move_source_offscreen(self) -> None:
+    def _prepare_source_window(
+        self,
+        hwnd: int,
+    ) -> None:
+        """Keep the Emulator alive for DWM but invisible to the user shell."""
+
+        if not WINDOWS or not hwnd:
+            return
+        current = int(
+            _get_window_long(
+                hwnd,
+                GWL_EXSTYLE,
+            )
+        )
+        desired = (
+            current
+            & ~WS_EX_APPWINDOW
+        ) | WS_EX_TOOLWINDOW
+        if desired != current:
+            ctypes.set_last_error(0)
+            _set_window_long(
+                hwnd,
+                GWL_EXSTYLE,
+                desired,
+            )
+        user32.SetWindowPos(
+            hwnd,
+            0,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE
+            | SWP_NOSIZE
+            | SWP_NOZORDER
+            | SWP_NOACTIVATE
+            | SWP_FRAMECHANGED,
+        )
+        self._move_source_offscreen(hwnd)
+
+    def _maintain_source_window(self) -> None:
         if not self.hwnd:
             return
-        width, _height = _window_size(self.hwnd)
+        self._prepare_source_window(
+            self.hwnd
+        )
+
+    def _move_source_offscreen(
+        self,
+        hwnd: int | None = None,
+    ) -> None:
+        source = int(hwnd or self.hwnd or 0)
+        if not source:
+            return
+
+        width, height = _window_size(source)
         virtual_left = int(
             user32.GetSystemMetrics(
                 SM_XVIRTUALSCREEN
             )
         )
-        offscreen_x = virtual_left - max(200, width) - 200
-        user32.SetWindowPos(
-            self.hwnd,
+        virtual_top = int(
+            user32.GetSystemMetrics(
+                SM_YVIRTUALSCREEN
+            )
+        )
+        virtual_width = int(
+            user32.GetSystemMetrics(
+                SM_CXVIRTUALSCREEN
+            )
+        )
+        virtual_height = int(
+            user32.GetSystemMetrics(
+                SM_CYVIRTUALSCREEN
+            )
+        )
+        offscreen_x, offscreen_y = (
+            _offscreen_position(
+                virtual_left,
+                virtual_top,
+                virtual_width,
+                virtual_height,
+                width,
+                height,
+            )
+        )
+        if not user32.SetWindowPos(
+            source,
             0,
             offscreen_x,
-            0,
+            offscreen_y,
             0,
             0,
             SWP_NOSIZE
             | SWP_NOZORDER
             | SWP_NOACTIVATE,
-        )
+        ):
+            raise RuntimeError(
+                "Не удалось убрать окно Emulator "
+                "за пределы рабочего стола"
+            )
 
     def _fail(self, message: str) -> None:
         self.detach()
