@@ -459,6 +459,27 @@ class AdbClient:
             )
         return component
 
+    def force_stop_package(
+        self,
+        serial: str,
+        package_name: str,
+    ) -> None:
+        self.ensure_ready(serial)
+        package_name = validate_package_name(
+            package_name
+        )
+        self._run_checked(
+            [
+                "-s",
+                serial,
+                "shell",
+                "am",
+                "force-stop",
+                package_name,
+            ],
+            timeout=15.0,
+        )
+
     def launch_package(
         self,
         serial: str,
