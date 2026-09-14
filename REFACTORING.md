@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.3.1 — Windows embedded Android latency/orientation hardening.  
+**Этап:** v0.4.0.dev0 — shared-memory 60 Hz embedded Android pipeline.  
 **Stable baseline:** v0.3.1 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -208,3 +208,13 @@ v0.3.0 выполнял bytes → QImage.copy → mirrored image → QPixmap →
 
 ### ADR-054 — Windows GPU host с автоматическим fallback
 На hardware-accelerated Windows runtime сначала запускается Emulator с GPU host. Если Emulator не может загрузиться с host backend, runtime автоматически останавливает его и повторяет запуск с GPU auto. Software-emulation path сохраняет SwiftShader.
+
+
+### ADR-055 — Emulator screenshot уже содержит logical rotation
+`ImageFormat.rotation` описывает orientation результата, но Emulator API уже поворачивает screenshot согласно coarse device orientation. Для RGBA/RGB требуется только коррекция documented bottom-up layout. Дополнительная reverse-rotation трансформация v0.3.1 была ошибочной и удалена. При загрузке managed AVD пользовательская ориентация фиксируется в portrait (`wm user-rotation lock 0`) до начала интерактивной работы.
+
+### ADR-056 — Pixel data идут через MMAP, input — через persistent stream
+Основной embedded framebuffer transport — `ImageTransport.MMAP`: gRPC несёт metadata/frame notifications, а RGBA framebuffer записывается Emulator напрямую в client-owned memory-mapped file. Это устраняет protobuf allocation/copy полного кадра на каждом refresh. При невозможности MMAP выполняется автоматический fallback на `grpc-bytes`. GUI публикует latest frame с precise timer около 60 Hz. Touch/key events идут через один длительно живущий `streamInputEvent`; unary sendTouch/sendKey остаются fallback.
+
+### ADR-057 — Windows использует Android-Studio-style hidden Qt Emulator
+На аппаратно ускоренном Windows managed Emulator запускается с `-qt-hide-window`, сохраняя Qt graphics path без внешнего окна. Это соответствует embedded режиму Android Studio. Linux/KVM acceptance и software-only fallback продолжают использовать `-no-window`.
