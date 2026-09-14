@@ -1,88 +1,87 @@
-# Mobile Research v0.4.0
+# Mobile Research v0.5.0
 
-This release replaces the remaining screenshot-style bottlenecks in the embedded Android UI with the Android Emulator's shared-memory display path.
+This release changes the Windows Android display architecture fundamentally.
 
-## Shared-memory framebuffer
+The previous v0.3/v0.4 generations mirrored Android into the Mobile Research GUI through screenshot/framebuffer transports. Even with gRPC MMAP and a 60 Hz presentation timer, that remained a second presentation pipeline and could not reliably match the smoothness of the native Android Emulator window.
 
-The primary interactive display path is now:
+v0.5.0 therefore stops mirroring the display on the normal Windows path.
 
-`Android Emulator → gRPC frame notification → ImageTransport.MMAP → shared RGBA buffer → QPainter`
+## Native Android Emulator window
 
-The full framebuffer is no longer carried inside a protobuf message for every frame when MMAP is available.
+The primary Windows display path is now:
 
-- Emulator writes RGBA pixels directly into a client-owned memory-mapped file.
-- gRPC carries frame metadata and notifications.
-- The GUI paints directly from the mapped buffer.
-- `grpc-bytes` remains an automatic compatibility fallback.
-- ADB screenshot polling remains the final fallback and is not the normal interactive path.
+`Android / SurfaceFlinger → Emulator GPU renderer → native Emulator Qt window → Win32 HWND child of Mobile Research`
 
-The real Android/KVM acceptance now explicitly requires a successful **`grpc-mmap`** frame before the normal research-session acceptance continues.
+Mobile Research:
 
-## 60 Hz presentation
+- starts its managed Android Emulator with the Qt window created but initially hidden;
+- finds the Emulator top-level HWND after Android has booted;
+- tracks the launcher process and its descendants so the actual Emulator/QEMU window can be identified;
+- removes top-level window chrome;
+- reparents the real Emulator window into the Android panel with Win32 `SetParent`;
+- resizes the child HWND with the Mobile Research panel;
+- shows and focuses the embedded native window.
 
-The embedded Android view now uses a precise approximately **60 Hz** GUI presentation timer instead of the previous ~30 Hz cadence.
+Mouse and keyboard input then go directly to the Emulator native window. There is no Mobile Research coordinate remapping in the normal Windows path.
 
-The latest-frame policy remains in place, so stale frames are discarded rather than accumulating visible latency.
+## Why this is faster
 
-## Persistent input stream
+Normal Windows interaction no longer performs:
 
-Touch and keyboard events now use one long-lived Emulator `streamInputEvent` gRPC stream when available.
+- screenshot capture;
+- gRPC/MMAP frame polling;
+- framebuffer copies;
+- QImage/QPainter video presentation;
+- application-side frame scheduling;
+- dropped-frame/latest-frame arbitration;
+- gRPC touch forwarding.
 
-This removes repeated unary RPC setup from the normal interactive input path. Unary `sendTouch` / `sendKey` remain compatibility fallbacks.
+The same Emulator GPU-rendered window that would normally be displayed standalone is now displayed inside Mobile Research.
 
-## Windows rendering path
+## Compatibility fallback
 
-On hardware-accelerated Windows systems Mobile Research now starts the managed Emulator using:
+The v0.4 display stack is retained as an automatic fallback.
 
-`-qt-hide-window`
+If the native Emulator window cannot be located or attached, Mobile Research switches back to:
 
-instead of `-no-window`.
+1. gRPC MMAP framebuffer;
+2. gRPC byte framebuffer;
+3. ADB screenshot/input as the final fallback.
 
-This preserves the Emulator Qt graphics path while keeping the separate Emulator window hidden. GPU policy remains:
+A native-window attach failure does **not** stop an active research session or collectors.
 
-1. `-gpu host` first;
-2. automatic retry with `-gpu auto` if host rendering cannot boot;
-3. SwiftShader only for the software-only fallback.
+## Research architecture unchanged
 
-## Orientation fix
+Native display embedding does not change the evidence contract or collectors:
 
-The v0.3.1 reverse-orientation correction was based on an incorrect interpretation of the Emulator screenshot metadata.
+- APK installation and target management remain ADB-based;
+- root ADB remains available;
+- logcat collection is unchanged;
+- screen recording is unchanged;
+- raw PCAP/tcpdump is unchanged;
+- package metadata collection is unchanged;
+- clean launch / continue-current-state modes are unchanged;
+- Research ZIP complete/partial/failed semantics and semantic audit are unchanged.
 
-The Emulator already returns the logical screenshot in the requested device orientation. Raw RGB/RGBA memory is bottom-up, so v0.4.0 applies exactly one vertical memory-order correction and no additional reverse-rotation transform.
-
-Before the live display starts, Mobile Research also normalizes the managed Android instance to portrait orientation with the WindowManager/user rotation lock. This addresses the upside-down/mirrored initial boot screen reported on the real Windows test machine.
-
-## Research functionality preserved
-
-The release retains:
-
-- clean launch / continue-current-state modes;
-- package-dump fallback hardening;
-- WHPX preferred path with usable AEHD compatibility fallback;
-- logcat;
-- screen recording;
-- raw PCAP;
-- complete / partial / failed session semantics;
-- verified Research ZIP export;
-- semantic audit.
+Display transport and research transport are deliberately independent.
 
 ## Validation
 
 The development implementation passed:
 
 - Windows CI;
-- standalone Windows executable build;
-- self-test and GUI smoke test;
+- Windows desktop unit tests;
+- a Win32 native-window test that creates a real Qt top-level HWND, discovers it through the same process/window enumeration path and reparents it into another native Qt host;
+- standalone EXE build;
+- GUI smoke test;
 - Inno Setup installer build;
 - installed-application smoke test;
 - clean Windows managed-Android provisioning;
 - real Android 15 / API 35 KVM boot;
-- **MMAP framebuffer acceptance (`grpc-mmap` required)**;
-- live Emulator input validation;
-- full real AVD Research Acceptance;
+- real AVD Research Acceptance;
 - Research ZIP integrity verification and semantic audit.
 
-The exact v0.4.0 release commit is revalidated again by CI, Desktop Build and real AVD Research Acceptance before publication.
+The exact v0.5.0 release commit is revalidated by CI, Desktop Build and real AVD Research Acceptance before publication.
 
 ## Distribution
 

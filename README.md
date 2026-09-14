@@ -1,6 +1,6 @@
 # Mobile Research
 
-## Development — v0.5.0
+## v0.5.0 — Native Emulator Window
 
 Windows-версия больше не использует screenshot/framebuffer mirroring как основной способ показа Android. Mobile Research запускает managed Android Emulator в скрытом Qt-режиме, находит его настоящее native HWND после загрузки и переподчиняет это окно непосредственно центральному Android-контейнеру программы. Рендеринг и ввод остаются внутри самого Android Emulator; MMAP/gRPC и ADB используются только как fallback и research/control transport.
 
@@ -51,7 +51,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.4.0 — Desktop Application** — стабильный self-contained Windows release с MMAP/shared-memory framebuffer, ~60 Hz embedded Android, persistent input stream и Android-Studio-style hidden Qt Emulator: GUI, managed Android runtime, автоматическая установка APK и встроенный Android без пользовательского Python/Android Studio/ADB.
+**v0.5.0 — Desktop Application** — стабильный self-contained Windows release с нативным окном Android Emulator, встроенным напрямую в GUI; MMAP/gRPC остаётся fallback: GUI, managed Android runtime, автоматическая установка APK и встроенный Android без пользовательского Python/Android Studio/ADB.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 
