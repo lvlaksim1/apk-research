@@ -87,10 +87,11 @@ class AndroidRuntime:
 
     @property
     def native_display_supported(self) -> bool:
-        return (
-            self._is_windows()
-            and self._display_mode == "native-hwnd-pending"
-        )
+        # v0.5.x proved that a Qt window created with
+        # -qt-hide-window is not a reliable Win32 video surface.
+        # Stable builds therefore use the Emulator's supported
+        # embedded gRPC/MMAP transport instead of SetParent().
+        return False
 
     @property
     def emulator_pid(self) -> int:
@@ -140,13 +141,13 @@ class AndroidRuntime:
             return [
                 (
                     "host",
-                    "native-hwnd-pending",
-                    "native Windows display",
+                    "grpc-embedded",
+                    "embedded gRPC/MMAP display",
                 ),
                 (
-                    "host",
-                    "headless",
-                    "headless hardware display",
+                    "auto",
+                    "grpc-embedded",
+                    "embedded gRPC/MMAP GPU auto",
                 ),
                 (
                     "swiftshader",
@@ -243,14 +244,12 @@ class AndroidRuntime:
                     ),
                 }
             )
-            if (
-                self._is_windows()
-                and display_mode == "headless"
-            ):
+            if self._is_windows():
                 self._emit(
                     progress,
-                    "Android запущен в совместимом "
-                    "framebuffer-режиме",
+                    "Android запущен: "
+                    "встроенный framebuffer "
+                    f"({display_mode}, GPU {gpu_mode})",
                     None,
                     None,
                 )
@@ -752,9 +751,11 @@ class AndroidRuntime:
         if (
             self._is_windows()
             and not self._software_acceleration
-            and self._display_mode
-            == "native-hwnd-pending"
+            and self._display_mode == "grpc-embedded"
         ):
+            # This is the supported embedded-Emulator mode used by
+            # Android Studio. Pixels are consumed through gRPC/MMAP;
+            # the hidden Qt HWND is intentionally not re-parented.
             command.append("-qt-hide-window")
         else:
             command.append("-no-window")

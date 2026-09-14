@@ -1,49 +1,51 @@
-# Mobile Research v0.5.1
+# Mobile Research v0.5.2
 
-This is a Windows Emulator startup reliability hotfix based on the first real-PC test of v0.5.0.
+This hotfix corrects the blank Android panel found during the real-PC test of v0.5.1.
 
-The v0.5.0 test showed that the managed Android Emulator process itself could terminate during boot while using the new native Qt/GPU display path. Mobile Research remained alive, but the internal Emulator crash reporter appeared over the application and the user could not reach a usable Android target.
+## Root cause
 
-## Automatic compatibility ladder
+v0.5.0/v0.5.1 treated the hidden Qt window created by Android Emulator `-qt-hide-window` as if it were a normal standalone video HWND that could be embedded with Win32 `SetParent`.
 
-Windows startup now tries three isolated profiles in order:
+That assumption was wrong.
 
-1. native Emulator HWND with host GPU;
-2. headless Emulator with host GPU;
-3. headless Emulator with SwiftShader.
+`-qt-hide-window` is the Android Studio embedded-emulator launch mode. The hidden Qt window is not a supported native video surface for third-party HWND reparenting. Mobile Research could therefore find an HWND, call `SetParent`, and report a successful native attach while no Android pixels were visible.
 
-A failure of the native display path therefore no longer prevents research. If the native path is unstable on a particular GPU/driver combination, Mobile Research automatically falls back to the existing framebuffer transport while keeping WHPX/AEHD CPU virtualization and the research collectors independent.
+## Stable Windows display path
 
-## Managed crash handling
+v0.5.2 uses the supported embedded architecture:
 
-Managed Emulator launches now use `-crash-report-mode disabled`.
+`Android Emulator → -qt-hide-window → gRPC/MMAP framebuffer → Mobile Research AndroidView`
 
-An internal QEMU/Emulator failure is handled by Mobile Research itself instead of leaving the Android Emulator crash-report dialog over the GUI. The failure is preserved in Mobile Research diagnostics and the next compatibility profile is attempted automatically.
+The existing low-latency framebuffer implementation is again the stable Windows display path.
 
-## Display selection
+Input continues through the persistent Emulator gRPC input stream, with ADB fallback.
 
-Native HWND embedding is attempted only when the profile that actually booted Android created a native Qt window.
+## Startup fallback
 
-When a headless compatibility profile succeeds, Mobile Research immediately uses:
+On hardware-accelerated Windows the managed runtime now tries:
 
-1. gRPC MMAP framebuffer;
-2. gRPC byte framebuffer;
-3. ADB screenshot/input fallback.
+1. host GPU + embedded gRPC/MMAP;
+2. GPU auto + embedded gRPC/MMAP;
+3. SwiftShader + headless framebuffer compatibility mode.
 
-The evidence pipeline is unchanged: ADB, root, logcat, screen recording, raw PCAP, metadata and Research ZIP do not depend on the display mode.
+The Android research core remains independent of display transport.
 
-## Diagnostics
+## Native HWND
 
-Each startup attempt records:
+The Win32 native-HWND experiment is disabled in stable runtime behavior. It is not used merely because an Emulator Qt HWND exists, so it can no longer suppress the working framebuffer stream or produce a false successful attach.
 
-- display profile;
-- GPU mode;
-- duration;
-- process exit code when available;
-- captured startup error;
-- exact Emulator command line.
+## Research evidence
 
-This makes future driver/GPU-specific failures diagnosable from the Mobile Research diagnostics rather than from a manually copied crash report.
+No evidence collector changed:
+
+- ADB target management;
+- root;
+- logcat;
+- screen recording;
+- raw PCAP/tcpdump;
+- package metadata;
+- Research ZIP;
+- semantic audit.
 
 ## Distribution
 

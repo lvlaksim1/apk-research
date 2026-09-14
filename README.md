@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.5.2 — Reliable embedded Android display
+
+Реальный тест v0.5.1 выявил ложный native attach: скрытый Qt HWND, созданный `-qt-hide-window`, успешно переподчинялся через Win32, но не являлся пригодной видеоповерхностью, поэтому GUI показывал пустой Android-контейнер. В v0.5.2 stable Windows path исправлен: `-qt-hide-window` используется только как штатный embedded-режим Emulator, а изображение передаётся через gRPC/MMAP framebuffer. Native HWND/SetParent отключён в стабильном runtime. GPU fallback: host → auto → SwiftShader/headless.
+
 ## v0.5.1 — Windows Emulator startup fallback
 
 После реального теста v0.5.0 Windows startup получил многоступенчатый fallback. Mobile Research сначала пытается запустить native HWND + host GPU, затем при сбое автоматически переходит на headless + host GPU и, при необходимости, на headless + SwiftShader. В headless-режиме интерфейс автоматически возвращается к MMAP/gRPC framebuffer, поэтому сбой native Qt/GPU path больше не блокирует исследование. Внутренний Android Emulator crash reporter для managed-запуска отключён, а все попытки старта сохраняются в диагностике.
@@ -55,7 +59,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.5.1 — Desktop Application** — стабильный self-contained Windows release с нативным Android Emulator при совместимом GPU/драйвере и автоматическим headless framebuffer fallback при сбое native Qt/GPU path; GUI, managed Android runtime, автоматическая установка APK и встроенный Android работают без пользовательского Python/Android Studio/ADB.
+**v0.5.2 — Desktop Application** — стабильный self-contained Windows release с embedded Android через Emulator gRPC/MMAP framebuffer. `-qt-hide-window` используется в штатном embedded-режиме, Win32 native-HWND reparenting отключён из-за ложного успешного attach на реальном Windows-ПК. GUI, managed Android runtime, установка APK и исследовательский core работают без пользовательского Python/Android Studio/ADB.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

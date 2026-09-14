@@ -2,6 +2,20 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.5.2] - 2026-09-14
+
+### Fixed
+
+- Removed the false-positive native HWND display path that could report "Нативное окно Android Emulator встроено" while the Android panel remained blank.
+- Windows stable display now uses the Android Emulator embedded mode for its intended purpose: `-qt-hide-window` keeps the Emulator UI hidden while Mobile Research consumes the live framebuffer through gRPC/MMAP.
+- The screen stream is no longer stopped merely because a hidden Qt HWND exists.
+- Windows boot fallback now tries host GPU → GPU auto through the same embedded gRPC/MMAP path, then falls back to headless SwiftShader if required.
+
+### Architecture
+
+- Native Win32 `SetParent` embedding is no longer part of the stable runtime contract. The code remains isolated for future experiments, but stable releases do not activate it.
+- This corrects the v0.5.0 assumption that Android Studio's `-qt-hide-window` mode exposes a reusable native video HWND. Android Studio's embedded path is based on the Emulator control/framebuffer transport instead.
+
 ## [0.5.1] - 2026-09-14
 
 ### Fixed

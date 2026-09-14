@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.5.1 — resilient Windows Emulator startup.  
-**Stable baseline:** v0.5.1 Desktop Application.  
+**Этап:** v0.5.2 — reliable gRPC/MMAP embedded display.  
+**Stable baseline:** v0.5.2 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -229,3 +229,7 @@ v0.3.0 выполнял bytes → QImage.copy → mirrored image → QPixmap →
 
 ### ADR-060 — Сбой native Emulator display не блокирует Research Target
 Реальный Windows-тест v0.5.0 показал, что Android Emulator/QEMU может аварийно завершиться ещё во время boot при использовании native Qt/GPU display path. Display transport не имеет права становиться single point of failure для research core. Windows managed boot поэтому использует последовательность профилей: native HWND + host GPU → headless + host GPU → headless + SwiftShader. После первой успешной загрузки выбранный профиль сохраняется на весь текущий runtime. Headless-профиль автоматически использует MMAP/gRPC/ADB framebuffer stack, а native HWND attach для него не выполняется. Все неуспешные попытки фиксируются в diagnostics вместе с GPU/display mode, duration, exit code, error и полной Emulator command line. Managed Emulator запускается с `-crash-report-mode disabled`, поскольку внутренний Google crash-report dialog не является частью пользовательского интерфейса Mobile Research; ошибка остаётся в локальной диагностике и инициирует автоматический fallback.
+
+
+### ADR-061 — `-qt-hide-window` не является контрактом native HWND embedding
+Реальный тест v0.5.1 показал ложный успех Win32 embedding: Mobile Research находила Qt HWND процесса Emulator, выполняла `SetParent` и считала display подключённым, но Android pixels в этом HWND не отображались. Официальный embedded режим Android Emulator использует `-qt-hide-window` совместно с control/framebuffer transport; скрытый Qt HWND не рассматривается как поддерживаемая внешняя native video surface. Поэтому stable runtime больше не активирует NativeEmulatorEmbedder и не останавливает framebuffer stream из-за существования такого HWND. На Windows основной display contract снова: `-qt-hide-window` + gRPC MMAP → gRPC bytes → ADB screenshot fallback. Win32 `SetParent` код остаётся изолированным экспериментом и не входит в stable path до появления отдельного доказательства корректной видеоотрисовки на реальном Windows hardware.

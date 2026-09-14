@@ -355,7 +355,7 @@ def test_windows_emulator_uses_qt_hidden_window(
         lambda: True,
     )
 
-    runtime._display_mode = "native-hwnd-pending"
+    runtime._display_mode = "grpc-embedded"
     command = runtime._emulator_command()
 
     assert "-qt-hide-window" in command
@@ -363,7 +363,7 @@ def test_windows_emulator_uses_qt_hidden_window(
     assert "-crash-report-mode" in command
     crash_index = command.index("-crash-report-mode")
     assert command[crash_index + 1] == "disabled"
-    assert runtime._display_mode == "native-hwnd-pending"
+    assert runtime._display_mode == "grpc-embedded"
 
 
 def test_non_windows_emulator_remains_headless(
@@ -387,7 +387,7 @@ def test_non_windows_emulator_remains_headless(
 
 
 
-def test_windows_runtime_reports_native_display_metadata(
+def test_windows_runtime_uses_framebuffer_not_native_hwnd(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -399,9 +399,9 @@ def test_windows_runtime_reports_native_display_metadata(
         "_is_windows",
         lambda: True,
     )
-    runtime._display_mode = "native-hwnd-pending"
+    runtime._display_mode = "grpc-embedded"
 
-    assert runtime.native_display_supported is True
+    assert runtime.native_display_supported is False
     assert runtime.emulator_pid == 0
 
 
@@ -430,7 +430,7 @@ def test_windows_headless_mode_disables_native_embedding(
     assert command[gpu_index + 1] == "swiftshader"
 
 
-def test_windows_boot_falls_back_to_headless_then_swiftshader(
+def test_windows_boot_falls_back_across_embedded_gpu_modes(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -483,8 +483,8 @@ def test_windows_boot_falls_back_to_headless_then_swiftshader(
     runtime._boot_managed_emulator(None)
 
     assert attempts == [
-        ("host", "native-hwnd-pending"),
-        ("host", "headless"),
+        ("host", "grpc-embedded"),
+        ("auto", "grpc-embedded"),
         ("swiftshader", "headless"),
     ]
     assert [
