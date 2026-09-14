@@ -7,6 +7,7 @@ import pytest
 
 from mobile_research.desktop.android_runtime import (
     AndroidRuntime,
+    AndroidRuntimeError,
     acceleration_provider,
 )
 from mobile_research.desktop.components import ComponentManager
@@ -354,10 +355,14 @@ def test_windows_emulator_uses_qt_hidden_window(
         lambda: True,
     )
 
+    runtime._display_mode = "native-hwnd-pending"
     command = runtime._emulator_command()
 
     assert "-qt-hide-window" in command
     assert "-no-window" not in command
+    assert "-crash-report-mode" in command
+    crash_index = command.index("-crash-report-mode")
+    assert command[crash_index + 1] == "disabled"
     assert runtime._display_mode == "native-hwnd-pending"
 
 
@@ -394,6 +399,100 @@ def test_windows_runtime_reports_native_display_metadata(
         "_is_windows",
         lambda: True,
     )
+    runtime._display_mode = "native-hwnd-pending"
 
     assert runtime.native_display_supported is True
     assert runtime.emulator_pid == 0
+
+
+def test_windows_headless_mode_disables_native_embedding(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+    runtime._grpc_port = 8554
+    runtime._gpu_mode = "swiftshader"
+    runtime._display_mode = "headless"
+    monkeypatch.setattr(
+        runtime,
+        "_is_windows",
+        lambda: True,
+    )
+
+    command = runtime._emulator_command()
+
+    assert runtime.native_display_supported is False
+    assert "-no-window" in command
+    assert "-qt-hide-window" not in command
+    gpu_index = command.index("-gpu")
+    assert command[gpu_index + 1] == "swiftshader"
+
+
+def test_windows_boot_falls_back_to_headless_then_swiftshader(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    runtime = AndroidRuntime(manager)
+    runtime._software_acceleration = False
+    attempts: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        runtime,
+        "_is_windows",
+        lambda: True,
+    )
+
+    def fake_start(progress):
+        attempts.append(
+            (
+                runtime._gpu_mode,
+                runtime._display_mode,
+            )
+        )
+        runtime._last_emulator_command = [
+            "emulator",
+            "-gpu",
+            runtime._gpu_mode,
+        ]
+
+    def fake_wait(progress):
+        if len(attempts) < 3:
+            raise AndroidRuntimeError(
+                "synthetic graphics startup failure"
+            )
+
+    monkeypatch.setattr(
+        runtime,
+        "_start_emulator",
+        fake_start,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_wait_for_boot",
+        fake_wait,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "stop",
+        lambda: None,
+    )
+
+    runtime._boot_managed_emulator(None)
+
+    assert attempts == [
+        ("host", "native-hwnd-pending"),
+        ("host", "headless"),
+        ("swiftshader", "headless"),
+    ]
+    assert [
+        item["status"]
+        for item in runtime._startup_attempts
+    ] == [
+        "failed",
+        "failed",
+        "completed",
+    ]
+    assert runtime.native_display_supported is False

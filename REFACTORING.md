@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.5.0 — native Windows Emulator embedding.  
-**Stable baseline:** v0.5.0 Desktop Application.  
+**Этап:** v0.5.1 — resilient Windows Emulator startup.  
+**Stable baseline:** v0.5.1 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -225,3 +225,7 @@ v0.3.0 выполнял bytes → QImage.copy → mirrored image → QPixmap →
 
 ### ADR-059 — Research transport отделён от display transport
 Переход на native HWND не меняет evidence contract. ADB, root, logcat, tcpdump, screenrecord, package metadata, Research ZIP и gRPC control остаются независимыми от способа визуального отображения Android. Native display можно отключить/потерять без остановки collectors; GUI автоматически возвращается к framebuffer fallback.
+
+
+### ADR-060 — Сбой native Emulator display не блокирует Research Target
+Реальный Windows-тест v0.5.0 показал, что Android Emulator/QEMU может аварийно завершиться ещё во время boot при использовании native Qt/GPU display path. Display transport не имеет права становиться single point of failure для research core. Windows managed boot поэтому использует последовательность профилей: native HWND + host GPU → headless + host GPU → headless + SwiftShader. После первой успешной загрузки выбранный профиль сохраняется на весь текущий runtime. Headless-профиль автоматически использует MMAP/gRPC/ADB framebuffer stack, а native HWND attach для него не выполняется. Все неуспешные попытки фиксируются в diagnostics вместе с GPU/display mode, duration, exit code, error и полной Emulator command line. Managed Emulator запускается с `-crash-report-mode disabled`, поскольку внутренний Google crash-report dialog не является частью пользовательского интерфейса Mobile Research; ошибка остаётся в локальной диагностике и инициирует автоматический fallback.

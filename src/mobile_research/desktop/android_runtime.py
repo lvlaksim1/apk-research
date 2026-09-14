@@ -78,6 +78,8 @@ class AndroidRuntime:
         self._software_acceleration = False
         self._gpu_mode = "auto"
         self._display_mode = "headless"
+        self._startup_attempts: list[dict[str, object]] = []
+        self._last_emulator_command: list[str] = []
 
     @property
     def paths(self):
@@ -85,7 +87,10 @@ class AndroidRuntime:
 
     @property
     def native_display_supported(self) -> bool:
-        return self._is_windows()
+        return (
+            self._is_windows()
+            and self._display_mode == "native-hwnd-pending"
+        )
 
     @property
     def emulator_pid(self) -> int:
@@ -111,28 +116,157 @@ class AndroidRuntime:
         )
         self._check_acceleration(progress)
         if not self._device_online():
-            self._gpu_mode = self._preferred_gpu_mode()
-            self._start_emulator(progress)
-            try:
-                self._wait_for_boot(progress)
-            except AndroidRuntimeError:
-                if self._gpu_mode != "host":
-                    raise
-                self.stop()
-                self._gpu_mode = "auto"
-                self._emit(
-                    progress,
-                    "GPU host недоступен, повтор с GPU auto",
-                    None,
-                    None,
-                )
-                self._start_emulator(progress)
-                self._wait_for_boot(progress)
+            self._boot_managed_emulator(progress)
         else:
             self._wait_for_boot(progress)
         self._ensure_root(progress)
         self._normalize_initial_orientation(progress)
         self._ensure_live_transport(progress)
+
+    def _startup_profiles(
+        self,
+    ) -> list[tuple[str, str, str]]:
+        """Return ordered graphics/display profiles for managed boot."""
+
+        if self._software_acceleration:
+            return [
+                (
+                    "swiftshader",
+                    "headless",
+                    "software compatibility",
+                )
+            ]
+        if self._is_windows():
+            return [
+                (
+                    "host",
+                    "native-hwnd-pending",
+                    "native Windows display",
+                ),
+                (
+                    "host",
+                    "headless",
+                    "headless hardware display",
+                ),
+                (
+                    "swiftshader",
+                    "headless",
+                    "headless SwiftShader compatibility",
+                ),
+            ]
+        return [
+            (
+                "auto",
+                "headless",
+                "headless display",
+            )
+        ]
+
+    def _boot_managed_emulator(
+        self,
+        progress: RuntimeProgress | None,
+    ) -> None:
+        """Boot with automatic isolation of graphics/window failures."""
+
+        profiles = self._startup_profiles()
+        self._startup_attempts = []
+        last_error: AndroidRuntimeError | None = None
+
+        for index, (
+            gpu_mode,
+            display_mode,
+            label,
+        ) in enumerate(profiles):
+            self._gpu_mode = gpu_mode
+            self._display_mode = display_mode
+            self._emit(
+                progress,
+                f"Запуск Android: {label}",
+                None,
+                None,
+            )
+            started = time.monotonic()
+            try:
+                self._start_emulator(progress)
+                self._wait_for_boot(progress)
+            except AndroidRuntimeError as exc:
+                process = self.process
+                exit_code = (
+                    process.returncode
+                    if process is not None
+                    else None
+                )
+                self._startup_attempts.append(
+                    {
+                        "label": label,
+                        "gpu_mode": gpu_mode,
+                        "display_mode": display_mode,
+                        "status": "failed",
+                        "duration_seconds": round(
+                            time.monotonic() - started,
+                            3,
+                        ),
+                        "exit_code": exit_code,
+                        "error": str(exc),
+                        "command": list(
+                            self._last_emulator_command
+                        ),
+                    }
+                )
+                last_error = exc
+                self.stop()
+                if index + 1 < len(profiles):
+                    self._emit(
+                        progress,
+                        "Android Emulator завершился. "
+                        "Автоматический переход к "
+                        "совместимому режиму…",
+                        None,
+                        None,
+                    )
+                continue
+
+            self._startup_attempts.append(
+                {
+                    "label": label,
+                    "gpu_mode": gpu_mode,
+                    "display_mode": display_mode,
+                    "status": "completed",
+                    "duration_seconds": round(
+                        time.monotonic() - started,
+                        3,
+                    ),
+                    "exit_code": None,
+                    "error": "",
+                    "command": list(
+                        self._last_emulator_command
+                    ),
+                }
+            )
+            if (
+                self._is_windows()
+                and display_mode == "headless"
+            ):
+                self._emit(
+                    progress,
+                    "Android запущен в совместимом "
+                    "framebuffer-режиме",
+                    None,
+                    None,
+                )
+            return
+
+        detail = (
+            str(last_error)
+            if last_error is not None
+            else "неизвестная ошибка запуска"
+        )
+        raise AndroidRuntimeError(
+            "Android Emulator не удалось запустить "
+            "ни в одном совместимом режиме. "
+            "Последняя ошибка: "
+            + detail
+        )
 
     def package_name_from_apk(
         self,
@@ -415,6 +549,12 @@ class AndroidRuntime:
                     if self._get_grpc_client() is not None
                     else ""
                 ),
+                "startup_attempts": list(
+                    self._startup_attempts
+                ),
+                "emulator_command": list(
+                    self._last_emulator_command
+                ),
             },
             "native_display": {
                 "supported": self.native_display_supported,
@@ -559,6 +699,7 @@ class AndroidRuntime:
         self._drop_grpc_client()
         self._grpc_port = self._find_free_tcp_port()
         command = self._emulator_command()
+        self._last_emulator_command = list(command)
         creation_flags = getattr(
             subprocess,
             "CREATE_NO_WINDOW",
@@ -604,14 +745,17 @@ class AndroidRuntime:
             "-no-snapshot",
             "-noaudio",
             "-no-boot-anim",
+            "-crash-report-mode",
+            "disabled",
         ]
 
         if (
             self._is_windows()
             and not self._software_acceleration
+            and self._display_mode
+            == "native-hwnd-pending"
         ):
             command.append("-qt-hide-window")
-            self._display_mode = "native-hwnd-pending"
         else:
             command.append("-no-window")
             self._display_mode = "headless"

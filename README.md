@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.5.1 — Windows Emulator startup fallback
+
+После реального теста v0.5.0 Windows startup получил многоступенчатый fallback. Mobile Research сначала пытается запустить native HWND + host GPU, затем при сбое автоматически переходит на headless + host GPU и, при необходимости, на headless + SwiftShader. В headless-режиме интерфейс автоматически возвращается к MMAP/gRPC framebuffer, поэтому сбой native Qt/GPU path больше не блокирует исследование. Внутренний Android Emulator crash reporter для managed-запуска отключён, а все попытки старта сохраняются в диагностике.
+
 ## v0.5.0 — Native Emulator Window
 
 Windows-версия больше не использует screenshot/framebuffer mirroring как основной способ показа Android. Mobile Research запускает managed Android Emulator в скрытом Qt-режиме, находит его настоящее native HWND после загрузки и переподчиняет это окно непосредственно центральному Android-контейнеру программы. Рендеринг и ввод остаются внутри самого Android Emulator; MMAP/gRPC и ADB используются только как fallback и research/control transport.
@@ -51,7 +55,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.5.0 — Desktop Application** — стабильный self-contained Windows release с нативным окном Android Emulator, встроенным напрямую в GUI; MMAP/gRPC остаётся fallback: GUI, managed Android runtime, автоматическая установка APK и встроенный Android без пользовательского Python/Android Studio/ADB.
+**v0.5.1 — Desktop Application** — стабильный self-contained Windows release с нативным Android Emulator при совместимом GPU/драйвере и автоматическим headless framebuffer fallback при сбое native Qt/GPU path; GUI, managed Android runtime, автоматическая установка APK и встроенный Android работают без пользовательского Python/Android Studio/ADB.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

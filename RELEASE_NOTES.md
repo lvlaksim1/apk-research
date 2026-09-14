@@ -1,87 +1,49 @@
-# Mobile Research v0.5.0
+# Mobile Research v0.5.1
 
-This release changes the Windows Android display architecture fundamentally.
+This is a Windows Emulator startup reliability hotfix based on the first real-PC test of v0.5.0.
 
-The previous v0.3/v0.4 generations mirrored Android into the Mobile Research GUI through screenshot/framebuffer transports. Even with gRPC MMAP and a 60 Hz presentation timer, that remained a second presentation pipeline and could not reliably match the smoothness of the native Android Emulator window.
+The v0.5.0 test showed that the managed Android Emulator process itself could terminate during boot while using the new native Qt/GPU display path. Mobile Research remained alive, but the internal Emulator crash reporter appeared over the application and the user could not reach a usable Android target.
 
-v0.5.0 therefore stops mirroring the display on the normal Windows path.
+## Automatic compatibility ladder
 
-## Native Android Emulator window
+Windows startup now tries three isolated profiles in order:
 
-The primary Windows display path is now:
+1. native Emulator HWND with host GPU;
+2. headless Emulator with host GPU;
+3. headless Emulator with SwiftShader.
 
-`Android / SurfaceFlinger → Emulator GPU renderer → native Emulator Qt window → Win32 HWND child of Mobile Research`
+A failure of the native display path therefore no longer prevents research. If the native path is unstable on a particular GPU/driver combination, Mobile Research automatically falls back to the existing framebuffer transport while keeping WHPX/AEHD CPU virtualization and the research collectors independent.
 
-Mobile Research:
+## Managed crash handling
 
-- starts its managed Android Emulator with the Qt window created but initially hidden;
-- finds the Emulator top-level HWND after Android has booted;
-- tracks the launcher process and its descendants so the actual Emulator/QEMU window can be identified;
-- removes top-level window chrome;
-- reparents the real Emulator window into the Android panel with Win32 `SetParent`;
-- resizes the child HWND with the Mobile Research panel;
-- shows and focuses the embedded native window.
+Managed Emulator launches now use `-crash-report-mode disabled`.
 
-Mouse and keyboard input then go directly to the Emulator native window. There is no Mobile Research coordinate remapping in the normal Windows path.
+An internal QEMU/Emulator failure is handled by Mobile Research itself instead of leaving the Android Emulator crash-report dialog over the GUI. The failure is preserved in Mobile Research diagnostics and the next compatibility profile is attempted automatically.
 
-## Why this is faster
+## Display selection
 
-Normal Windows interaction no longer performs:
+Native HWND embedding is attempted only when the profile that actually booted Android created a native Qt window.
 
-- screenshot capture;
-- gRPC/MMAP frame polling;
-- framebuffer copies;
-- QImage/QPainter video presentation;
-- application-side frame scheduling;
-- dropped-frame/latest-frame arbitration;
-- gRPC touch forwarding.
-
-The same Emulator GPU-rendered window that would normally be displayed standalone is now displayed inside Mobile Research.
-
-## Compatibility fallback
-
-The v0.4 display stack is retained as an automatic fallback.
-
-If the native Emulator window cannot be located or attached, Mobile Research switches back to:
+When a headless compatibility profile succeeds, Mobile Research immediately uses:
 
 1. gRPC MMAP framebuffer;
 2. gRPC byte framebuffer;
-3. ADB screenshot/input as the final fallback.
+3. ADB screenshot/input fallback.
 
-A native-window attach failure does **not** stop an active research session or collectors.
+The evidence pipeline is unchanged: ADB, root, logcat, screen recording, raw PCAP, metadata and Research ZIP do not depend on the display mode.
 
-## Research architecture unchanged
+## Diagnostics
 
-Native display embedding does not change the evidence contract or collectors:
+Each startup attempt records:
 
-- APK installation and target management remain ADB-based;
-- root ADB remains available;
-- logcat collection is unchanged;
-- screen recording is unchanged;
-- raw PCAP/tcpdump is unchanged;
-- package metadata collection is unchanged;
-- clean launch / continue-current-state modes are unchanged;
-- Research ZIP complete/partial/failed semantics and semantic audit are unchanged.
+- display profile;
+- GPU mode;
+- duration;
+- process exit code when available;
+- captured startup error;
+- exact Emulator command line.
 
-Display transport and research transport are deliberately independent.
-
-## Validation
-
-The development implementation passed:
-
-- Windows CI;
-- Windows desktop unit tests;
-- a Win32 native-window test that creates a real Qt top-level HWND, discovers it through the same process/window enumeration path and reparents it into another native Qt host;
-- standalone EXE build;
-- GUI smoke test;
-- Inno Setup installer build;
-- installed-application smoke test;
-- clean Windows managed-Android provisioning;
-- real Android 15 / API 35 KVM boot;
-- real AVD Research Acceptance;
-- Research ZIP integrity verification and semantic audit.
-
-The exact v0.5.0 release commit is revalidated by CI, Desktop Build and real AVD Research Acceptance before publication.
+This makes future driver/GPU-specific failures diagnosable from the Mobile Research diagnostics rather than from a manually copied crash report.
 
 ## Distribution
 
@@ -90,4 +52,4 @@ Release assets:
 - `MobileResearchSetup.exe`
 - `SHA256SUMS.txt`
 
-Normal use requires no separately installed Python, Android Studio or ADB.
+No separately installed Python, Android Studio or ADB is required.

@@ -2,6 +2,20 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.5.1] - 2026-09-14
+
+### Fixed
+
+- Real-Windows startup no longer treats a crash of the native Qt/GPU Emulator path as a fatal application failure.
+- Windows managed boot now uses an ordered compatibility ladder: native HWND + host GPU → headless + host GPU → headless + SwiftShader.
+- Native HWND attachment is attempted only when the successful boot actually uses the native-window profile; compatibility boots immediately use the existing MMAP/gRPC framebuffer path.
+- Android Emulator crash-report UI is disabled for managed launches so an internal QEMU failure cannot leave a Google crash dialog over the Mobile Research interface.
+
+### Diagnostics
+
+- Every Emulator startup attempt now records its display mode, GPU mode, duration, exit code, error and exact command line in Mobile Research diagnostics.
+- Compatibility fallback is reported explicitly in the progress log instead of looking like a stalled second boot.
+
 ## [0.5.0] - 2026-09-14
 
 ### Architecture

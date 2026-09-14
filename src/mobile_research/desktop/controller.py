@@ -241,7 +241,7 @@ class DesktopController(QObject):
             self.runtime.ensure_ready(
                 self._progress_callback
             )
-            self._start_screen_stream()
+            self._prepare_display_transport()
             package = self.runtime.install_apk(
                 path,
                 self._progress_callback,
