@@ -162,3 +162,12 @@ Google Emulator запускается headless. Mobile Research получае�
 
 ### ADR-041 — Stable desktop release публикует installer
 Начиная с v0.2 основным release asset является `MobileResearchSetup.exe` + SHA-256. Stable publication требует exact-SHA Windows CI, real AVD acceptance и Desktop Build.
+
+
+### ADR-042 — Android SDK provisioning uses stable channel-0
+
+Mobile Research must not select the first matching `remotePackage` from Google repository metadata. The same package path can exist simultaneously on stable, beta, dev and canary channels. Normal desktop provisioning filters to `channel-0` (packages without `channelRef` are treated as stable for metadata compatibility) and selects the highest revision only inside that stable set. This prevents a newer prerelease Emulator from silently replacing the stable runtime.
+
+### ADR-043 — Windows provisioning and Android boot are separate release gates
+
+GitHub-hosted Windows VMs are suitable for validating the complete managed-component provisioning path but are not a reliable hardware-accelerated Android host. Desktop Build therefore validates download, checksum, extraction, executable versions and private AVD creation on clean Windows without requiring Android boot. Real boot/root/raw-PCAP/Research-ZIP acceptance remains mandatory on Linux/KVM. v0.2.0rc1 additionally requires manual acceptance of the accelerated Windows/WHPX path before final v0.2.0.
