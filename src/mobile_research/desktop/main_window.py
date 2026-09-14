@@ -840,9 +840,10 @@ class MainWindow(QMainWindow):
             self.status_network.setStyleSheet(
                 "color: #238636;"
             )
-        self.global_status.setText(
-            "Android готов"
-        )
+        if data.get("device_online"):
+            self.global_status.setText(
+                "Android готов"
+            )
 
     def _on_apk_ready(
         self,
