@@ -562,7 +562,11 @@ class AndroidRuntime:
             str(self.PORT),
             "-no-window",
             "-gpu",
-            self._gpu_mode,
+            (
+                "swiftshader"
+                if self._software_acceleration
+                else self._gpu_mode
+            ),
             "-grpc",
             str(self._grpc_port or self._find_free_tcp_port()),
             "-no-snapshot",

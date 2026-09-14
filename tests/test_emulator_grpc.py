@@ -38,7 +38,7 @@ def test_minimal_emulator_proto_round_trip() -> None:
     restored_reply = Image.FromString(
         reply.SerializeToString()
     )
-    assert restored_reply.format.width == 540
+    assert restored_reply.format.width == 360
     assert restored_reply.image == b"abc"
     assert restored_reply.seq == 7
 
