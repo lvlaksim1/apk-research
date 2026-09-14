@@ -4,7 +4,7 @@ import queue
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QTimer, Signal
+from PySide6.QtCore import QObject, QTimer, Qt, Signal
 
 from mobile_research.desktop.android_runtime import (
     AndroidRuntime,
@@ -68,7 +68,10 @@ class DesktopController(QObject):
         self._latest_frame_id = 0
         self._published_frame_id = 0
         self._frame_timer = QTimer(self)
-        self._frame_timer.setInterval(33)
+        self._frame_timer.setTimerType(
+            Qt.TimerType.PreciseTimer
+        )
+        self._frame_timer.setInterval(16)
         self._frame_timer.timeout.connect(
             self._publish_latest_frame
         )
@@ -548,8 +551,8 @@ class DesktopController(QObject):
         try:
             for frame in self.runtime.screen_frames(
                 self._stop_screen,
-                width=360,
-                height=640,
+                width=405,
+                height=720,
             ):
                 if self._stop_screen.is_set():
                     break
