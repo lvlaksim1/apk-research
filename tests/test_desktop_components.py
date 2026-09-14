@@ -153,3 +153,25 @@ def test_repository_policy_treats_missing_channel_as_stable() -> None:
     )
 
     assert result.url.endswith("platform-tools.zip")
+
+
+def test_remove_all_deletes_only_managed_component_tree(
+    tmp_path: Path,
+) -> None:
+    manager = ComponentManager(tmp_path / "components")
+    manager.paths.root.mkdir(parents=True)
+    (manager.paths.root / "marker.txt").write_text(
+        "managed",
+        encoding="utf-8",
+    )
+
+    research_marker = tmp_path / "research.txt"
+    research_marker.write_text(
+        "keep",
+        encoding="utf-8",
+    )
+
+    manager.remove_all()
+
+    assert not manager.paths.root.exists()
+    assert research_marker.read_text(encoding="utf-8") == "keep"
