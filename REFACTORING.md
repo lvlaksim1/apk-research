@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.6.0 — verified standalone native Emulator embedding.  
-**Stable baseline:** v0.6.0 Desktop Application.  
+**Этап:** v0.7.1 — DWM live Emulator composition.  
+**Stable baseline:** v0.7.1 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.

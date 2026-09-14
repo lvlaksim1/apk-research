@@ -2,6 +2,12 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.7.1] - 2026-09-15
+
+### Fixed
+
+- Corrected conversion of the Win32 DWM thumbnail handle returned through ctypes before storing it in the live-display controller.
+
 ## [0.7.0] - 2026-09-15
 
 ### DWM live display

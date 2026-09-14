@@ -1,6 +1,6 @@
-# Mobile Research v0.7.0
+# Mobile Research v0.7.1
 
-v0.7.0 replaces cross-process `SetParent` embedding with DWM live composition.
+v0.7.1 replaces cross-process `SetParent` embedding with DWM live composition and includes the final Win32 thumbnail-handle correction from the implementation pass.
 
 The real-PC v0.6.0 test proved that Mobile Research could find and re-parent the correct standalone Android Emulator window, but the Emulator GPU surface stopped rendering after the parent change. The original standalone window rendered normally again when Mobile Research closed. This release therefore removes `SetParent` from the active display architecture.
 
