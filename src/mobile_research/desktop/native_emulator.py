@@ -81,12 +81,13 @@ if WINDOWS:
     kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
     kernel32.CloseHandle.restype = wintypes.BOOL
 
+    WNDENUMPROC = ctypes.WINFUNCTYPE(
+        wintypes.BOOL,
+        wintypes.HWND,
+        wintypes.LPARAM,
+    )
     user32.EnumWindows.argtypes = [
-        ctypes.WINFUNCTYPE(
-            wintypes.BOOL,
-            wintypes.HWND,
-            wintypes.LPARAM,
-        ),
+        WNDENUMPROC,
         wintypes.LPARAM,
     ]
     user32.EnumWindows.restype = wintypes.BOOL
@@ -284,13 +285,7 @@ def find_emulator_window(
     }
     candidates: list[tuple[int, int, dict]] = []
 
-    callback_type = ctypes.WINFUNCTYPE(
-        wintypes.BOOL,
-        wintypes.HWND,
-        wintypes.LPARAM,
-    )
-
-    @callback_type
+    @WNDENUMPROC
     def callback(hwnd, _lparam):
         pid = wintypes.DWORD()
         user32.GetWindowThreadProcessId(
