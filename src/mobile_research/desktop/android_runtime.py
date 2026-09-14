@@ -364,6 +364,15 @@ class AndroidRuntime:
             "paths": self.paths.to_dict(),
             "serial": self.SERIAL,
             "device_online": self._device_online(),
+            "interactive_transport": {
+                "active": (
+                    "grpc"
+                    if self._get_grpc_client() is not None
+                    else "adb-screencap"
+                ),
+                "grpc_port": self._grpc_port,
+                "gpu_mode": "auto",
+            },
         }
 
         versions: dict[str, object] = {}
@@ -833,6 +842,76 @@ class AndroidRuntime:
             subprocess.TimeoutExpired,
         ):
             return None
+
+    def _ensure_live_transport(
+        self,
+        progress: RuntimeProgress | None,
+    ) -> None:
+        if self._grpc_port is None:
+            self._emit(
+                progress,
+                "Интерактивный экран: ADB fallback",
+                None,
+                None,
+            )
+            return
+        client: EmulatorGrpcClient | None = None
+        try:
+            client = EmulatorGrpcClient(self._grpc_port)
+            client.wait_ready(timeout=8.0)
+        except Exception:
+            if client is not None:
+                try:
+                    client.close()
+                except Exception:
+                    pass
+            self._emit(
+                progress,
+                "Интерактивный экран: ADB fallback",
+                None,
+                None,
+            )
+            return
+
+        with self._grpc_lock:
+            previous = self._grpc_client
+            self._grpc_client = client
+        if previous is not None:
+            try:
+                previous.close()
+            except Exception:
+                pass
+        self._emit(
+            progress,
+            "Интерактивный экран: Emulator gRPC",
+            None,
+            None,
+        )
+
+    def _get_grpc_client(
+        self,
+    ) -> EmulatorGrpcClient | None:
+        with self._grpc_lock:
+            return self._grpc_client
+
+    def _drop_grpc_client(self) -> None:
+        with self._grpc_lock:
+            client = self._grpc_client
+            self._grpc_client = None
+        if client is not None:
+            try:
+                client.close()
+            except Exception:
+                pass
+
+    @staticmethod
+    def _find_free_tcp_port() -> int:
+        with socket.socket(
+            socket.AF_INET,
+            socket.SOCK_STREAM,
+        ) as handle:
+            handle.bind(("127.0.0.1", 0))
+            return int(handle.getsockname()[1])
 
     def _device_online(self) -> bool:
         if not self.paths.adb.is_file():
