@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import subprocess
 
 from mobile_research.desktop.android_runtime import (
@@ -131,3 +132,159 @@ def test_acceleration_provider_distinguishes_hypervisors() -> None:
         == "hypervisor-framework"
     )
     assert acceleration_provider("acceleration available") == "unknown"
+
+
+
+def test_windows_aehd_is_accepted_without_uac(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+
+    monkeypatch.setattr(
+        runtime,
+        "_is_windows",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_acceleration_check",
+        lambda: subprocess.CompletedProcess(
+            ["emulator", "-accel-check"],
+            0,
+            stdout="AEHD (version 2.2) is installed and usable.\n",
+            stderr="",
+        ),
+    )
+
+    called = False
+
+    def fail_enable():
+        nonlocal called
+        called = True
+        raise AssertionError("UAC must not be requested for usable AEHD")
+
+    monkeypatch.setattr(
+        runtime,
+        "_enable_windows_hypervisor_features",
+        fail_enable,
+    )
+
+    runtime._check_acceleration()
+
+    assert called is False
+    assert runtime._software_acceleration is False
+
+
+def test_windows_whpx_is_preferred_without_uac(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+
+    monkeypatch.setattr(
+        runtime,
+        "_is_windows",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_acceleration_check",
+        lambda: subprocess.CompletedProcess(
+            ["emulator", "-accel-check"],
+            0,
+            stdout="WHPX is installed and usable.\n",
+            stderr="",
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_enable_windows_hypervisor_features",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("UAC must not be requested for WHPX")
+        ),
+    )
+
+    runtime._check_acceleration()
+
+    assert runtime._software_acceleration is False
+
+
+def test_windows_setup_requires_reboot_when_no_hypervisor(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from mobile_research.desktop.android_runtime import AndroidRuntimeError
+
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+
+    monkeypatch.setattr(
+        runtime,
+        "_is_windows",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_acceleration_check",
+        lambda: subprocess.CompletedProcess(
+            ["emulator", "-accel-check"],
+            1,
+            stdout="accel: 1\nNo usable hypervisor found.\n",
+            stderr="",
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_enable_windows_hypervisor_features",
+        lambda: 10,
+    )
+
+    with pytest.raises(
+        AndroidRuntimeError,
+        match="нужно перезагрузить компьютер",
+    ):
+        runtime._check_acceleration()
+
+
+def test_whpx_enablement_uses_one_uac_and_only_required_feature(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    runtime = AndroidRuntime(manager)
+    captured: list[str] = []
+
+    def fake_subprocess_run(command, **kwargs):
+        captured.extend(str(item) for item in command)
+        return subprocess.CompletedProcess(command, 10)
+
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        fake_subprocess_run,
+    )
+
+    code = runtime._enable_windows_hypervisor_features()
+
+    assert code == 10
+    joined = " ".join(captured)
+    assert joined.count("Start-Process") == 1
+    assert "VirtualMachinePlatform" not in joined
+
+    encoded_index = captured.index("-Command") + 1
+    outer = captured[encoded_index]
+    marker = "'-EncodedCommand','"
+    start = outer.index(marker) + len(marker)
+    end = outer.index("'", start)
+    script = base64.b64decode(
+        outer[start:end]
+    ).decode("utf-16-le")
+    assert "HypervisorPlatform" in script
+    assert "VirtualMachinePlatform" not in script
+    assert "hypervisorlaunchtype Auto" in script

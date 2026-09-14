@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.2.1 — Windows/WHPX hardware acceptance hardening.  
+**Этап:** v0.2.2.dev0 — Windows hypervisor compatibility hardening.  
 **Stable baseline:** v0.2.1 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -184,3 +184,7 @@ GitHub-hosted Windows CI остаётся обязательным для сбо
 
 ### ADR-047 — Package Manager dump failure degrades evidence instead of aborting capture
 A full raw package-manager dump remains required for a `complete` session, but it is not allowed to prevent collection of unrelated high-value evidence. Before the dump, Mobile Research best-effort waits for Package Manager main/background handlers. The primary transport uses bounded `dumpsys -t 30 package <package>`; a bounded `cmd package dump-package` path is the fallback. If neither produces a complete dump, `device_metadata` still writes explicit diagnostic package evidence and normalized metadata, records a non-fatal degradation, and orchestration proceeds to logcat, screen recording and raw PCAP. The final session therefore becomes `partial`, preserving the evidence contract without turning a metadata timeout into a 1–2 KB failed archive.
+
+
+### ADR-048 — Release acceptance и пользовательская hypervisor-совместимость разделены
+WHPX остаётся предпочтительным Microsoft-backed Windows hypervisor и обязательным target dedicated Windows hardware acceptance. Это не означает, что пользовательский runtime должен отвергать уже установленный и usable AEHD/GVM, пока текущий Android Emulator официально поддерживает этот fallback. Если `emulator -accel-check` подтверждает WHPX или AEHD/GVM, Mobile Research продолжает работу без UAC. Автоматическая настройка Windows выполняется только при отсутствии usable hypervisor. Она включает только `HypervisorPlatform` и `hypervisorlaunchtype=Auto` через один elevated PowerShell process; `VirtualMachinePlatform` для Android Emulator не включается. Если изменение Windows требует reboot, приложение обязано сообщить об этом явно, поскольку `/NoRestart`/NoRestart semantics могут не показывать системный prompt.

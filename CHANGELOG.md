@@ -2,6 +2,16 @@
 
 All notable Mobile Research changes are recorded here.
 
+## Unreleased — 0.2.2.dev0
+
+### Fixed
+
+- Restored compatibility with an already-installed and usable Android Emulator Hypervisor Driver (AEHD/GVM) on Windows. WHPX remains the preferred and release-accepted Windows path, but usable AEHD no longer blocks the user or triggers elevation.
+- Fixed duplicate UAC prompts during Windows virtualization setup: Mobile Research now performs the entire WHPX configuration through one elevated PowerShell process.
+- Removed unnecessary automatic enablement of VirtualMachinePlatform; Android Emulator WHPX needs HypervisorPlatform, not a second unrelated Windows feature.
+- WHPX setup now also ensures `hypervisorlaunchtype=Auto` and explicitly reports when a reboot is required instead of immediately treating the still-running AEHD provider as a fatal error.
+
+
 ## [0.2.1] - 2026-09-14
 
 ### Changed

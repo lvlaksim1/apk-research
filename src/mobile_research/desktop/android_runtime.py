@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import os
 import re
 import subprocess
@@ -56,6 +57,7 @@ class AndroidRuntime:
 
     SERIAL = "emulator-5554"
     PORT = 5554
+    SUPPORTED_WINDOWS_HYPERVISORS = {"whpx", "aehd"}
 
     def __init__(
         self,
@@ -81,7 +83,7 @@ class AndroidRuntime:
             None,
             None,
         )
-        self._check_acceleration()
+        self._check_acceleration(progress)
         if not self._device_online():
             self._start_emulator(progress)
         self._wait_for_boot(progress)
@@ -554,7 +556,10 @@ class AndroidRuntime:
             + last_error
         )
 
-    def _check_acceleration(self) -> None:
+    def _check_acceleration(
+        self,
+        progress: RuntimeProgress | None = None,
+    ) -> None:
         if (
             os.environ.get(
                 "MOBILE_RESEARCH_SOFTWARE_EMULATOR"
@@ -564,7 +569,85 @@ class AndroidRuntime:
             self._software_acceleration = True
             return
 
-        result = self._run(
+        result = self._acceleration_check()
+        detail = (
+            result.stdout
+            or result.stderr
+        ).strip()
+        provider = acceleration_provider(detail)
+
+        if result.returncode == 0:
+            if not self._is_windows():
+                self._software_acceleration = False
+                return
+            if provider in self.SUPPORTED_WINDOWS_HYPERVISORS:
+                self._software_acceleration = False
+                if provider == "aehd":
+                    self._emit(
+                        progress,
+                        "Аппаратное ускорение: AEHD "
+                        "(совместимый fallback)",
+                        None,
+                        None,
+                    )
+                return
+
+        if self._is_windows():
+            setup_code = self._enable_windows_hypervisor_features()
+            result = self._acceleration_check()
+            detail = (
+                result.stdout
+                or result.stderr
+            ).strip()
+            provider = acceleration_provider(detail)
+
+            if (
+                result.returncode == 0
+                and provider in self.SUPPORTED_WINDOWS_HYPERVISORS
+            ):
+                self._software_acceleration = False
+                if provider == "aehd":
+                    self._emit(
+                        progress,
+                        "WHPX включён; до следующей "
+                        "перезагрузки используется AEHD",
+                        None,
+                        None,
+                    )
+                return
+
+            if setup_code == 10:
+                raise AndroidRuntimeError(
+                    "Windows Hypervisor Platform (WHPX) включён. "
+                    "Чтобы Windows загрузила системный гипервизор, "
+                    "нужно перезагрузить компьютер. Windows может "
+                    "не показывать отдельный запрос на перезагрузку. "
+                    "После перезагрузки снова откройте Mobile Research. "
+                    "Диагностика Android Emulator: "
+                    + detail
+                )
+
+            if setup_code not in {0, None}:
+                raise AndroidRuntimeError(
+                    "Не удалось автоматически настроить Windows "
+                    "Hypervisor Platform. Код настройки: "
+                    f"{setup_code}. Проверьте, что запрос UAC был "
+                    "разрешён, и повторите попытку. Диагностика: "
+                    + detail
+                )
+
+        raise AndroidRuntimeError(
+            "Аппаратное ускорение Android Emulator недоступно. "
+            "Проверьте аппаратную виртуализацию VT-x/AMD-V "
+            "в BIOS/UEFI. На Windows после первого включения "
+            "WHPX может потребоваться перезагрузка. Диагностика: "
+            + detail
+        )
+
+    def _acceleration_check(
+        self,
+    ) -> subprocess.CompletedProcess[str]:
+        return self._run(
             [
                 str(self.paths.emulator),
                 "-accel-check",
@@ -572,80 +655,175 @@ class AndroidRuntime:
             timeout=20.0,
             check=False,
         )
-        detail = (
-            result.stdout
-            or result.stderr
-        ).strip()
-        provider = acceleration_provider(detail)
-        if (
-            result.returncode == 0
-            and (
-                os.name != "nt"
-                or provider == "whpx"
-            )
-        ):
-            self._software_acceleration = False
-            return
 
-        if os.name == "nt":
-            self._enable_windows_hypervisor_features()
-            result = self._run(
-                [
-                    str(self.paths.emulator),
-                    "-accel-check",
-                ],
-                timeout=20.0,
-                check=False,
-            )
-            detail = (
-                result.stdout
-                or result.stderr
-            ).strip()
-            provider = acceleration_provider(detail)
-            if (
-                result.returncode == 0
-                and provider == "whpx"
-            ):
-                self._software_acceleration = False
-                return
+    @staticmethod
+    def _is_windows() -> bool:
+        return os.name == "nt"
 
-            if result.returncode == 0:
-                raise AndroidRuntimeError(
-                    "Mobile Research требует Windows Hypervisor "
-                    "Platform (WHPX), но Android Emulator выбрал "
-                    f"другой hypervisor: {provider}. "
-                    "Mobile Research попыталась включить WHPX. "
-                    "Если Windows запросила перезагрузку, "
-                    "перезагрузите компьютер и снова откройте "
-                    "программу. Диагностика: "
-                    + detail
-                )
+    def _enable_windows_hypervisor_features(
+        self,
+    ) -> int | None:
+        """Enable WHPX with a single UAC prompt.
 
-        raise AndroidRuntimeError(
-            "Аппаратное ускорение Android Emulator пока "
-            "недоступно. Mobile Research попыталась включить "
-            "необходимые компоненты Windows. Если Windows "
-            "запросила перезагрузку, перезагрузите компьютер "
-            "и снова откройте программу. Если ошибка останется, "
-            "проверьте аппаратную виртуализацию в BIOS/UEFI. "
-            + detail
+        Exit code 10 means that Windows configuration changed and
+        a reboot is required before WHPX can become active.
+        """
+
+        elevated_script = (
+            "$ErrorActionPreference='Stop';"
+            "$restart=$false;"
+            "$feature=Get-WindowsOptionalFeature "
+            "-Online -FeatureName HypervisorPlatform;"
+            "$state=[string]$feature.State;"
+            "if($state -eq 'EnablePending'){"
+            "$restart=$true"
+            "}elseif($state -ne 'Enabled'){"
+            "$r=Enable-WindowsOptionalFeature -Online "
+            "-FeatureName HypervisorPlatform -All -NoRestart;"
+            "$restart=$true;"
+            "if($r.RestartNeeded){$restart=$true}"
+            "};"
+            "$bcd=(& bcdedit.exe /enum '{current}' 2>&1 "
+            "| Out-String);"
+            "if($LASTEXITCODE -ne 0){exit 22};"
+            "if($bcd -notmatch "
+            "'(?im)^\\s*hypervisorlaunchtype\\s+Auto\\s*
+    def _device_online(self) -> bool:
+        if not self.paths.adb.is_file():
+            return False
+        result = self._run(
+            [
+                str(self.paths.adb),
+                "devices",
+            ],
+            timeout=10.0,
+            check=False,
+        )
+        return any(
+            line.split()[:2]
+            == [self.SERIAL, "device"]
+            for line in result.stdout.splitlines()
         )
 
-    def _enable_windows_hypervisor_features(self) -> None:
-        """Best-effort enablement of Windows virtualization via UAC."""
+    def _ensure_process_alive(self) -> None:
+        with self._process_lock:
+            process = self.process
+        if (
+            process is not None
+            and process.poll() is not None
+        ):
+            log_path = self.paths.root / "emulator.log"
+            tail = ""
+            if log_path.is_file():
+                try:
+                    tail = log_path.read_text(
+                        encoding="utf-8",
+                        errors="replace",
+                    )[-4000:]
+                except OSError:
+                    pass
+            raise AndroidRuntimeError(
+                "Android Emulator завершился с кодом "
+                f"{process.returncode}.\n{tail}"
+            )
 
-        command = (
-            "$ErrorActionPreference='Stop'; "
-            "$features=@('HypervisorPlatform',"
-            "'VirtualMachinePlatform'); "
-            "foreach($f in $features){"
-            "$p=Start-Process dism.exe -Verb RunAs "
-            "-Wait -PassThru -ArgumentList "
-            "@('/Online','/Enable-Feature',"
-            "('/FeatureName:'+$f),'/All','/NoRestart'); "
-            "if($p.ExitCode -ne 0 -and "
-            "$p.ExitCode -ne 3010){exit $p.ExitCode}}; "
+    def _adb_shell(
+        self,
+        *arguments: str,
+        timeout: float = 15.0,
+        check: bool = True,
+    ) -> subprocess.CompletedProcess[str]:
+        return self._run(
+            [
+                str(self.paths.adb),
+                "-s",
+                self.SERIAL,
+                "shell",
+                *arguments,
+            ],
+            timeout=timeout,
+            check=check,
+        )
+
+    def _run(
+        self,
+        command: Sequence[str],
+        *,
+        timeout: float,
+        check: bool = True,
+    ) -> subprocess.CompletedProcess[str]:
+        creation_flags = getattr(
+            subprocess,
+            "CREATE_NO_WINDOW",
+            0,
+        )
+        try:
+            result = subprocess.run(
+                list(command),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout,
+                check=False,
+                env=self.components.environment(),
+                creationflags=creation_flags,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise AndroidRuntimeError(
+                "Команда Android превысила таймаут "
+                f"{timeout:g} с"
+            ) from exc
+        except OSError as exc:
+            raise AndroidRuntimeError(
+                "Не удалось запустить Android-команду: "
+                f"{exc}"
+            ) from exc
+        if check and result.returncode != 0:
+            detail = (
+                result.stderr.strip()
+                or result.stdout.strip()
+                or "нет диагностики"
+            )
+            raise AndroidRuntimeError(
+                "Android-команда завершилась с кодом "
+                f"{result.returncode}: {detail}"
+            )
+        return result
+
+    @staticmethod
+    def _emit(
+        callback: RuntimeProgress | None,
+        message: str,
+        current: int | None,
+        total: int | None,
+    ) -> None:
+        if callback is not None:
+            callback(message, current, total)
+){"
+            "& bcdedit.exe /set hypervisorlaunchtype Auto "
+            "| Out-Null;"
+            "if($LASTEXITCODE -ne 0){exit 23};"
+            "$restart=$true"
+            "};"
+            "if($restart){exit 10};"
             "exit 0"
+        )
+        encoded = base64.b64encode(
+            elevated_script.encode("utf-16-le")
+        ).decode("ascii")
+        command = (
+            "$ErrorActionPreference='Stop';"
+            "try{"
+            "$p=Start-Process powershell.exe -Verb RunAs "
+            "-WindowStyle Hidden -Wait -PassThru "
+            "-ArgumentList @("
+            "'-NoProfile','-ExecutionPolicy','Bypass',"
+            "'-EncodedCommand','"
+            + encoded
+            + "');"
+            "exit $p.ExitCode"
+            "}catch{exit 122}"
         )
         creation_flags = getattr(
             subprocess,
@@ -653,7 +831,7 @@ class AndroidRuntime:
             0,
         )
         try:
-            subprocess.run(
+            result = subprocess.run(
                 [
                     "powershell.exe",
                     "-NoProfile",
@@ -662,15 +840,16 @@ class AndroidRuntime:
                     "-Command",
                     command,
                 ],
-                timeout=180,
+                timeout=240,
                 check=False,
                 creationflags=creation_flags,
             )
+            return int(result.returncode)
         except (
             OSError,
             subprocess.TimeoutExpired,
         ):
-            return
+            return None
 
     def _device_online(self) -> bool:
         if not self.paths.adb.is_file():

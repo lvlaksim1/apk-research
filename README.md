@@ -10,6 +10,13 @@ Desktop Build собирает автономный MobileResearchSetup.exe. And
 
 Подробный desktop contract: docs/V0.2_DESKTOP.md.
 
+## Development after v0.2.1
+
+Текущая development-линия — **0.2.2.dev0**. WHPX остаётся предпочтительным Windows hypervisor и обязательным hardware release-acceptance path, но пользовательский runtime снова принимает уже установленный и рабочий AEHD/GVM как совместимый fallback до завершения его официального переходного периода. Это разделяет две разные задачи: release должен доказать современный WHPX path, а приложение не должно ломать уже рабочий компьютер пользователя только из-за наличия поддерживаемого legacy hypervisor.
+
+При отсутствии любого usable hypervisor Mobile Research включает только Windows Hypervisor Platform одним UAC-запросом, выставляет `hypervisorlaunchtype=Auto` и явно сообщает о необходимости перезагрузки, если она требуется.
+
+
 ## v0.2.1 — hardening пользовательского Windows-сценария
 
 v0.2.1 исправляет обнаруженный на реальном приложении `com.evrasia` отказ preflight: зависший полный Package Manager dump больше не уничтожает всё исследование. Mobile Research ожидает завершения pending Package Manager operations, использует ограниченные по времени основной и резервный способы получения package dump, а при их отказе продолжает logcat/screen/PCAP и завершает сессию как `partial`.
