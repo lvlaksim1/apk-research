@@ -497,6 +497,9 @@ class MainWindow(QMainWindow):
         self.reset_android_button = QPushButton(
             "Сбросить Android в чистое состояние"
         )
+        self.repair_components_button = QPushButton(
+            "Переустановить Android-компоненты"
+        )
         component_layout.addWidget(
             QLabel(
                 "Android SDK, Emulator и AVD "
@@ -511,6 +514,9 @@ class MainWindow(QMainWindow):
         )
         component_layout.addWidget(
             self.reset_android_button
+        )
+        component_layout.addWidget(
+            self.repair_components_button
         )
         layout.addWidget(component_group)
 
@@ -648,6 +654,9 @@ class MainWindow(QMainWindow):
         self.reset_android_button.clicked.connect(
             self._reset_android
         )
+        self.repair_components_button.clicked.connect(
+            self._repair_components
+        )
 
     def _choose_apk(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -771,6 +780,16 @@ class MainWindow(QMainWindow):
         self.stop_button.setEnabled(
             self._research_active
         )
+        settings_enabled = (
+            not busy
+            and not self._research_active
+        )
+        self.reset_android_button.setEnabled(
+            settings_enabled
+        )
+        self.repair_components_button.setEnabled(
+            settings_enabled
+        )
 
     def _on_environment_ready(
         self,
@@ -821,9 +840,10 @@ class MainWindow(QMainWindow):
             self.status_network.setStyleSheet(
                 "color: #238636;"
             )
-        self.global_status.setText(
-            "Android готов"
-        )
+        if data.get("device_online"):
+            self.global_status.setText(
+                "Android готов"
+            )
 
     def _on_apk_ready(
         self,
@@ -1020,6 +1040,27 @@ class MainWindow(QMainWindow):
         state = (
             self.controller.component_state
         )
+
+        self.status_android.setText("○ Android")
+        self.status_android.setStyleSheet("")
+        self.status_adb.setText("○ ADB")
+        self.status_adb.setStyleSheet("")
+        self.status_root.setText("○ Root")
+        self.status_root.setStyleSheet("")
+        self.status_network.setText("○ PCAP")
+        self.status_network.setStyleSheet("")
+
+        if self.controller.package_name:
+            self.status_package.setText(
+                "● APK установлен"
+            )
+            self.status_package.setStyleSheet(
+                "color: #238636;"
+            )
+        else:
+            self.status_package.setText("○ APK")
+            self.status_package.setStyleSheet("")
+
         if state.platform_tools:
             self.status_adb.setText(
                 "● ADB установлен"
@@ -1041,6 +1082,10 @@ class MainWindow(QMainWindow):
         if state.ready:
             self.global_status.setText(
                 "Компоненты готовы"
+            )
+        elif not self._research_active:
+            self.global_status.setText(
+                "Android-компоненты не готовы"
             )
 
     def _refresh_results(self) -> None:
@@ -1268,6 +1313,31 @@ class MainWindow(QMainWindow):
             == QMessageBox.StandardButton.Yes
         ):
             self.controller.reset_android()
+
+    def _repair_components(self) -> None:
+        if self._research_active or self._busy:
+            QMessageBox.warning(
+                self,
+                "Mobile Research",
+                "Нельзя переустановить Android-компоненты "
+                "во время другой операции.",
+            )
+            return
+
+        response = QMessageBox.question(
+            self,
+            "Переустановка Android-компонентов",
+            "Удалить управляемые Mobile Research Android SDK, "
+            "Emulator, system image и AVD?\n\n"
+            "Данные исследований не удаляются. "
+            "При следующей подготовке Android-компоненты "
+            "будут загружены заново.",
+        )
+        if (
+            response
+            == QMessageBox.StandardButton.Yes
+        ):
+            self.controller.repair_components()
 
     @staticmethod
     def _open_folder(path: Path) -> None:

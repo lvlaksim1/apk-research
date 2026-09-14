@@ -126,6 +126,11 @@ class DesktopController(QObject):
             self._reset_android_worker
         )
 
+    def repair_components(self) -> None:
+        self._thread(
+            self._repair_components_worker
+        )
+
     def tap(self, x: int, y: int) -> None:
         self._thread_quiet(
             self.runtime.tap,
@@ -224,6 +229,7 @@ class DesktopController(QObject):
             self._set_busy(False)
 
     def _research_worker(self) -> None:
+        orchestrator: ResearchOrchestrator | None = None
         try:
             self._set_busy(True)
             assert self.package_name is not None
@@ -254,31 +260,138 @@ class DesktopController(QObject):
             result = (
                 orchestrator.stop_and_export()
             )
-            payload = result.to_dict()
-            try:
-                audit = (
-                    audit_complete_research_zip(
-                        Path(result.archive)
-                    )
-                )
-                payload["audit"] = (
-                    audit.to_dict()
-                )
-            except Exception as exc:
-                payload["audit_error"] = str(exc)
+            payload = self._research_payload(result)
             self.researchFinished.emit(payload)
             self.log.emit(
                 "Research ZIP создан: "
                 f"{result.archive}"
             )
         except Exception as exc:
-            self.error.emit(
+            message = (
                 str(exc)
                 or exc.__class__.__name__
             )
+            recovered = False
+            if orchestrator is not None:
+                recovered = self._salvage_research(
+                    orchestrator,
+                    message,
+                    existing_archive=getattr(
+                        exc,
+                        "archive",
+                        None,
+                    ),
+                )
+            if recovered:
+                message += (
+                    "\n\nMobile Research остановила collectors "
+                    "и сохранила аварийный Research ZIP."
+                )
+            self.error.emit(message)
         finally:
             self.orchestrator = None
             self._set_busy(False)
+
+    def _research_payload(
+        self,
+        result,
+        *,
+        recovered_error: str | None = None,
+    ) -> dict:
+        payload = result.to_dict()
+        if recovered_error:
+            payload["recovered_after_error"] = (
+                recovered_error
+            )
+        try:
+            audit = audit_complete_research_zip(
+                Path(result.archive)
+            )
+            payload["audit"] = audit.to_dict()
+        except Exception as exc:
+            payload["audit_error"] = str(exc)
+        return payload
+
+    def _salvage_research(
+        self,
+        orchestrator: ResearchOrchestrator,
+        message: str,
+        *,
+        existing_archive: str | None = None,
+    ) -> bool:
+        session = getattr(
+            orchestrator,
+            "session",
+            None,
+        )
+        status = getattr(
+            getattr(session, "status", None),
+            "value",
+            "",
+        )
+
+        if existing_archive:
+            payload = {
+                "session_id": getattr(
+                    session,
+                    "session_id",
+                    "",
+                ),
+                "session_root": str(
+                    getattr(
+                        getattr(session, "paths", None),
+                        "root",
+                        "",
+                    )
+                ),
+                "session_status": status or "failed",
+                "archive": existing_archive,
+                "validation_issues": None,
+                "recovered_after_error": message,
+            }
+            try:
+                audit = audit_complete_research_zip(
+                    Path(existing_archive)
+                )
+                payload["audit"] = audit.to_dict()
+            except Exception as exc:
+                payload["audit_error"] = str(exc)
+            self.researchFinished.emit(payload)
+            self.log.emit(
+                "Failed Research ZIP уже сохранён: "
+                f"{existing_archive}"
+            )
+            return True
+
+        if status not in {
+            "active",
+            "stopping",
+            "failed",
+        }:
+            return False
+
+        try:
+            result = orchestrator.stop_and_export()
+            payload = self._research_payload(
+                result,
+                recovered_error=message,
+            )
+            self.researchFinished.emit(payload)
+            self.log.emit(
+                "Аварийное завершение сохранено: "
+                f"{result.archive}"
+            )
+            return True
+        except Exception as exc:
+            self.log.emit(
+                "Не удалось сохранить аварийный "
+                "Research ZIP: "
+                + (
+                    str(exc)
+                    or exc.__class__.__name__
+                )
+            )
+            return False
 
     def _inspect_archive_worker(
         self,
@@ -352,6 +465,29 @@ class DesktopController(QObject):
             self.log.emit(
                 "Android userdata очищены. "
                 "Следующий запуск будет чистым."
+            )
+            self.environmentReady.emit(
+                self.runtime.diagnostics()
+            )
+        except Exception as exc:
+            self.error.emit(
+                str(exc)
+                or exc.__class__.__name__
+            )
+        finally:
+            self._set_busy(False)
+
+    def _repair_components_worker(self) -> None:
+        try:
+            self._set_busy(True)
+            self._stop_screen.set()
+            self.runtime.stop()
+            self.runtime.components.remove_all()
+            self.package_name = None
+            self.log.emit(
+                "Android-компоненты удалены. "
+                "При следующей подготовке Mobile Research "
+                "загрузит их заново."
             )
             self.environmentReady.emit(
                 self.runtime.diagnostics()
