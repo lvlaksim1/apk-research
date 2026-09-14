@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.7.2 — DWM live Emulator composition
+
+Итоговый DWM live release. Помимо display-path исправлена release-candidate логика: временный installer artifact создаётся только для commit-driven релизов и удаляется после публикации GitHub Release.
+
 ## v0.7.1 — DWM live Emulator composition
 
 Финальный release DWM live path: Android Emulator остаётся самостоятельным GPU/top-level окном, DWM композитит его в Android-панель Mobile Research без `SetParent`; дополнительно исправлена обработка Win32 thumbnail handle.
@@ -71,7 +75,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.7.1 — Desktop Application** — self-contained Windows release с primary DWM live composition: реальный standalone Android Emulator сохраняет свой GPU/top-level window, а DWM отображает его live preview внутри Mobile Research без `SetParent` и без Python/QPainter frame-copy. gRPC/MMAP остаётся fallback.
+**v0.7.2 — Desktop Application** — self-contained Windows release с primary DWM live composition: реальный standalone Android Emulator сохраняет свой GPU/top-level window, а DWM отображает его live preview внутри Mobile Research без `SetParent` и без Python/QPainter frame-copy. gRPC/MMAP остаётся fallback.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

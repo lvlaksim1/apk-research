@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.7.1 — DWM live Emulator composition.  
-**Stable baseline:** v0.7.1 Desktop Application.  
+**Этап:** v0.7.2 — DWM live Emulator composition.  
+**Stable baseline:** v0.7.2 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -248,3 +248,7 @@ v0.3.0 выполнял bytes → QImage.copy → mirrored image → QPixmap →
 
 ### ADR-065 — DWM live composition заменяет cross-process SetParent
 Реальный тест v0.6.0 доказал, что Mobile Research находит правильный standalone Qt HWND Android Emulator, но после cross-process `SetParent` GPU surface становится чёрной; при возврате окна к top-level состоянию изображение снова появляется. Поэтому `SetParent` исключён из active display path. Начиная с v0.7.0 Emulator остаётся самостоятельным top-level GPU window, а Mobile Research регистрирует его через `DwmRegisterThumbnail` в собственном top-level HWND и обновляет `DWM_THUMBNAIL_PROPERTIES.rcDestination` по геометрии AndroidView. DWM API требует top-level source и destination, что соответствует новой архитектуре. После успешной регистрации source window перемещается за пределы virtual desktop, но не скрывается/минимизируется; при shutdown оно не восстанавливается, чтобы исключить визуальную вспышку. Input остаётся через Emulator gRPC. При ошибке DWM используется существующий gRPC/MMAP → gRPC bytes → ADB fallback.
+
+
+### ADR-066 — Release-candidate artifact определяется release commit contract
+Попытка определять release-candidate сравнением версии с parent через `git show` оказалась ненадёжной в GitHub Actions checkout и дала false negative для v0.7.1. Поскольку проект уже имеет формальный commit-driven release contract, временный `mobile-research-windows-desktop` artifact создаётся только на push в main, если head commit message начинается с `Release Mobile Research v`. Обычные коммиты не создают installer artifacts. Release workflow по-прежнему удаляет этот однодневный artifact сразу после публикации.

@@ -31,8 +31,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -112,36 +110,8 @@ jobs:
           "$hash  MobileResearchSetup.exe" | Set-Content installer\SHA256SUMS.txt -Encoding ascii
           Get-Content installer\SHA256SUMS.txt
 
-      - name: Detect release candidate
-        id: release_candidate
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: pwsh
-        run: |
-          $currentText = Get-Content pyproject.toml -Raw
-          if ($currentText -notmatch '(?m)^version\s*=\s*"([^"]+)"') {
-            throw "Current version not found"
-          }
-          $currentVersion = $Matches[1]
-
-          $previousVersion = ""
-          try {
-            $previousText = git show "$env:GITHUB_SHA^:pyproject.toml"
-            if ($LASTEXITCODE -eq 0 -and $previousText -match '(?m)^version\s*=\s*"([^"]+)"') {
-              $previousVersion = $Matches[1]
-            }
-          } catch {
-            $previousVersion = ""
-          }
-
-          $changed = ($previousVersion -eq "" -or $currentVersion -ne $previousVersion)
-          "changed=$($changed.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-          "current_version=$currentVersion" >> $env:GITHUB_OUTPUT
-          Write-Host "Previous version: $previousVersion"
-          Write-Host "Current version:  $currentVersion"
-          Write-Host "Release candidate: $changed"
-
       - name: Upload temporary release installer
-        if: steps.release_candidate.outputs.changed == 'true'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release Mobile Research v')
         uses: actions/upload-artifact@v4
         with:
           name: mobile-research-windows-desktop

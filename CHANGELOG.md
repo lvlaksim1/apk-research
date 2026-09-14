@@ -2,6 +2,13 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.7.2] - 2026-09-15
+
+### Release workflow
+
+- Fixed release-candidate detection for the ephemeral Windows installer artifact. Desktop Build now uploads the one-day installer artifact only for commits whose message starts with `Release Mobile Research v`, matching the project's commit-driven release contract.
+- This avoids both false negatives on real releases and unnecessary installer artifacts on ordinary commits.
+
 ## [0.7.1] - 2026-09-15
 
 ### Fixed
