@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.2.2 — Windows hypervisor compatibility hardening.  
+**Этап:** v0.3.0.dev0 — low-latency embedded Android interaction.  
 **Stable baseline:** v0.2.2 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -188,3 +188,13 @@ A full raw package-manager dump remains required for a `complete` session, but i
 
 ### ADR-048 — Release acceptance и пользовательская hypervisor-совместимость разделены
 WHPX остаётся предпочтительным Microsoft-backed Windows hypervisor и обязательным target dedicated Windows hardware acceptance. Это не означает, что пользовательский runtime должен отвергать уже установленный и usable AEHD/GVM, пока текущий Android Emulator официально поддерживает этот fallback. Если `emulator -accel-check` подтверждает WHPX или AEHD/GVM, Mobile Research продолжает работу без UAC. Автоматическая настройка Windows выполняется только при отсутствии usable hypervisor. Она включает только `HypervisorPlatform` и `hypervisorlaunchtype=Auto` через один elevated PowerShell process; `VirtualMachinePlatform` для Android Emulator не включается. Если изменение Windows требует reboot, приложение обязано сообщить об этом явно, поскольку `/NoRestart`/NoRestart semantics могут не показывать системный prompt.
+
+
+### ADR-049 — Интерактивный Android использует Emulator gRPC
+Штатный desktop path получает непрерывный RGB framebuffer из локального managed Emulator через gRPC и отправляет touch/key input тем же control plane. GUI хранит только последний кадр и публикует его примерно каждые 33 ms, поэтому устаревшие frames не образуют очередь. ADB screenshot/input остаётся compatibility fallback; research collectors по-прежнему независимы от GUI transport.
+
+### ADR-050 — GPU rendering выбирает Emulator
+При аппаратном CPU-ускорении managed Emulator использует GPU mode auto. Принудительный SwiftShader удалён из штатного hardware path и сохраняется только для software-only fallback.
+
+### ADR-051 — Clean launch является отдельным research mode
+Режим clean останавливает текущий экземпляр target package до preflight, затем запускает collectors и только после перехода capture в ACTIVE запускает APK. Режим continue сохраняет уже существующее состояние приложения. Выбранный режим фиксируется в session event log.
