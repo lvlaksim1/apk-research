@@ -276,6 +276,11 @@ class DesktopController(QObject):
                 recovered = self._salvage_research(
                     orchestrator,
                     message,
+                    existing_archive=getattr(
+                        exc,
+                        "archive",
+                        None,
+                    ),
                 )
             if recovered:
                 message += (
@@ -311,6 +316,8 @@ class DesktopController(QObject):
         self,
         orchestrator: ResearchOrchestrator,
         message: str,
+        *,
+        existing_archive: str | None = None,
     ) -> bool:
         session = getattr(
             orchestrator,
@@ -322,21 +329,46 @@ class DesktopController(QObject):
             "value",
             "",
         )
+
+        if existing_archive:
+            payload = {
+                "session_id": getattr(
+                    session,
+                    "session_id",
+                    "",
+                ),
+                "session_root": str(
+                    getattr(
+                        getattr(session, "paths", None),
+                        "root",
+                        "",
+                    )
+                ),
+                "session_status": status or "failed",
+                "archive": existing_archive,
+                "validation_issues": None,
+                "recovered_after_error": message,
+            }
+            try:
+                audit = audit_complete_research_zip(
+                    Path(existing_archive)
+                )
+                payload["audit"] = audit.to_dict()
+            except Exception as exc:
+                payload["audit_error"] = str(exc)
+            self.researchFinished.emit(payload)
+            self.log.emit(
+                "Failed Research ZIP уже сохранён: "
+                f"{existing_archive}"
+            )
+            return True
+
         if status not in {
             "active",
             "stopping",
             "failed",
         }:
-            archive = getattr(
-                getattr(
-                    orchestrator,
-                    "last_error",
-                    None,
-                ),
-                "archive",
-                None,
-            )
-            return bool(archive)
+            return False
 
         try:
             result = orchestrator.stop_and_export()
