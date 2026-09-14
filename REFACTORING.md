@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.7.5 — real-time touch + startup flash suppression.  
-**Stable baseline:** v0.7.5 Desktop Application.  
+**Этап:** v0.7.6 — correct DWM source HWND + real-time touch.  
+**Stable baseline:** v0.7.6 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -270,3 +270,7 @@ DWM thumbnail композитится в top-level HWND и не являетс�
 
 ### ADR-071 — DWM source создаётся скрытым и показывается только после установки z-order
 Даже 15-ms polling оставлял короткую вспышку standalone Emulator до того, как source HWND успевал оказаться за Mobile Research. В DWM-live Windows launch v0.7.5 передаёт `STARTUPINFO.dwFlags |= STARTF_USESHOWWINDOW` и `wShowWindow=SW_HIDE`. NativeEmulatorEmbedder ищет top-level source независимо от текущего visibility, устанавливает TOOLWINDOW/z-order/geometry за Mobile Research и только затем показывает source через `SW_SHOWNOACTIVATE`. Discovery polling сокращён до 5 ms для Emulator builds, которые частично игнорируют startup show state.
+
+
+### ADR-072 — DWM source выбирается по identity, а не только по PID ancestry
+Реальный тест v0.7.5 выявил race: STARTUPINFO/SW_HIDE скрывал главное окно Emulator, а `find_emulator_window(require_visible=False)` мог выбрать другой top-level Qt/helper HWND того же процесса/descendant process. DWM тогда композитил белую helper surface, а настоящее окно Emulator оставалось отдельно. v0.7.6 отменяет hidden process startup и снова ищет visible top-level source. Среди кандидатов приоритетный pool формируется только из окон, title которых содержит `Android Emulator` или имя managed AVD; PID ancestry используется лишь как дополнительный сигнал. После точной идентификации source мгновенно скрывается, позиционируется за Mobile Research и показывается через `SW_SHOWNOACTIVATE` до DWM registration. Это сохраняет нормальную GPU surface и одновременно сокращает видимую startup-вспышку.

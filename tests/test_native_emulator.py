@@ -101,3 +101,39 @@ def test_hidden_qt_window_is_not_a_dwm_candidate() -> None:
 
     fake_emulator.close()
     app.processEvents()
+
+
+
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="Win32 window discovery is Windows-only",
+)
+def test_real_emulator_title_beats_larger_pid_helper() -> None:
+    app = QApplication.instance() or QApplication([])
+
+    helper = QWidget()
+    helper.setWindowTitle("Qt helper surface")
+    helper.resize(900, 900)
+    helper.show()
+
+    emulator = QWidget()
+    emulator.setWindowTitle(
+        "Android Emulator - AVD_RESEARCH:5554"
+    )
+    emulator.resize(420, 760)
+    emulator.show()
+    app.processEvents()
+
+    found = find_emulator_window(
+        os.getpid(),
+        "AVD_RESEARCH",
+        require_visible=True,
+    )
+    assert found is not None
+    hwnd, details = found
+    assert int(hwnd) == int(emulator.winId())
+    assert details["title_match"] is True
+
+    emulator.close()
+    helper.close()
+    app.processEvents()

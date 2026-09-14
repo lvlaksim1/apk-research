@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.7.6 — Correct DWM source HWND
+
+Исправлена регрессия v0.7.5: скрытый старт процесса позволял выбрать Qt helper HWND вместо настоящего окна Android Emulator, из-за чего отдельный Emulator оставался на рабочем столе, а DWM внутри Mobile Research был белым. Теперь выбирается строго идентифицированное окно Android Emulator/AVD; только после его обнаружения оно кратко скрывается, ставится за Mobile Research, показывается без активации и подключается к DWM. Потоковый DOWN/MOVE/UP свайп сохранён.
+
 ## v0.7.5 — Real-time touch + no startup flash
 
 Мышь в Android-панели теперь работает как настоящий touchscreen: DOWN отправляется при нажатии, MOVE — непрерывно во время движения, UP — при отпускании. Поэтому свайп должен двигать Android уже в процессе движения мыши, а не после release. Для DWM-live Windows Emulator запускается первоначально скрытым, затем source HWND ставится за Mobile Research и только после этого показывается без активации; это устраняет стартовое мигание отдельного окна.
@@ -87,7 +91,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.7.5 — Desktop Application** — self-contained Windows release с covered-source DWM live, потоковым gRPC touch DOWN/MOVE/UP для real-time drag и скрытым initial launch source window перед безопасным размещением за Mobile Research. gRPC/MMAP остаётся fallback.
+**v0.7.6 — Desktop Application** — self-contained Windows release с covered-source DWM live, строгой идентификацией настоящего Android Emulator HWND и потоковым gRPC touch DOWN/MOVE/UP. Source скрывается только после точного обнаружения, затем сразу размещается за Mobile Research. gRPC/MMAP остаётся fallback.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

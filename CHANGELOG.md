@@ -2,6 +2,16 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.7.6] - 2026-09-15
+
+### DWM source-window identity fix
+
+- Reverted the v0.7.5 STARTUPINFO/SW_HIDE process-launch experiment. The real-PC test showed that hidden startup allowed Mobile Research to bind to a hidden Qt helper top-level HWND from the Emulator process while the real Emulator window appeared separately.
+- DWM source discovery now strongly prefers a top-level window whose title identifies the actual Android Emulator or managed AVD; PID ancestry alone is no longer sufficient when an identified Emulator window exists.
+- The real Emulator window is discovered while visible, immediately hidden only after positive identity, positioned behind Mobile Research, shown without activation, and then registered with DWM.
+- Added a Windows discovery test proving that a larger same-process Qt helper window cannot outrank the correctly titled Emulator window.
+- The real-time gRPC touch DOWN/MOVE/UP path from v0.7.5 is retained unchanged.
+
 ## [0.7.5] - 2026-09-15
 
 ### Real-time touch drag

@@ -801,32 +801,14 @@ class AndroidRuntime:
             "CREATE_NO_WINDOW",
             0,
         )
-        startupinfo = None
-        if (
-            self._is_windows()
-            and self._display_mode == "dwm-live"
-            and hasattr(subprocess, "STARTUPINFO")
-        ):
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= getattr(
-                subprocess,
-                "STARTF_USESHOWWINDOW",
-                1,
-            )
-            startupinfo.wShowWindow = 0  # SW_HIDE
-        popen_kwargs = {
-            "stdin": subprocess.DEVNULL,
-            "stdout": log_handle,
-            "stderr": subprocess.STDOUT,
-            "env": self.components.environment(),
-            "creationflags": creation_flags,
-        }
-        if startupinfo is not None:
-            popen_kwargs["startupinfo"] = startupinfo
         try:
             process = subprocess.Popen(
                 command,
-                **popen_kwargs,
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                env=self.components.environment(),
+                creationflags=creation_flags,
             )
         except OSError as exc:
             log_handle.close()
