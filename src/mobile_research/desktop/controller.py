@@ -3,7 +3,7 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, QTimer, Signal
 
 from mobile_research.desktop.android_runtime import (
     AndroidRuntime,
@@ -32,7 +32,7 @@ class DesktopController(QObject):
     researchStarted = Signal(dict)
     researchFinished = Signal(dict)
     researchHealth = Signal(dict)
-    screenFrame = Signal(bytes)
+    screenFrame = Signal(object)
     operationBusy = Signal(bool)
     archiveInspection = Signal(dict)
     diagnosticsReady = Signal(dict)
@@ -53,6 +53,17 @@ class DesktopController(QObject):
         self._research_thread: (
             threading.Thread | None
         ) = None
+        self._clean_launch = True
+        self._frame_lock = threading.Lock()
+        self._latest_frame = None
+        self._latest_frame_id = 0
+        self._published_frame_id = 0
+        self._frame_timer = QTimer(self)
+        self._frame_timer.setInterval(33)
+        self._frame_timer.timeout.connect(
+            self._publish_latest_frame
+        )
+        self._frame_timer.start()
 
     @property
     def component_state(self):
@@ -76,7 +87,11 @@ class DesktopController(QObject):
             self._prepare_environment_worker
         )
 
-    def start_research(self) -> None:
+    def start_research(
+        self,
+        clean_launch: bool = True,
+    ) -> None:
+        self._clean_launch = bool(clean_launch)
         if (
             self.apk_path is None
             or not self.package_name
@@ -240,6 +255,11 @@ class DesktopController(QObject):
                 client,
                 self.runtime.SERIAL,
                 self.package_name,
+                launch_mode=(
+                    "clean"
+                    if self._clean_launch
+                    else "continue"
+                ),
             )
             self.orchestrator = orchestrator
             started = orchestrator.start()
@@ -515,16 +535,33 @@ class DesktopController(QObject):
         self._screen_thread.start()
 
     def _screen_worker(self) -> None:
-        while not self._stop_screen.is_set():
-            try:
-                frame = (
-                    self.runtime.screenshot_png()
-                )
-                if frame:
-                    self.screenFrame.emit(frame)
-            except Exception:
-                pass
-            self._stop_screen.wait(0.30)
+        try:
+            for frame in self.runtime.screen_frames(
+                self._stop_screen,
+                width=540,
+                height=960,
+            ):
+                if self._stop_screen.is_set():
+                    break
+                with self._frame_lock:
+                    self._latest_frame = frame
+                    self._latest_frame_id += 1
+        except Exception:
+            pass
+
+    def _publish_latest_frame(self) -> None:
+        with self._frame_lock:
+            if (
+                self._latest_frame is None
+                or self._latest_frame_id
+                == self._published_frame_id
+            ):
+                return
+            frame = self._latest_frame
+            self._published_frame_id = (
+                self._latest_frame_id
+            )
+        self.screenFrame.emit(frame)
 
     def _progress_callback(
         self,
