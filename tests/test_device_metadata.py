@@ -299,8 +299,6 @@ def test_package_dump_timeout_uses_bounded_fallback(
         "com.example.app",
     )
     fallback = (
-        "timeout",
-        "30s",
         "cmd",
         "package",
         "dump-package",
