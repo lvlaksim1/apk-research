@@ -2,7 +2,7 @@
 
 All notable Mobile Research changes are recorded here.
 
-## [Unreleased] — v0.2 Desktop Application
+## [0.2.0rc1] - 2026-09-14 — v0.2 Desktop Application Release Candidate
 
 ### Added
 
@@ -18,6 +18,15 @@ All notable Mobile Research changes are recorded here.
 - GUI session history, Research ZIP verify/audit and diagnostics.
 - Desktop Build workflow producing `MobileResearchSetup.exe` plus SHA-256.
 - Stable release gate extended to exact-SHA CI + AVD acceptance + Desktop Build.
+- Android SDK repository resolution now follows stable `channel-0` and rejects newer beta/dev/canary emulator packages.
+- Clean-Windows provisioning acceptance downloads, verifies and extracts the managed Android stack and validates ADB, aapt2, Emulator and the private AVD without relying on unsupported software boot inside GitHub-hosted Windows VMs.
+
+### Validated
+
+- Windows installer build, silent installation, standalone self-test and GUI smoke-test.
+- Clean Windows provisioning selected Android Emulator 37.1.11 build 15917651, ADB 37.0.1 and Android 15 API 35 AOSP system image.
+- Real Linux/KVM AVD acceptance completed boot, root, raw PCAP, logcat, screen evidence and verified Research ZIP on the exact main commit.
+- Remaining RC validation: first-run accelerated Android boot on a real Windows/WHPX machine.
 
 ### Preserved
 
