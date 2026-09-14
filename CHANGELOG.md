@@ -2,6 +2,21 @@
 
 All notable Mobile Research changes are recorded here.
 
+## Unreleased — 0.3.0.dev0
+
+### Added
+
+- Low-latency Android Emulator gRPC framebuffer/input transport for the embedded Android view.
+- Latest-frame GUI delivery at approximately 30 fps; stale frames are dropped instead of accumulating latency.
+- Explicit research launch modes: clean launch and continue-current-state.
+
+### Changed
+
+- Hardware-accelerated Emulator runs use `-gpu auto` instead of forced SwiftShader; software-only fallback retains SwiftShader.
+- ADB screenshot/input remains an automatic compatibility fallback but is no longer the primary interactive transport.
+- Package dump fallback invokes `cmd package dump-package` directly under the existing host-side timeout.
+
+
 ## [0.2.2] - 2026-09-14
 
 ### Fixed
