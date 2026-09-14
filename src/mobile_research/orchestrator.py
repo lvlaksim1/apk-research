@@ -186,6 +186,7 @@ class ResearchOrchestrator:
         screen_factory: ScreenFactory = _screen_factory,
         network_factory: NetworkFactory = _network_factory,
         exporter: Exporter = export_research_zip,
+        launch_mode: str = "continue",
     ) -> None:
         self.adb = adb
         self.serial = serial.strip()
@@ -201,6 +202,14 @@ class ResearchOrchestrator:
         self.screen_factory = screen_factory
         self.network_factory = network_factory
         self.exporter = exporter
+        if launch_mode not in {
+            "clean",
+            "continue",
+        }:
+            raise ValueError(
+                "launch_mode must be 'clean' or 'continue'"
+            )
+        self.launch_mode = launch_mode
 
         self.session: SessionManager | None = None
         self.logcat: CollectorLike | None = None
@@ -234,7 +243,22 @@ class ResearchOrchestrator:
             self._event(
                 "session_created",
                 target_utc=self._target_time_best_effort(),
+                details={
+                    "launch_mode": self.launch_mode,
+                },
             )
+
+            if self.launch_mode == "clean":
+                self.adb.force_stop_package(
+                    self.serial,
+                    self.package_name,
+                )
+                self._event(
+                    "package_force_stopped",
+                    target_utc=(
+                        self._target_time_best_effort()
+                    ),
+                )
 
             self.session.begin_preflight()
             self._event("preflight_started")
