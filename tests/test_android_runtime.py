@@ -3,6 +3,8 @@ from __future__ import annotations
 import base64
 import subprocess
 
+import pytest
+
 from mobile_research.desktop.android_runtime import (
     AndroidRuntime,
     acceleration_provider,
