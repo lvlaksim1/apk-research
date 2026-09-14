@@ -10,6 +10,11 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QLabel
 
+from mobile_research.desktop.native_emulator import (
+    NativeEmulatorEmbedder,
+    windows_native_embedding_available,
+)
+
 
 class AndroidView(QLabel):
     """Embedded Android framebuffer optimized for continuous 60 Hz painting."""
@@ -24,6 +29,8 @@ class AndroidView(QLabel):
     )
     keyRequested = Signal(int)
     textRequested = Signal(str)
+    nativeAttached = Signal(dict)
+    nativeAttachFailed = Signal(str)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -43,6 +50,22 @@ class AndroidView(QLabel):
         self.setFocusPolicy(
             Qt.FocusPolicy.StrongFocus
         )
+        self.setAttribute(
+            Qt.WidgetAttribute.WA_NativeWindow,
+            True,
+        )
+        self._native_embedder = (
+            NativeEmulatorEmbedder(self)
+            if windows_native_embedding_available()
+            else None
+        )
+        if self._native_embedder is not None:
+            self._native_embedder.attached.connect(
+                self._on_native_attached
+            )
+            self._native_embedder.failed.connect(
+                self._on_native_failed
+            )
         self._source_image: QImage | None = None
         self._frame_owner = None
         self._display_rect = QRect()
@@ -53,7 +76,39 @@ class AndroidView(QLabel):
         self._input_height = 0
         self._bottom_up = False
 
+    @property
+    def native_active(self) -> bool:
+        return bool(
+            self._native_embedder is not None
+            and self._native_embedder.active
+        )
+
+    def attach_native(
+        self,
+        process_id: int,
+        avd_name: str,
+    ) -> bool:
+        if self._native_embedder is None:
+            return False
+        self._source_image = None
+        self._frame_owner = None
+        self.setText(
+            "Подключение нативного Android Emulator…"
+        )
+        self.update()
+        self._native_embedder.attach(
+            process_id,
+            avd_name,
+        )
+        return True
+
+    def detach_native(self) -> None:
+        if self._native_embedder is not None:
+            self._native_embedder.detach()
+
     def set_frame(self, frame) -> None:
+        if self.native_active:
+            return
         encoding = getattr(
             frame,
             "encoding",
@@ -172,6 +227,8 @@ class AndroidView(QLabel):
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
         self._update_display_rect()
+        if self._native_embedder is not None:
+            self._native_embedder.resize_embedded()
 
     def mousePressEvent(
         self,
@@ -290,6 +347,26 @@ class AndroidView(QLabel):
             event.accept()
             return
         super().keyPressEvent(event)
+
+    def _on_native_attached(
+        self,
+        details: dict,
+    ) -> None:
+        self._source_image = None
+        self._frame_owner = None
+        self.setText("")
+        self.nativeAttached.emit(details)
+
+    def _on_native_failed(
+        self,
+        message: str,
+    ) -> None:
+        self.nativeAttachFailed.emit(message)
+        if self._source_image is None:
+            self.setText(
+                "Нативное окно недоступно\n"
+                "Переход на framebuffer fallback…"
+            )
 
     def _update_display_rect(self) -> None:
         if (
