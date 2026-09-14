@@ -1,6 +1,6 @@
 # Mobile Research
 
-## Development — v0.3.1
+## v0.3.1 — Emulator rendering and latency hotfix
 
 v0.3.1 исправляет обнаруженные на реальном Windows-ПК проблемы v0.3.0: reverse-orientation framebuffer теперь нормализуется, а embedded Android rendering переведён на более лёгкий 360×640 RGBA stream и прямой QPainter без цепочки QImage copy → mirror → QPixmap → scaled pixmap. Windows hardware path сначала использует GPU host с автоматическим fallback на GPU auto.
 
@@ -42,7 +42,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.3.0 — Desktop Application** — стабильный self-contained Windows release с low-latency embedded Android через Emulator gRPC, GPU auto, clean launch и исправленным package-dump fallback: GUI, managed Android runtime, автоматическая установка APK и встроенный Android без пользовательского Python/Android Studio/ADB.
+**v0.3.1 — Desktop Application** — стабильный self-contained Windows release с исправленной reverse-orientation обработкой и оптимизированным embedded Android rendering/input: GUI, managed Android runtime, автоматическая установка APK и встроенный Android без пользовательского Python/Android Studio/ADB.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

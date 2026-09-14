@@ -1,5 +1,5 @@
 """Mobile Research core package."""
 
-__version__ = "0.3.1.dev0"
+__version__ = "0.3.1"
 
 __all__ = ["__version__"]

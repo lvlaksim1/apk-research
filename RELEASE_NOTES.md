@@ -1,60 +1,74 @@
-# Mobile Research v0.3.0
+# Mobile Research v0.3.1
 
-This release replaces the slow ADB/PNG interactive Android path with a low-latency embedded Emulator transport and incorporates the two follow-up fixes confirmed after the first real `com.evrasia` research session.
+Hotfix for two issues discovered during real Windows testing of v0.3.0: the embedded Android home screen could initially appear upside-down/reversed, and interactive latency remained too high.
 
-## Low-latency embedded Android
+## Orientation fix
 
-- The primary framebuffer path is now Android Emulator gRPC `streamScreenshot`.
-- Frames are transported as RGB instead of repeatedly encoding/decoding full-screen PNG screenshots through ADB.
-- The GUI publishes the newest available frame at approximately 30 fps and drops stale frames instead of allowing latency to accumulate.
-- Touch, swipe and supported keyboard input are sent directly through the Emulator gRPC control plane.
-- ADB screenshot/input remains an automatic compatibility fallback.
-- Hardware-accelerated Emulator runs use `-gpu auto`, allowing Emulator to use host GPU acceleration when available. The software-only fallback retains SwiftShader.
+The Emulator screenshot protocol exposes coarse device rotation metadata. v0.3.0 discarded that field and only corrected the bottom-up raw pixel layout.
 
-The real Android/KVM acceptance workflow explicitly boots Android and validates the live gRPC framebuffer/input transport before running the normal research-session acceptance.
+v0.3.1 now:
 
-## Research launch modes
+- parses the official Emulator `ImageFormat.rotation` field;
+- distinguishes normal and reverse portrait/landscape orientations;
+- normalizes reverse orientation before display;
+- transforms touch coordinates consistently with the normalized image;
+- fixes the input Y-coordinate clamp to use Android input-space height.
 
-The GUI now exposes two explicit modes:
+This directly addresses the startup state where Android appeared reversed before selecting an APK.
 
-- **Clean launch (recommended):** `am force-stop <package>` before preflight, then collectors start, capture becomes ACTIVE, and only then is the target application launched.
-- **Continue current state:** preserves the existing application state and continues from an already-running instance.
+## Rendering and latency improvements
 
-The selected mode is recorded in the session event log.
+The v0.3.0 path still performed several expensive operations for every frame:
 
-## Package metadata fix
+`gRPC bytes → QImage copy → mirror copy → QPixmap upload → scaled QPixmap allocation`
 
-The package dump fallback no longer invokes the incompatible Android `timeout 30s ...` wrapper that produced `timeout: Need 2 arguments` on the real Evrasia test.
+v0.3.1 changes that path substantially:
 
-The fallback now calls:
+- live stream target reduced from **540×960 RGB** to **360×640 RGBA**, which is close to the actual embedded-view resolution and substantially reduces transport/copy volume;
+- QImage now owns the frame only through the retained frame object rather than making an immediate deep copy;
+- vertical bottom-up correction and reverse-orientation normalization are performed by QPainter transforms during paint;
+- QPixmap conversion and per-frame scaled-pixmap allocation are removed;
+- the GUI still keeps only the newest frame, so stale frames cannot accumulate latency;
+- input events now use one ordered worker instead of creating a new Python thread for each click/swipe/key event;
+- an isolated gRPC input failure falls back for that input without destroying the live framebuffer stream and forcing the whole UI back to slow ADB screenshots.
 
-`cmd package dump-package <package>`
+## Windows GPU acceleration
 
-directly while Mobile Research itself enforces the bounded host-side timeout. This is intended to turn the previously partial package-metadata case into a complete session when the fallback succeeds.
+For hardware-accelerated Windows systems:
 
-## Windows hypervisor behavior
+1. Mobile Research first starts Android Emulator with **`-gpu host`**;
+2. if that backend cannot boot, Mobile Research automatically stops it and retries with **`-gpu auto`**;
+3. software-only Emulator mode continues to use SwiftShader.
 
-- WHPX remains the preferred Windows hypervisor.
-- A usable AEHD/GVM remains an accepted compatibility fallback.
-- Windows automatic WHPX setup still uses one UAC prompt and explicitly handles reboot-required state.
-- Dedicated Windows WHPX acceptance remains available as additional hardware evidence, but an unavailable self-hosted WHPX runner no longer blocks normal stable publication.
+The currently active framebuffer transport and GPU mode are shown in the Android readiness status/diagnostics.
+
+## Preserved functionality
+
+v0.3.1 retains:
+
+- Emulator gRPC framebuffer/input transport with ADB fallback;
+- clean launch / continue-current-state research modes;
+- fixed package-dump fallback;
+- AEHD compatibility fallback and preferred WHPX path;
+- logcat, screen recording and raw PCAP collection;
+- complete / partial / failed evidence semantics;
+- verified Research ZIP export and semantic audit.
 
 ## Validation
 
-The v0.3 development candidate passed:
+The development SHA passed:
 
-- Windows CI and unit tests;
-- standalone Windows EXE build;
+- Windows CI;
+- standalone EXE build and self-test;
 - GUI smoke test;
 - Inno Setup build;
 - installed-application smoke test;
 - clean Windows managed-Android provisioning;
 - real Android 15 / API 35 KVM boot;
-- **live Emulator gRPC transport acceptance**;
-- full real AVD Research Acceptance;
-- Research ZIP verification.
+- live Emulator gRPC transport acceptance;
+- full real AVD Research Acceptance and Research ZIP verification.
 
-The release commit is revalidated on its exact SHA before publication.
+The exact v0.3.1 release commit is revalidated by CI, Desktop Build and real AVD Research Acceptance before GitHub publication.
 
 ## Distribution
 
@@ -63,4 +77,4 @@ Release assets:
 - `MobileResearchSetup.exe`
 - `SHA256SUMS.txt`
 
-Normal use requires no separately installed Python, Android Studio or ADB.
+No separately installed Python, Android Studio or ADB is required.

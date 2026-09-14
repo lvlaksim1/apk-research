@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.3.1.dev0 — Windows embedded Android latency/orientation hardening.  
-**Stable baseline:** v0.3.0 Desktop Application.  
+**Этап:** v0.3.1 — Windows embedded Android latency/orientation hardening.  
+**Stable baseline:** v0.3.1 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
