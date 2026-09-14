@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 import traceback
 from datetime import datetime, timezone
@@ -25,6 +26,15 @@ def _utc_now() -> str:
     )
 
 
+def _env_flag(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def run_runtime_acceptance() -> int:
     root = Path(
         os.environ.get(
@@ -32,12 +42,17 @@ def run_runtime_acceptance() -> int:
             Path.cwd() / "windows-runtime-acceptance",
         )
     ).resolve()
-    component_root = Path(
-        os.environ.get(
-            "MOBILE_RESEARCH_COMPONENT_ROOT",
-            root / "components",
+    component_override = os.environ.get(
+        "MOBILE_RESEARCH_COMPONENT_ROOT"
+    )
+    manager = (
+        ComponentManager(
+            Path(component_override).resolve()
         )
-    ).resolve()
+        if component_override
+        else ComponentManager()
+    )
+    component_root = manager.paths.root.resolve()
     result_path = Path(
         os.environ.get(
             "MOBILE_RESEARCH_ACCEPTANCE_RESULT",
@@ -53,12 +68,42 @@ def run_runtime_acceptance() -> int:
     sessions_root.mkdir(parents=True, exist_ok=True)
     result_path.parent.mkdir(parents=True, exist_ok=True)
 
+    component_root_preexisting = component_root.exists()
+    component_root_entries = (
+        sorted(path.name for path in component_root.iterdir())
+        if component_root_preexisting
+        else []
+    )
+    requirements = {
+        "windows": _env_flag(
+            "MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_WINDOWS"
+        ),
+        "frozen_executable": _env_flag(
+            "MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_FROZEN"
+        ),
+        "whpx": _env_flag(
+            "MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_WHPX"
+        ),
+        "clean_components": _env_flag(
+            "MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_CLEAN_COMPONENTS"
+        ),
+    }
+
     payload: dict[str, object] = {
         "status": "running",
         "started_utc": _utc_now(),
         "component_root": str(component_root),
+        "component_root_preexisting": component_root_preexisting,
+        "component_root_entries_before": component_root_entries,
         "sessions_root": str(sessions_root),
         "archive": str(archive),
+        "requirements": requirements,
+        "host": {
+            "os_name": os.name,
+            "platform": sys.platform,
+            "executable": sys.executable,
+            "frozen": bool(getattr(sys, "frozen", False)),
+        },
     }
 
     def log(message: str) -> None:
@@ -82,17 +127,77 @@ def run_runtime_acceptance() -> int:
                 f"{message}: {current}/{total}"
             )
 
-    runtime = AndroidRuntime(
-        ComponentManager(component_root)
-    )
+    runtime = AndroidRuntime(manager)
     orchestrator: ResearchOrchestrator | None = None
     stopped = False
 
     try:
         log("Windows desktop runtime acceptance started")
+
+        if requirements["windows"] and os.name != "nt":
+            raise RuntimeError(
+                "Windows hardware acceptance requires Windows"
+            )
+
+        if (
+            requirements["frozen_executable"]
+            and not getattr(sys, "frozen", False)
+        ):
+            raise RuntimeError(
+                "Acceptance must run from the packaged MobileResearch.exe"
+            )
+
+        expected_executable = os.environ.get(
+            "MOBILE_RESEARCH_ACCEPTANCE_EXPECT_EXECUTABLE"
+        )
+        if expected_executable:
+            actual = os.path.normcase(
+                str(Path(sys.executable).resolve())
+            )
+            expected = os.path.normcase(
+                str(Path(expected_executable).resolve())
+            )
+            if actual != expected:
+                raise RuntimeError(
+                    "Acceptance executable mismatch: "
+                    f"expected {expected}, got {actual}"
+                )
+
+        if (
+            requirements["clean_components"]
+            and component_root_entries
+        ):
+            raise RuntimeError(
+                "Managed Android component root was not clean: "
+                + ", ".join(component_root_entries)
+            )
+
+        if (
+            requirements["whpx"]
+            and os.environ.get(
+                "MOBILE_RESEARCH_SOFTWARE_EMULATOR"
+            )
+            == "1"
+        ):
+            raise RuntimeError(
+                "WHPX acceptance cannot use software emulation"
+            )
+
         runtime.ensure_ready(progress)
         diagnostics = runtime.diagnostics()
         payload["diagnostics"] = diagnostics
+
+        if requirements["whpx"]:
+            acceleration = diagnostics.get("acceleration")
+            if (
+                not isinstance(acceleration, dict)
+                or acceleration.get("available") is not True
+                or acceleration.get("provider") != "whpx"
+            ):
+                raise RuntimeError(
+                    "Windows hardware acceptance requires WHPX; "
+                    f"diagnostics={acceleration!r}"
+                )
 
         if not diagnostics.get("device_online"):
             raise RuntimeError(

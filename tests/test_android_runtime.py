@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import subprocess
 
-from mobile_research.desktop.android_runtime import AndroidRuntime
+from mobile_research.desktop.android_runtime import (
+    AndroidRuntime,
+    acceleration_provider,
+)
 from mobile_research.desktop.components import ComponentManager
 
 
@@ -92,4 +95,39 @@ def test_diagnostics_reports_component_versions_and_acceleration(
 
     acceleration = data["acceleration"]
     assert acceleration["available"] is True
+    assert acceleration["provider"] == "whpx"
     assert "WHPX" in acceleration["detail"]
+
+
+def test_acceleration_provider_distinguishes_hypervisors() -> None:
+    assert (
+        acceleration_provider(
+            "WHPX(10.0.26100) is installed and usable."
+        )
+        == "whpx"
+    )
+    assert (
+        acceleration_provider(
+            "AEHD is installed and usable."
+        )
+        == "aehd"
+    )
+    assert (
+        acceleration_provider(
+            "GVM is installed and usable."
+        )
+        == "aehd"
+    )
+    assert (
+        acceleration_provider(
+            "KVM (version 12) is installed and usable."
+        )
+        == "kvm"
+    )
+    assert (
+        acceleration_provider(
+            "Hypervisor.Framework OS X Version 15"
+        )
+        == "hypervisor-framework"
+    )
+    assert acceleration_provider("acceleration available") == "unknown"

@@ -1,0 +1,247 @@
+name: Windows WHPX Acceptance
+
+on:
+  push:
+    paths:
+      - "src/mobile_research/**"
+      - "packaging/**"
+      - "pyproject.toml"
+      - "tests/**"
+      - "tools/**"
+      - ".github/workflows/desktop-build.yml"
+      - ".github/workflows/windows-whpx-acceptance.yml"
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: "Exact commit SHA to validate; defaults to selected ref SHA"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: windows-whpx-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  resolve-desktop-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      run_id: ${{ steps.resolve.outputs.run_id }}
+      target_sha: ${{ steps.target.outputs.sha }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Resolve target SHA
+        id: target
+        shell: bash
+        env:
+          REQUESTED_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          SHA="${REQUESTED_SHA:-$GITHUB_SHA}"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Target SHA: $SHA"
+
+      - name: Wait for exact-SHA Desktop Build
+        id: resolve
+        shell: bash
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 240); do
+            RUNS="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "Desktop Build" --commit "$TARGET_SHA" --limit 20 --json databaseId,headSha,status,conclusion)"
+            STATE="$(jq -r --arg sha "$TARGET_SHA" '[.[] | select(.headSha == $sha)][0] | if . == null then "missing" else (.status + ":" + (.conclusion // "")) end' <<<"$RUNS")"
+            RUN_ID="$(jq -r --arg sha "$TARGET_SHA" '[.[] | select(.headSha == $sha)][0].databaseId // empty' <<<"$RUNS")"
+            echo "Desktop Build=$STATE run_id=$RUN_ID"
+            if [[ "$STATE" == "completed:success" ]]; then
+              echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [[ "$STATE" == completed:* && "$STATE" != "completed:success" ]]; then
+              echo "Desktop Build failed for $TARGET_SHA: $STATE"
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "Timed out waiting for exact-SHA Desktop Build"
+          exit 1
+
+  windows-whpx-e2e:
+    needs: resolve-desktop-build
+    runs-on:
+      - self-hosted
+      - Windows
+      - X64
+      - mobile-research-whpx
+    timeout-minutes: 90
+
+    steps:
+      - name: Download exact-SHA tested installer
+        uses: actions/download-artifact@v4
+        with:
+          name: mobile-research-windows-desktop
+          path: ${{ runner.temp }}/MobileResearchWHPXInstaller
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve-desktop-build.outputs.run_id }}
+
+      - name: Verify installer checksum
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $artifact = Join-Path $env:RUNNER_TEMP "MobileResearchWHPXInstaller"
+          $installer = Join-Path $artifact "MobileResearchSetup.exe"
+          $checksums = Join-Path $artifact "SHA256SUMS.txt"
+          if (-not (Test-Path $installer)) { throw "Installer artifact is missing" }
+          if (-not (Test-Path $checksums)) { throw "SHA256SUMS.txt is missing" }
+
+          $expected = ((Get-Content $checksums -Raw).Trim() -split "\s+")[0].ToLowerInvariant()
+          $actual = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "Installer SHA-256 mismatch: expected $expected, got $actual"
+          }
+
+      - name: Prepare clean dedicated Windows user state
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $programDir = Join-Path $env:LOCALAPPDATA "Programs\MobileResearch"
+          $uninstaller = Join-Path $programDir "unins000.exe"
+          if (Test-Path $uninstaller) {
+            $process = Start-Process -FilePath $uninstaller -ArgumentList @(
+              "/VERYSILENT",
+              "/SUPPRESSMSGBOXES",
+              "/NORESTART"
+            ) -Wait -PassThru
+            if ($process.ExitCode -ne 0) {
+              throw "Previous Mobile Research uninstall failed: $($process.ExitCode)"
+            }
+          }
+
+          $stateRoot = Join-Path $env:LOCALAPPDATA "MobileResearch"
+          Remove-Item $programDir -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item $stateRoot -Recurse -Force -ErrorAction SilentlyContinue
+
+          $listeners = Get-NetTCPConnection -LocalPort 5554 -State Listen -ErrorAction SilentlyContinue
+          if ($listeners) {
+            throw "TCP port 5554 is already in use; runner is not clean"
+          }
+
+          $acceptanceRoot = Join-Path $env:RUNNER_TEMP "MobileResearchWHPX"
+          Remove-Item $acceptanceRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $acceptanceRoot | Out-Null
+
+      - name: Install Mobile Research as a user would
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = Join-Path $env:RUNNER_TEMP "MobileResearchWHPXInstaller\MobileResearchSetup.exe"
+          $process = Start-Process -FilePath $installer -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/SP-"
+          ) -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "MobileResearchSetup.exe failed: $($process.ExitCode)"
+          }
+
+          $exe = Join-Path $env:LOCALAPPDATA "Programs\MobileResearch\MobileResearch.exe"
+          if (-not (Test-Path $exe)) {
+            throw "Installed MobileResearch.exe was not found"
+          }
+
+      - name: Run installed EXE end-to-end with WHPX
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $acceptanceRoot = Join-Path $env:RUNNER_TEMP "MobileResearchWHPX"
+          $resultPath = Join-Path $acceptanceRoot "result.json"
+          $stdoutPath = Join-Path $acceptanceRoot "stdout.txt"
+          $stderrPath = Join-Path $acceptanceRoot "stderr.txt"
+          $exe = Join-Path $env:LOCALAPPDATA "Programs\MobileResearch\MobileResearch.exe"
+
+          $env:MOBILE_RESEARCH_ACCEPTANCE_ROOT = $acceptanceRoot
+          $env:MOBILE_RESEARCH_ACCEPTANCE_RESULT = $resultPath
+          $env:MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_WINDOWS = "1"
+          $env:MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_FROZEN = "1"
+          $env:MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_WHPX = "1"
+          $env:MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_CLEAN_COMPONENTS = "1"
+          $env:MOBILE_RESEARCH_ACCEPTANCE_EXPECT_EXECUTABLE = $exe
+          Remove-Item Env:MOBILE_RESEARCH_COMPONENT_ROOT -ErrorAction SilentlyContinue
+          Remove-Item Env:MOBILE_RESEARCH_SOFTWARE_EMULATOR -ErrorAction SilentlyContinue
+
+          $process = Start-Process -FilePath $exe -ArgumentList "--runtime-acceptance" -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+
+          if (Test-Path $stdoutPath) { Get-Content $stdoutPath }
+          if (Test-Path $stderrPath) { Get-Content $stderrPath }
+          if (Test-Path $resultPath) { Get-Content $resultPath }
+
+          if ($process.ExitCode -ne 0) {
+            throw "Installed MobileResearch.exe runtime acceptance failed: $($process.ExitCode)"
+          }
+          if (-not (Test-Path $resultPath)) {
+            throw "Runtime acceptance did not create result.json"
+          }
+
+          $result = Get-Content $resultPath -Raw | ConvertFrom-Json
+          if ($result.status -ne "success") {
+            throw "Runtime acceptance status is $($result.status)"
+          }
+          if ($result.host.frozen -ne $true) {
+            throw "Acceptance did not run from a frozen executable"
+          }
+          if ($result.diagnostics.acceleration.provider -ne "whpx") {
+            throw "Expected WHPX, got $($result.diagnostics.acceleration.provider)"
+          }
+          if ($result.diagnostics.root -ne $true) {
+            throw "Root ADB was not proven"
+          }
+          if ($result.diagnostics.tcpdump.available -ne $true) {
+            throw "tcpdump was not proven"
+          }
+          if ($result.stop.session_status -ne "complete") {
+            throw "Research session was not complete"
+          }
+          if ($result.verification.valid -ne $true) {
+            throw "Research ZIP verification failed"
+          }
+
+          $componentRoot = Join-Path $env:LOCALAPPDATA "MobileResearch\components"
+          foreach ($name in @("components.json", "emulator.log")) {
+            $source = Join-Path $componentRoot $name
+            if (Test-Path $source) {
+              Copy-Item $source (Join-Path $acceptanceRoot $name) -Force
+            }
+          }
+
+      - name: Upload Windows WHPX acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-research-windows-whpx-${{ needs.resolve-desktop-build.outputs.target_sha }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/MobileResearchWHPX/**
+
+      - name: Clean dedicated runner state
+        if: always()
+        shell: pwsh
+        run: |
+          $programDir = Join-Path $env:LOCALAPPDATA "Programs\MobileResearch"
+          $uninstaller = Join-Path $programDir "unins000.exe"
+          if (Test-Path $uninstaller) {
+            Start-Process -FilePath $uninstaller -ArgumentList @(
+              "/VERYSILENT",
+              "/SUPPRESSMSGBOXES",
+              "/NORESTART"
+            ) -Wait | Out-Null
+          }
+          Remove-Item $programDir -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item (Join-Path $env:LOCALAPPDATA "MobileResearch") -Recurse -Force -ErrorAction SilentlyContinue

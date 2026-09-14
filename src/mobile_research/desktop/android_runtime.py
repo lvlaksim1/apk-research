@@ -36,6 +36,21 @@ def parse_aapt_package_name(output: str) -> str:
     return match.group(1)
 
 
+def acceleration_provider(detail: str) -> str:
+    """Normalize Android Emulator -accel-check output."""
+
+    normalized = detail.upper()
+    if "WHPX" in normalized:
+        return "whpx"
+    if "AEHD" in normalized or "GVM" in normalized:
+        return "aehd"
+    if "KVM" in normalized:
+        return "kvm"
+    if "HYPERVISOR.FRAMEWORK" in normalized:
+        return "hypervisor-framework"
+    return "unknown"
+
+
 class AndroidRuntime:
     """Managed, private Android Emulator for the desktop application."""
 
@@ -326,6 +341,7 @@ class AndroidRuntime:
                 data["acceleration"] = {
                     "available": result.returncode == 0,
                     "returncode": result.returncode,
+                    "provider": acceleration_provider(detail),
                     "detail": detail,
                     "stdout": result.stdout,
                     "stderr": result.stderr,
@@ -556,7 +572,18 @@ class AndroidRuntime:
             timeout=20.0,
             check=False,
         )
-        if result.returncode == 0:
+        detail = (
+            result.stdout
+            or result.stderr
+        ).strip()
+        provider = acceleration_provider(detail)
+        if (
+            result.returncode == 0
+            and (
+                os.name != "nt"
+                or provider == "whpx"
+            )
+        ):
             self._software_acceleration = False
             return
 
@@ -570,14 +597,30 @@ class AndroidRuntime:
                 timeout=20.0,
                 check=False,
             )
-            if result.returncode == 0:
+            detail = (
+                result.stdout
+                or result.stderr
+            ).strip()
+            provider = acceleration_provider(detail)
+            if (
+                result.returncode == 0
+                and provider == "whpx"
+            ):
                 self._software_acceleration = False
                 return
 
-        detail = (
-            result.stdout
-            or result.stderr
-        ).strip()
+            if result.returncode == 0:
+                raise AndroidRuntimeError(
+                    "Mobile Research требует Windows Hypervisor "
+                    "Platform (WHPX), но Android Emulator выбрал "
+                    f"другой hypervisor: {provider}. "
+                    "Mobile Research попыталась включить WHPX. "
+                    "Если Windows запросила перезагрузку, "
+                    "перезагрузите компьютер и снова откройте "
+                    "программу. Диагностика: "
+                    + detail
+                )
+
         raise AndroidRuntimeError(
             "Аппаратное ускорение Android Emulator пока "
             "недоступно. Mobile Research попыталась включить "

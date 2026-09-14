@@ -10,6 +10,12 @@ Desktop Build собирает автономный MobileResearchSetup.exe. And
 
 Подробный desktop contract: docs/V0.2_DESKTOP.md.
 
+## Development after v0.2.0
+
+Текущая development-линия — **0.2.1.dev0**. Для следующего stable release добавлен обязательный hardware gate `Windows WHPX Acceptance`: он использует именно собранный `MobileResearchSetup.exe` того же commit SHA, устанавливает приложение на выделенный Windows x64 runner, начинает с чистого `%LOCALAPPDATA%\MobileResearch`, требует реальный WHPX, загружает managed Android и завершает полноценную research-сессию с проверкой и semantic audit Research ZIP.
+
+Обычный GitHub-hosted `windows-latest` сохраняется для build/provisioning checks, но больше не считается доказательством реального Windows/WHPX boot.
+
 ## Stable core baseline
 
 Mobile Research — Windows-система для воспроизводимого исследования сетевой активности Android-приложений в управляемой исследовательской среде.

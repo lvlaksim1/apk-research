@@ -2,6 +2,19 @@
 
 All notable Mobile Research changes are recorded here.
 
+## Unreleased — 0.2.1.dev0
+
+### Changed
+
+- Windows desktop runtime now requires the Microsoft Windows Hypervisor Platform (WHPX) instead of accepting AEHD/GVM as an equivalent Windows hypervisor.
+- Runtime acceptance can require a packaged/frozen executable, exact installed executable path, a clean managed-component root and verified WHPX.
+
+### CI / Acceptance
+
+- Added a dedicated Windows WHPX end-to-end gate for a hardware-capable self-hosted Windows x64 runner.
+- The gate downloads the exact-SHA `Desktop Build` installer, performs a clean per-user installation, provisions Android through the installed `MobileResearch.exe`, boots the private AVD with WHPX, validates root/tcpdump/framebuffer, records a real research session, and verifies plus semantically audits the resulting Research ZIP.
+- Future stable releases must pass `Windows WHPX Acceptance` for the exact release SHA in addition to CI, Linux/KVM AVD acceptance and Desktop Build.
+
 ## [0.2.0] - 2026-09-14
 
 ### Added

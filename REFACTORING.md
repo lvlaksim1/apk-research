@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.2.0 — Desktop Application.  
+**Этап:** v0.2.1.dev0 — Windows/WHPX hardware acceptance hardening.  
 **Stable baseline:** v0.2.0 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -176,3 +176,7 @@ GitHub-hosted Windows runner без аппаратной виртуализац�
 
 ### ADR-045 — Managed Android можно полностью восстановить без ручного удаления файлов
 Настройки Mobile Research содержат repair action для удаления только managed Android SDK/Emulator/system image/AVD. Research sessions хранятся отдельно и не удаляются. Следующая подготовка заново скачивает официальные компоненты и проверяет checksums.
+
+
+### ADR-046 — Stable Windows release требует installed-EXE WHPX hardware acceptance
+GitHub-hosted Windows CI остаётся обязательным для сборки, unit/GUI smoke и чистого provisioning, но не считается доказательством пользовательского Android boot: nested virtualization на hosted runner не является гарантированным контрактом. Для следующего stable release обязателен отдельный workflow `Windows WHPX Acceptance` на выделенном self-hosted Windows x64 runner с аппаратной виртуализацией и меткой `mobile-research-whpx`. Workflow скачивает `MobileResearchSetup.exe` из `Desktop Build` того же commit SHA, выполняет чистую установку, запускает acceptance через установленный frozen `MobileResearch.exe`, требует именно WHPX по `emulator -accel-check`, загружает private AVD и доказывает root ADB, tcpdump/raw PCAP, framebuffer, logcat, screen recording, complete Research ZIP, checksum verification и semantic audit. Release workflow обязан ждать этот exact-SHA gate и не публикует stable version без его success.

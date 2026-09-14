@@ -18,7 +18,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 120
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -64,11 +64,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 150); do
+          for attempt in $(seq 1 660); do
             RUNS="$(gh run list --commit "$GITHUB_SHA" --limit 30 --json databaseId,workflowName,status,conclusion)"
             ALL_OK=true
             DESKTOP_RUN_ID=""
-            for NAME in "CI" "AVD Research Acceptance" "Desktop Build"; do
+            for NAME in "CI" "AVD Research Acceptance" "Desktop Build" "Windows WHPX Acceptance"; do
               STATE="$(jq -r --arg name "$NAME" '[.[] | select(.workflowName == $name)][0] | if . == null then "missing" else (.status + ":" + (.conclusion // "")) end' <<<"$RUNS")"
               echo "$NAME=$STATE"
               if [[ "$STATE" == completed:* && "$STATE" != completed:success ]]; then
