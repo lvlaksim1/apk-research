@@ -2,7 +2,7 @@
 
 All notable Mobile Research changes are recorded here.
 
-## Unreleased — 0.4.0.dev0
+## [0.4.0] - 2026-09-14
 
 ### Changed
 

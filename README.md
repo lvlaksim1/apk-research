@@ -1,6 +1,6 @@
 # Mobile Research
 
-## Development — v0.4.0
+## v0.4.0 — 60 Hz shared-memory embedded Android
 
 Интерактивный Android переводится на тот же класс embedded transport, для которого сам Android Emulator предусматривает side-channel framebuffer: gRPC уведомляет о новых кадрах, а pixel data передаются через MMAP/shared memory без упаковки полного кадра в protobuf. GUI работает с целевой частотой ~60 Hz. Input передаётся через постоянный `streamInputEvent`, а Windows Emulator запускается через `-qt-hide-window`, как embedded Emulator в Android Studio. gRPC byte-stream и ADB остаются fallback.
 
@@ -47,7 +47,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.3.1 — Desktop Application** — стабильный self-contained Windows release с исправленной reverse-orientation обработкой и оптимизированным embedded Android rendering/input: GUI, managed Android runtime, автоматическая установка APK и встроенный Android без пользовательского Python/Android Studio/ADB.
+**v0.4.0 — Desktop Application** — стабильный self-contained Windows release с MMAP/shared-memory framebuffer, ~60 Hz embedded Android, persistent input stream и Android-Studio-style hidden Qt Emulator: GUI, managed Android runtime, автоматическая установка APK и встроенный Android без пользовательского Python/Android Studio/ADB.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.4.0.dev0 — shared-memory 60 Hz embedded Android pipeline.  
-**Stable baseline:** v0.3.1 Desktop Application.  
+**Этап:** v0.4.0 — shared-memory 60 Hz embedded Android pipeline.  
+**Stable baseline:** v0.4.0 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
