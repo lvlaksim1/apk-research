@@ -2,6 +2,19 @@
 
 All notable Mobile Research changes are recorded here.
 
+## Unreleased — 0.5.0.dev0
+
+### Architecture
+
+- Windows interactive display now embeds the **real Android Emulator native Qt window (HWND)** into the Mobile Research GUI instead of redrawing a screenshot/framebuffer stream.
+- The Emulator keeps its own native GPU rendering and receives mouse/keyboard input directly from Windows.
+- The existing MMAP/gRPC framebuffer pipeline remains only as an automatic compatibility fallback if native-window attachment fails.
+
+### Performance
+
+- Normal Windows interaction no longer performs screenshot capture, MMAP frame polling, QImage/QPainter video rendering, frame scheduling, coordinate remapping or gRPC touch forwarding.
+- Native Emulator rendering therefore runs at the same frame production/presentation path as the standalone Emulator window.
+
 ## [0.4.0] - 2026-09-14
 
 ### Changed

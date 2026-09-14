@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.4.0 — shared-memory 60 Hz embedded Android pipeline.  
+**Этап:** v0.5.0.dev0 — native Windows Emulator embedding.  
 **Stable baseline:** v0.4.0 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -218,3 +218,10 @@ v0.3.0 выполнял bytes → QImage.copy → mirrored image → QPixmap →
 
 ### ADR-057 — Windows использует Android-Studio-style hidden Qt Emulator
 На аппаратно ускоренном Windows managed Emulator запускается с `-qt-hide-window`, сохраняя Qt graphics path без внешнего окна. Это соответствует embedded режиму Android Studio. Linux/KVM acceptance и software-only fallback продолжают использовать `-no-window`.
+
+
+### ADR-058 — Windows interactive display использует native Emulator HWND
+Требование пользовательского UX — плавность интерфейса, сопоставимая с обычным Android Emulator/телефоном. Screenshot-based paths (ADB PNG, gRPC bytes, MMAP framebuffer) сохраняют дополнительную стадию capture/mirror/presentation и не могут гарантировать тот же visual cadence, что собственное окно Emulator. На Windows Mobile Research поэтому использует настоящий Qt window Android Emulator: окно запускается скрытым через `-qt-hide-window`, после boot Mobile Research находит HWND процесса/его descendants, удаляет top-level chrome, выполняет `SetParent` в native QWidget и синхронизирует размер через Win32. Mouse/keyboard попадают непосредственно в Emulator child window. MMAP/gRPC framebuffer остаётся fallback при невозможности attach.
+
+### ADR-059 — Research transport отделён от display transport
+Переход на native HWND не меняет evidence contract. ADB, root, logcat, tcpdump, screenrecord, package metadata, Research ZIP и gRPC control остаются независимыми от способа визуального отображения Android. Native display можно отключить/потерять без остановки collectors; GUI автоматически возвращается к framebuffer fallback.

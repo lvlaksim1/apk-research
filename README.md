@@ -1,5 +1,9 @@
 # Mobile Research
 
+## Development — v0.5.0
+
+Windows-версия больше не использует screenshot/framebuffer mirroring как основной способ показа Android. Mobile Research запускает managed Android Emulator в скрытом Qt-режиме, находит его настоящее native HWND после загрузки и переподчиняет это окно непосредственно центральному Android-контейнеру программы. Рендеринг и ввод остаются внутри самого Android Emulator; MMAP/gRPC и ADB используются только как fallback и research/control transport.
+
 ## v0.4.0 — 60 Hz shared-memory embedded Android
 
 Интерактивный Android переводится на тот же класс embedded transport, для которого сам Android Emulator предусматривает side-channel framebuffer: gRPC уведомляет о новых кадрах, а pixel data передаются через MMAP/shared memory без упаковки полного кадра в protobuf. GUI работает с целевой частотой ~60 Hz. Input передаётся через постоянный `streamInputEvent`, а Windows Emulator запускается через `-qt-hide-window`, как embedded Emulator в Android Studio. gRPC byte-stream и ADB остаются fallback.
