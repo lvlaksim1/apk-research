@@ -89,3 +89,64 @@ def test_repository_base_url_follows_metadata_directory() -> None:
         "https://dl.google.com/android/repository/"
         "sys-img/android/"
     )
+
+
+def test_repository_policy_prefers_latest_stable_over_canary() -> None:
+    xml = b"""<?xml version='1.0' encoding='UTF-8'?>
+    <sdk:sdk-repository xmlns:sdk='urn:test'>
+      <remotePackage path='emulator'>
+        <revision><major>37</major><minor>1</minor><micro>10</micro></revision>
+        <channelRef ref='channel-0'/>
+        <archives><archive><host-os>windows</host-os><complete>
+          <size>100</size><checksum type='sha1'>aa</checksum>
+          <url>stable-old.zip</url>
+        </complete></archive></archives>
+      </remotePackage>
+      <remotePackage path='emulator'>
+        <revision><major>38</major><minor>0</minor><micro>0</micro></revision>
+        <channelRef ref='channel-3'/>
+        <archives><archive><host-os>windows</host-os><complete>
+          <size>300</size><checksum type='sha1'>cc</checksum>
+          <url>canary.zip</url>
+        </complete></archive></archives>
+      </remotePackage>
+      <remotePackage path='emulator'>
+        <revision><major>37</major><minor>1</minor><micro>11</micro></revision>
+        <channelRef ref='channel-0'/>
+        <archives><archive><host-os>windows</host-os><complete>
+          <size>200</size><checksum type='sha1'>bb</checksum>
+          <url>stable-new.zip</url>
+        </complete></archive></archives>
+      </remotePackage>
+    </sdk:sdk-repository>"""
+
+    result = select_archive_from_repository_xml(
+        xml,
+        "emulator",
+        base_url="https://example.invalid/repository/",
+    )
+
+    assert result.url.endswith("stable-new.zip")
+    assert result.size == 200
+    assert result.checksum == "bb"
+
+
+def test_repository_policy_treats_missing_channel_as_stable() -> None:
+    xml = b"""<?xml version='1.0' encoding='UTF-8'?>
+    <sdk:sdk-repository xmlns:sdk='urn:test'>
+      <remotePackage path='platform-tools'>
+        <revision><major>37</major><minor>0</minor><micro>1</micro></revision>
+        <archives><archive><host-os>windows</host-os><complete>
+          <size>123</size><checksum type='sha1'>aa</checksum>
+          <url>platform-tools.zip</url>
+        </complete></archive></archives>
+      </remotePackage>
+    </sdk:sdk-repository>"""
+
+    result = select_archive_from_repository_xml(
+        xml,
+        "platform-tools",
+        base_url="https://example.invalid/repository/",
+    )
+
+    assert result.url.endswith("platform-tools.zip")
