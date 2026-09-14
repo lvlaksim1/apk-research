@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QPoint, QRect, Qt, Signal
 from PySide6.QtGui import (
+    QImage,
     QKeyEvent,
     QMouseEvent,
     QPixmap,
@@ -11,7 +12,7 @@ from PySide6.QtWidgets import QLabel
 
 
 class AndroidView(QLabel):
-    """Interactive Android framebuffer backed by ADB screenshots/input."""
+    """Low-latency Android framebuffer with gRPC-first transport."""
 
     tapRequested = Signal(int, int)
     swipeRequested = Signal(
@@ -47,14 +48,57 @@ class AndroidView(QLabel):
         self._press_pos: QPoint | None = None
         self._source_width = 0
         self._source_height = 0
+        self._input_width = 0
+        self._input_height = 0
 
-    def set_frame(self, png: bytes) -> None:
-        pixmap = QPixmap()
-        if (
-            not png
-            or not pixmap.loadFromData(png, "PNG")
-        ):
-            return
+    def set_frame(self, frame) -> None:
+        encoding = getattr(
+            frame,
+            "encoding",
+            "png",
+        )
+        data = getattr(
+            frame,
+            "data",
+            frame if isinstance(frame, bytes) else b"",
+        )
+
+        if encoding == "rgb888":
+            width = int(getattr(frame, "width", 0))
+            height = int(getattr(frame, "height", 0))
+            if (
+                width <= 0
+                or height <= 0
+                or len(data) != width * height * 3
+            ):
+                return
+            image = QImage(
+                data,
+                width,
+                height,
+                width * 3,
+                QImage.Format.Format_RGB888,
+            ).copy()
+            image = image.mirrored(False, True)
+            pixmap = QPixmap.fromImage(image)
+            self._input_width = int(
+                getattr(frame, "input_width", width)
+                or width
+            )
+            self._input_height = int(
+                getattr(frame, "input_height", height)
+                or height
+            )
+        else:
+            pixmap = QPixmap()
+            if (
+                not data
+                or not pixmap.loadFromData(data, "PNG")
+            ):
+                return
+            self._input_width = pixmap.width()
+            self._input_height = pixmap.height()
+
         self._source_pixmap = pixmap
         self._source_width = pixmap.width()
         self._source_height = pixmap.height()
@@ -139,7 +183,7 @@ class AndroidView(QLabel):
         y2 = max(
             0,
             min(
-                self._source_height - 1,
+                self._input_height - 1,
                 center[1] + direction * distance,
             ),
         )
@@ -190,7 +234,7 @@ class AndroidView(QLabel):
         scaled = pixmap.scaled(
             available.size(),
             Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
+            Qt.TransformationMode.FastTransformation,
         )
         x = (
             available.x()
@@ -215,8 +259,8 @@ class AndroidView(QLabel):
         point: QPoint,
     ) -> tuple[int, int] | None:
         if (
-            self._source_width <= 0
-            or self._source_height <= 0
+            self._input_width <= 0
+            or self._input_height <= 0
             or not self._display_rect.contains(point)
         ):
             return None
@@ -227,17 +271,17 @@ class AndroidView(QLabel):
             point.y() - self._display_rect.y()
         ) / self._display_rect.height()
         x = min(
-            self._source_width - 1,
+            self._input_width - 1,
             max(
                 0,
-                int(x_ratio * self._source_width),
+                int(x_ratio * self._input_width),
             ),
         )
         y = min(
             self._source_height - 1,
             max(
                 0,
-                int(y_ratio * self._source_height),
+                int(y_ratio * self._input_height),
             ),
         )
         return x, y
