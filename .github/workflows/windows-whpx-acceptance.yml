@@ -54,7 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in $(seq 1 240); do
-            RUNS="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "Desktop Build" --commit "$TARGET_SHA" --limit 20 --json databaseId,headSha,status,conclusion)"
+            RUNS="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "Desktop Build" --commit "$TARGET_SHA" --event push --limit 20 --json databaseId,headSha,status,conclusion)"
             STATE="$(jq -r --arg sha "$TARGET_SHA" '[.[] | select(.headSha == $sha)][0] | if . == null then "missing" else (.status + ":" + (.conclusion // "")) end' <<<"$RUNS")"
             RUN_ID="$(jq -r --arg sha "$TARGET_SHA" '[.[] | select(.headSha == $sha)][0].databaseId // empty' <<<"$RUNS")"
             echo "Desktop Build=$STATE run_id=$RUN_ID"
