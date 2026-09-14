@@ -1,8 +1,8 @@
 # Mobile Research
 
-## v0.2.0.dev0 — Desktop Application
+## v0.2.0rc1 — Desktop Application Release Candidate
 
-После стабильного v0.1.0 проект перешёл к полноценному Windows-приложению.
+После стабильного v0.1.0 проект перешёл к полноценному Windows-приложению. v0.2.0rc1 — первый пользовательский release candidate для проверки реального Windows/WHPX runtime перед финальным v0.2.0.
 Штатный пользовательский сценарий v0.2 не требует Python, PowerShell, Android Studio, отдельного ADB или ручного AVD.
 Mobile Research сама управляет Android-компонентами, устанавливает APK, показывает Android внутри GUI и запускает существующее research core кнопками START/STOP.
 
