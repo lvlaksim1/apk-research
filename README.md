@@ -1,6 +1,6 @@
 # Mobile Research
 
-## Development — v0.3.0
+## v0.3.0 — Live Emulator Interaction
 
 Встроенный Android переведён с периодических ADB/PNG screenshots на постоянный локальный Android Emulator gRPC stream. Кадры передаются как RGB, GUI показывает только самый свежий кадр с частотой до ~30 fps, а touch/key input отправляется напрямую в Emulator. ADB сохраняется как fallback и как независимый research transport для collectors.
 
@@ -38,7 +38,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.2.2 — Desktop Application** — стабильный self-contained Windows release: GUI, managed Android runtime, автоматическая установка APK и встроенный Android без пользовательского Python/Android Studio/ADB.
+**v0.3.0 — Desktop Application** — стабильный self-contained Windows release с low-latency embedded Android через Emulator gRPC, GPU auto, clean launch и исправленным package-dump fallback: GUI, managed Android runtime, автоматическая установка APK и встроенный Android без пользовательского Python/Android Studio/ADB.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

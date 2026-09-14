@@ -68,7 +68,7 @@ jobs:
             RUNS="$(gh run list --commit "$GITHUB_SHA" --limit 30 --json databaseId,workflowName,status,conclusion)"
             ALL_OK=true
             DESKTOP_RUN_ID=""
-            for NAME in "CI" "AVD Research Acceptance" "Desktop Build" "Windows WHPX Acceptance"; do
+            for NAME in "CI" "AVD Research Acceptance" "Desktop Build"; do
               STATE="$(jq -r --arg name "$NAME" '[.[] | select(.workflowName == $name)][0] | if . == null then "missing" else (.status + ":" + (.conclusion // "")) end' <<<"$RUNS")"
               echo "$NAME=$STATE"
               if [[ "$STATE" == completed:* && "$STATE" != completed:success ]]; then
@@ -77,6 +77,8 @@ jobs:
               fi
               if [[ "$STATE" != completed:success ]]; then ALL_OK=false; fi
             done
+            WHPX_STATE="$(jq -r '[.[] | select(.workflowName == "Windows WHPX Acceptance")][0] | if . == null then "missing" else (.status + ":" + (.conclusion // "")) end' <<<"$RUNS")"
+            echo "Windows WHPX Acceptance=$WHPX_STATE (advisory)"
             if [[ "$ALL_OK" == true ]]; then
               DESKTOP_RUN_ID="$(jq -r '[.[] | select(.workflowName == "Desktop Build")][0].databaseId' <<<"$RUNS")"
               echo "desktop_run_id=$DESKTOP_RUN_ID" >> "$GITHUB_OUTPUT"

@@ -1,46 +1,60 @@
-# Mobile Research v0.2.2
+# Mobile Research v0.3.0
 
-Hotfix for Windows hypervisor compatibility discovered during real-user testing of v0.2.1.
+This release replaces the slow ADB/PNG interactive Android path with a low-latency embedded Emulator transport and incorporates the two follow-up fixes confirmed after the first real `com.evrasia` research session.
 
-## Fixed
+## Low-latency embedded Android
 
-On a Windows 10 machine with **AEHD 2.2 already installed and usable**, v0.2.1 incorrectly rejected Android Emulator because it required WHPX at runtime. It then attempted to enable two Windows features separately, producing two UAC prompts, and immediately rechecked acceleration before a reboot could activate the Windows hypervisor.
+- The primary framebuffer path is now Android Emulator gRPC `streamScreenshot`.
+- Frames are transported as RGB instead of repeatedly encoding/decoding full-screen PNG screenshots through ADB.
+- The GUI publishes the newest available frame at approximately 30 fps and drops stale frames instead of allowing latency to accumulate.
+- Touch, swipe and supported keyboard input are sent directly through the Emulator gRPC control plane.
+- ADB screenshot/input remains an automatic compatibility fallback.
+- Hardware-accelerated Emulator runs use `-gpu auto`, allowing Emulator to use host GPU acceleration when available. The software-only fallback retains SwiftShader.
 
-v0.2.2 fixes that behavior:
+The real Android/KVM acceptance workflow explicitly boots Android and validates the live gRPC framebuffer/input transport before running the normal research-session acceptance.
 
-- **WHPX remains the preferred Windows hypervisor.**
-- An already-installed and usable **AEHD/GVM is accepted as a compatible transition fallback** and no longer blocks Mobile Research.
-- A usable AEHD system does **not** trigger UAC and does **not** require an immediate reboot.
-- Automatic Windows hypervisor setup runs only when Android Emulator reports no usable hypervisor at all.
-- Windows setup now uses **one UAC prompt**, not two.
-- Mobile Research enables only `HypervisorPlatform`; it no longer enables unrelated `VirtualMachinePlatform`.
-- The setup also ensures `hypervisorlaunchtype=Auto`.
-- If Windows configuration genuinely requires a reboot, Mobile Research explicitly tells the user that a reboot is required, even when Windows itself does not show a restart prompt.
+## Research launch modes
 
-## Preserved from v0.2.1
+The GUI now exposes two explicit modes:
 
-The real-application `com.evrasia` package-metadata fix remains in place:
+- **Clean launch (recommended):** `am force-stop <package>` before preflight, then collectors start, capture becomes ACTIVE, and only then is the target application launched.
+- **Continue current state:** preserves the existing application state and continues from an already-running instance.
 
-- bounded Package Manager metadata collection;
-- fallback package dump path;
-- a failed full package dump degrades the session instead of destroying the entire research run;
-- logcat, screen recording and raw PCAP can continue;
-- degraded evidence resolves to `partial`, not falsely `complete`.
+The selected mode is recorded in the session event log.
+
+## Package metadata fix
+
+The package dump fallback no longer invokes the incompatible Android `timeout 30s ...` wrapper that produced `timeout: Need 2 arguments` on the real Evrasia test.
+
+The fallback now calls:
+
+`cmd package dump-package <package>`
+
+directly while Mobile Research itself enforces the bounded host-side timeout. This is intended to turn the previously partial package-metadata case into a complete session when the fallback succeeds.
+
+## Windows hypervisor behavior
+
+- WHPX remains the preferred Windows hypervisor.
+- A usable AEHD/GVM remains an accepted compatibility fallback.
+- Windows automatic WHPX setup still uses one UAC prompt and explicitly handles reboot-required state.
+- Dedicated Windows WHPX acceptance remains available as additional hardware evidence, but an unavailable self-hosted WHPX runner no longer blocks normal stable publication.
 
 ## Validation
 
-The development hotfix passed:
+The v0.3 development candidate passed:
 
-- Windows CI;
-- unit tests including explicit AEHD/WHPX compatibility cases;
-- standalone EXE build;
-- standalone self-test;
-- GUI smoke-test;
+- Windows CI and unit tests;
+- standalone Windows EXE build;
+- GUI smoke test;
 - Inno Setup build;
-- installed-application smoke-test;
-- clean Windows managed-Android provisioning.
+- installed-application smoke test;
+- clean Windows managed-Android provisioning;
+- real Android 15 / API 35 KVM boot;
+- **live Emulator gRPC transport acceptance**;
+- full real AVD Research Acceptance;
+- Research ZIP verification.
 
-The normal release commit is revalidated again by CI, Desktop Build and real Android/KVM acceptance before publication.
+The release commit is revalidated on its exact SHA before publication.
 
 ## Distribution
 

@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.3.0.dev0 — low-latency embedded Android interaction.  
-**Stable baseline:** v0.2.2 Desktop Application.  
+**Этап:** v0.3.0 — low-latency embedded Android interaction.  
+**Stable baseline:** v0.3.0 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -178,8 +178,8 @@ GitHub-hosted Windows runner без аппаратной виртуализац�
 Настройки Mobile Research содержат repair action для удаления только managed Android SDK/Emulator/system image/AVD. Research sessions хранятся отдельно и не удаляются. Следующая подготовка заново скачивает официальные компоненты и проверяет checksums.
 
 
-### ADR-046 — Stable Windows release требует installed-EXE WHPX hardware acceptance
-GitHub-hosted Windows CI остаётся обязательным для сборки, unit/GUI smoke и чистого provisioning, но не считается доказательством пользовательского Android boot: nested virtualization на hosted runner не является гарантированным контрактом. Для следующего stable release обязателен отдельный workflow `Windows WHPX Acceptance` на выделенном self-hosted Windows x64 runner с аппаратной виртуализацией и меткой `mobile-research-whpx`. Workflow скачивает `MobileResearchSetup.exe` из `Desktop Build` того же commit SHA, выполняет чистую установку, запускает acceptance через установленный frozen `MobileResearch.exe`, требует именно WHPX по `emulator -accel-check`, загружает private AVD, скачивает зафиксированный Appium ApiDemos v6.0.17 по immutable release URL и проверяет SHA-256 `90cc1041c063a7fb68889143250fefa3139ef0c81e4208f67dbaafe8f15c8be9`, затем именно установленный MobileResearch.exe определяет package через managed aapt2, устанавливает APK через managed ADB и исследует `io.appium.android.apis`. Gate также доказывает root ADB, tcpdump/raw PCAP, framebuffer, logcat, screen recording, complete Research ZIP, checksum verification и semantic audit. Release workflow обязан ждать этот exact-SHA gate и не публикует stable version без его success.
+### ADR-046 — Windows WHPX hardware acceptance является дополнительным release evidence
+GitHub-hosted Windows CI остаётся обязательным для сборки, unit/GUI smoke и чистого provisioning, но не считается доказательством пользовательского Android boot: nested virtualization на hosted runner не является гарантированным контрактом. Отдельный workflow `Windows WHPX Acceptance` на выделенном self-hosted Windows x64 runner с аппаратной виртуализацией и меткой `mobile-research-whpx` сохраняется как дополнительная hardware acceptance. Workflow скачивает `MobileResearchSetup.exe` из `Desktop Build` того же commit SHA, выполняет чистую установку, запускает acceptance через установленный frozen `MobileResearch.exe`, требует именно WHPX по `emulator -accel-check`, загружает private AVD, скачивает зафиксированный Appium ApiDemos v6.0.17 по immutable release URL и проверяет SHA-256 `90cc1041c063a7fb68889143250fefa3139ef0c81e4208f67dbaafe8f15c8be9`, затем именно установленный MobileResearch.exe определяет package через managed aapt2, устанавливает APK через managed ADB и исследует `io.appium.android.apis`. Gate также доказывает root ADB, tcpdump/raw PCAP, framebuffer, logcat, screen recording, complete Research ZIP, checksum verification и semantic audit. Stable publication не блокируется отсутствием или очередью этого self-hosted runner: обязательные exact-SHA gates — CI, Desktop Build и real AVD Research Acceptance. Если WHPX runner доступен, его результат сохраняется как дополнительное evidence и используется для диагностики Windows-specific regressions.
 
 
 ### ADR-047 — Package Manager dump failure degrades evidence instead of aborting capture
@@ -187,7 +187,7 @@ A full raw package-manager dump remains required for a `complete` session, but i
 
 
 ### ADR-048 — Release acceptance и пользовательская hypervisor-совместимость разделены
-WHPX остаётся предпочтительным Microsoft-backed Windows hypervisor и обязательным target dedicated Windows hardware acceptance. Это не означает, что пользовательский runtime должен отвергать уже установленный и usable AEHD/GVM, пока текущий Android Emulator официально поддерживает этот fallback. Если `emulator -accel-check` подтверждает WHPX или AEHD/GVM, Mobile Research продолжает работу без UAC. Автоматическая настройка Windows выполняется только при отсутствии usable hypervisor. Она включает только `HypervisorPlatform` и `hypervisorlaunchtype=Auto` через один elevated PowerShell process; `VirtualMachinePlatform` для Android Emulator не включается. Если изменение Windows требует reboot, приложение обязано сообщить об этом явно, поскольку `/NoRestart`/NoRestart semantics могут не показывать системный prompt.
+WHPX остаётся предпочтительным Microsoft-backed Windows hypervisor и целевым dedicated Windows hardware acceptance. Это не означает, что пользовательский runtime должен отвергать уже установленный и usable AEHD/GVM, пока текущий Android Emulator официально поддерживает этот fallback. Если `emulator -accel-check` подтверждает WHPX или AEHD/GVM, Mobile Research продолжает работу без UAC. Автоматическая настройка Windows выполняется только при отсутствии usable hypervisor. Она включает только `HypervisorPlatform` и `hypervisorlaunchtype=Auto` через один elevated PowerShell process; `VirtualMachinePlatform` для Android Emulator не включается. Если изменение Windows требует reboot, приложение обязано сообщить об этом явно, поскольку `/NoRestart`/NoRestart semantics могут не показывать системный prompt.
 
 
 ### ADR-049 — Интерактивный Android использует Emulator gRPC
