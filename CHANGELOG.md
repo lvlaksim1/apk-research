@@ -2,48 +2,15 @@
 
 All notable Mobile Research changes are recorded here.
 
-## [0.7.7] - 2026-09-15
+## [0.7.8] - 2026-09-15
 
-### Atomic Android reset and orphan recovery
+### Controlled rollback to v0.7.4 + real-time swipe only
 
-- Reworked “Сбросить Android в чистое состояние” so it no longer deletes live AVD files immediately after requesting Emulator shutdown.
-- Reset now fully stops the private managed AVD, writes a persistent reset marker, and performs the official Android Emulator `-wipe-data` operation on the next owned boot.
-- The reset marker survives an application restart and is removed only after a successful Emulator boot.
-- Emulator shutdown now waits for ADB to go offline and the owned launcher to exit; on Windows any remaining `emulator.exe` / `qemu-system-*.exe` processes are force-terminated only when their command line belongs to `mobile_research_api35`.
-- Startup detects an online Emulator that is not owned by the current Mobile Research process (for example after a prior crash), terminates that orphaned private AVD, then starts a fresh owned instance. This directly prevents `Another emulator instance is running`.
-
-### Display/controller reset consistency
-
-- Reset and component repair now detach DWM before stopping Android and explicitly invalidate the controller’s native-display state.
-- Screen-frame state is cleared during display suspension so stale frames cannot be published after reset.
-- Reset clears the installed-package state and disables research start until the APK is installed again.
-- Added a dedicated reset-complete UI state instead of leaving the interface reporting a live/rooted Android after the Emulator has been destroyed.
-
-## [0.7.6] - 2026-09-15
-
-### DWM source-window identity fix
-
-- Reverted the v0.7.5 STARTUPINFO/SW_HIDE process-launch experiment. The real-PC test showed that hidden startup allowed Mobile Research to bind to a hidden Qt helper top-level HWND from the Emulator process while the real Emulator window appeared separately.
-- DWM source discovery now strongly prefers a top-level window whose title identifies the actual Android Emulator or managed AVD; PID ancestry alone is no longer sufficient when an identified Emulator window exists.
-- The real Emulator window is discovered while visible, immediately hidden only after positive identity, positioned behind Mobile Research, shown without activation, and then registered with DWM.
-- Added a Windows discovery test proving that a larger same-process Qt helper window cannot outrank the correctly titled Emulator window.
-- The real-time gRPC touch DOWN/MOVE/UP path from v0.7.5 is retained unchanged.
-
-## [0.7.5] - 2026-09-15
-
-### Real-time touch drag
-
-- Mouse interaction in the Android panel now maps directly to the Emulator touch lifecycle: mouse press → touch DOWN, mouse movement → streamed touch MOVE, mouse release → touch UP.
-- MOVE events are emitted continuously while dragging, throttled to approximately 80 Hz to avoid input-queue backlog while preserving native-feeling motion.
-- The final drag position is always sent before UP, so scrolling tracks the cursor instead of executing only after mouse release.
-- Drag coordinates are clamped to the Android display rectangle, allowing a gesture to finish correctly even when the pointer reaches or slightly crosses an edge.
-- The existing wheel swipe path and ADB fallback remain available.
-
-### Startup flash suppression
-
-- The Windows DWM-live Emulator process is now launched with STARTUPINFO/SW_HIDE where supported.
-- DWM source discovery accepts the initially hidden top-level Emulator window, positions it behind Mobile Research, and only then shows it without activation.
-- Initial HWND polling was reduced from 15 ms to 5 ms as an additional guard for Emulator builds that partially ignore the Windows startup show state.
+- Functional baseline is restored to the exact v0.7.4 tree.
+- All v0.7.5–v0.7.7 changes to Emulator startup, DWM source-window discovery, reset lifecycle, orphan cleanup and AVD handling are removed.
+- The only retained behavioral change is real-time pointer drag: mouse DOWN → gRPC touch DOWN, held movement → streamed MOVE, release → UP.
+- MOVE events are throttled to about 80 Hz and coordinates are clamped to the Android display rectangle.
+- Existing v0.7.4 wheel swipe, DWM covered-source behavior, reset behavior and startup behavior remain unchanged.
 
 ## [0.7.4] - 2026-09-15
 

@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.7.7 — atomic Android lifecycle + orphan recovery.  
-**Stable baseline:** v0.7.7 Desktop Application.  
+**Этап:** v0.7.8 — controlled rollback to v0.7.4 + real-time swipe.  
+**Stable baseline:** v0.7.4 display/runtime architecture + streaming touch only.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -265,22 +265,5 @@ v0.3.0 выполнял bytes → QImage.copy → mirrored image → QPixmap →
 DWM thumbnail композитится в top-level HWND и не является дочерним Qt widget, поэтому QTabWidget не может автоматически clip/hide его. Начиная с v0.7.4 `tabs.currentChanged` явно переключает `DWM_THUMBNAIL_PROPERTIES.fVisible`: только индекс вкладки Исследование имеет visible=true. Это исключает наложение Android изображения поверх Настроек, Диагностики, Истории и Результатов.
 
 
-### ADR-070 — Pointer drag передаётся как реальный touch lifecycle
-Прежний AndroidView отправлял swipe только в `mouseReleaseEvent`, поэтому Android не получал движения до отпускания кнопки. Начиная с v0.7.5 mouse press немедленно создаёт gRPC touch DOWN, mouse move во время удержания генерирует последовательность MOVE с pressure=1, а release отправляет финальный MOVE и UP с pressure=0. MOVE ограничен интервалом 12 ms (~83 Hz), чтобы не создавать backlog на высокочастотной мыши. Controller и AndroidRuntime получили отдельные `touch_down/touch_move/touch_up`; EmulatorGrpcClient отправляет их в уже существующий persistent `streamInputEvent`. ADB fallback при отсутствии gRPC по-прежнему сводит жест к tap/swipe на release.
-
-### ADR-071 — DWM source создаётся скрытым и показывается только после установки z-order
-Даже 15-ms polling оставлял короткую вспышку standalone Emulator до того, как source HWND успевал оказаться за Mobile Research. В DWM-live Windows launch v0.7.5 передаёт `STARTUPINFO.dwFlags |= STARTF_USESHOWWINDOW` и `wShowWindow=SW_HIDE`. NativeEmulatorEmbedder ищет top-level source независимо от текущего visibility, устанавливает TOOLWINDOW/z-order/geometry за Mobile Research и только затем показывает source через `SW_SHOWNOACTIVATE`. Discovery polling сокращён до 5 ms для Emulator builds, которые частично игнорируют startup show state.
-
-
-### ADR-072 — DWM source выбирается по identity, а не только по PID ancestry
-Реальный тест v0.7.5 выявил race: STARTUPINFO/SW_HIDE скрывал главное окно Emulator, а `find_emulator_window(require_visible=False)` мог выбрать другой top-level Qt/helper HWND того же процесса/descendant process. DWM тогда композитил белую helper surface, а настоящее окно Emulator оставалось отдельно. v0.7.6 отменяет hidden process startup и снова ищет visible top-level source. Среди кандидатов приоритетный pool формируется только из окон, title которых содержит `Android Emulator` или имя managed AVD; PID ancestry используется лишь как дополнительный сигнал. После точной идентификации source мгновенно скрывается, позиционируется за Mobile Research и показывается через `SW_SHOWNOACTIVATE` до DWM registration. Это сохраняет нормальную GPU surface и одновременно сокращает видимую startup-вспышку.
-
-
-### ADR-073 — Reset не удаляет userdata работающего/завершающегося AVD
-Реальный тест v0.7.6 выявил race: `reset_userdata()` вызывал `stop()`, после чего `ComponentManager.reset_avd_userdata()` сразу удалял содержимое AVD. Launcher Emulator мог уже изменить состояние, но qemu child и single-instance lock ещё оставались живы. v0.7.7 отказывается от ручного удаления runtime AVD-файлов. Reset сначала полностью завершает managed AVD, затем создаёт persistent marker `reset-userdata.pending`. Следующий owned boot получает официальный параметр `-wipe-data`; marker удаляется только после успешного boot. Это сохраняет reset intent через рестарт приложения и исключает удаление файлов под живым Emulator.
-
-### ADR-074 — Mobile Research владеет единственным экземпляром private AVD
-Private AVD `mobile_research_api35` не должен переживать процесс Mobile Research. `stop()` теперь ждёт ADB offline и завершение launcher; на Windows после grace period дополнительно завершаются только `emulator.exe`/`qemu-system-*.exe`, command line которых содержит имя private AVD. При startup online `emulator-5554` без owned Popen считается orphan предыдущего crash и сначала завершается. Это предотвращает `Another emulator instance is running` без вмешательства в любые сторонние Android Emulator пользователя.
-
-### ADR-075 — Reset инвалидирует display/controller state
-DWM thumbnail, native-display flag и framebuffer state относятся к конкретному Emulator process lifetime. Reset/repair теперь сначала detach DWM, затем `suspend_display()`: native flag=false, screen worker stop, latest frame очищен. После wipe package state также сбрасывается, потому что APK физически больше не установлен. Нельзя переносить display/package state через уничтожение AVD.
+### ADR-070 — v0.7.8 намеренно ограничен одним изменением относительно v0.7.4
+После реальных тестов v0.7.5–v0.7.7 принято решение вернуть весь functional tree к v0.7.4. В v0.7.8 не переносятся изменения startup/DWM/reset/orphan/AVD lifecycle из последующих версий. Единственный retained delta — pointer drag как touch lifecycle: press → DOWN, move → streamed MOVE, release → UP. `AndroidView`, `DesktopController`, `AndroidRuntime` и `EmulatorGrpcClient` получают только необходимые touch methods; native display и Emulator startup code остаются байт-в-байт на baseline v0.7.4, кроме файлов, где touch integration требует изменений.

@@ -452,8 +452,6 @@ def find_emulator_window(
                     "class_name": class_name,
                     "visible_before_attach": visible,
                     "area": area,
-                    "title_match": title_match,
-                    "pid_match": pid_match,
                 },
             )
         )
@@ -462,22 +460,11 @@ def find_emulator_window(
     user32.EnumWindows(callback, 0)
     if not candidates:
         return None
-
-    # The Emulator process creates several top-level Qt/helper windows.
-    # For DWM we must use the real user-facing Emulator window, whose title
-    # contains "Android Emulator" or the AVD name. PID ancestry alone is not
-    # sufficient and caused v0.7.5 to bind a hidden helper HWND.
-    identified = [
-        item
-        for item in candidates
-        if bool(item[2].get("title_match"))
-    ]
-    pool = identified or candidates
-    pool.sort(
+    candidates.sort(
         key=lambda item: item[0],
         reverse=True,
     )
-    _score, hwnd, details = pool[0]
+    _score, hwnd, details = candidates[0]
     return hwnd, details
 
 
@@ -500,7 +487,7 @@ class NativeEmulatorEmbedder(QObject):
         self._presentation_visible = True
         self._source_hidden_for_minimize = False
         self._timer = QTimer(self)
-        self._timer.setInterval(5)
+        self._timer.setInterval(15)
         self._timer.timeout.connect(self._poll)
 
     @property
@@ -532,7 +519,7 @@ class NativeEmulatorEmbedder(QObject):
             + max(1.0, float(timeout))
         )
         self.host.window().winId()
-        self._timer.setInterval(5)
+        self._timer.setInterval(15)
         self._timer.start()
         self._poll()
 
@@ -605,15 +592,6 @@ class NativeEmulatorEmbedder(QObject):
         if found is not None:
             hwnd, details = found
             try:
-                # Suppress the brief standalone flash only after the exact
-                # visible Emulator HWND has been identified. It is immediately
-                # positioned behind Mobile Research and shown again before DWM
-                # registration, preserving the working GPU surface.
-                if user32.IsWindowVisible(hwnd):
-                    user32.ShowWindow(
-                        hwnd,
-                        SW_HIDE,
-                    )
                 self._prepare_source_window(hwnd)
                 self._register_thumbnail(hwnd)
             except Exception as exc:

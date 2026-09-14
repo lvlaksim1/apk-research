@@ -1,16 +1,8 @@
 # Mobile Research
 
-## v0.7.7 — Atomic reset + orphan recovery
+## v0.7.8 — v0.7.4 baseline + real-time swipe only
 
-Сброс Android теперь является безопасной транзакцией: DWM отключается, private AVD полностью завершается, остаточные процессы именно `mobile_research_api35` при необходимости принудительно убираются, а чистое состояние создаётся штатным Emulator `-wipe-data` при следующем запуске. Persistent marker переживает перезапуск программы. Если после аварии остался запущенный private Emulator, Mobile Research автоматически обнаруживает и завершает его до нового запуска, устраняя `Another emulator instance is running`.
-
-## v0.7.6 — Correct DWM source HWND
-
-Исправлена регрессия v0.7.5: скрытый старт процесса позволял выбрать Qt helper HWND вместо настоящего окна Android Emulator, из-за чего отдельный Emulator оставался на рабочем столе, а DWM внутри Mobile Research был белым. Теперь выбирается строго идентифицированное окно Android Emulator/AVD; только после его обнаружения оно кратко скрывается, ставится за Mobile Research, показывается без активации и подключается к DWM. Потоковый DOWN/MOVE/UP свайп сохранён.
-
-## v0.7.5 — Real-time touch + no startup flash
-
-Мышь в Android-панели теперь работает как настоящий touchscreen: DOWN отправляется при нажатии, MOVE — непрерывно во время движения, UP — при отпускании. Поэтому свайп должен двигать Android уже в процессе движения мыши, а не после release. Для DWM-live Windows Emulator запускается первоначально скрытым, затем source HWND ставится за Mobile Research и только после этого показывается без активации; это устраняет стартовое мигание отдельного окна.
+Полный функциональный baseline возвращён к v0.7.4. Единственное изменение поведения: свайп мышью передаётся как настоящий touch lifecycle DOWN → MOVE → UP и поэтому Android реагирует во время движения, а не после отпускания кнопки. Изменения v0.7.5–v0.7.7 в запуске Emulator, DWM, reset/AVD lifecycle и orphan cleanup не входят в этот релиз.
 
 ## v0.7.4 — Covered DWM source window
 
@@ -95,7 +87,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.7.7 — Desktop Application** — self-contained Windows release с covered-source DWM live, real-time gRPC touch и атомарным lifecycle private Android: безопасный reset через persistent `-wipe-data`, гарантированное завершение qemu/emulator и автоматическое восстановление после orphaned AVD предыдущего crash. gRPC/MMAP остаётся fallback.
+**v0.7.8 — Desktop Application** — точный функциональный baseline v0.7.4 с единственным дополнением: потоковый gRPC touch DOWN/MOVE/UP для real-time swipe. Startup, DWM source handling, reset и AVD lifecycle оставлены как в v0.7.4.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 
