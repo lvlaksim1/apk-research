@@ -1,6 +1,6 @@
 # Mobile Research
 
-## v0.2.0 — Desktop Application
+## v0.2.1 — Desktop Application
 
 После стабильного v0.1.0 проект перешёл к полноценному Windows-приложению.
 Штатный пользовательский сценарий v0.2 не требует Python, PowerShell, Android Studio, отдельного ADB или ручного AVD.
@@ -10,11 +10,13 @@ Desktop Build собирает автономный MobileResearchSetup.exe. And
 
 Подробный desktop contract: docs/V0.2_DESKTOP.md.
 
-## Development after v0.2.0
+## v0.2.1 — hardening пользовательского Windows-сценария
 
-Текущая development-линия — **0.2.1.dev0**. Для следующего stable release добавлен обязательный hardware gate `Windows WHPX Acceptance`: он использует именно собранный `MobileResearchSetup.exe` того же commit SHA, устанавливает приложение на выделенный Windows x64 runner, начинает с чистого `%LOCALAPPDATA%\MobileResearch`, требует реальный WHPX, загружает managed Android, через установленный EXE определяет package и устанавливает фиксированный проверяемый APK Appium ApiDemos, запускает его и завершает полноценную research-сессию с проверкой и semantic audit Research ZIP.
+v0.2.1 исправляет обнаруженный на реальном приложении `com.evrasia` отказ preflight: зависший полный Package Manager dump больше не уничтожает всё исследование. Mobile Research ожидает завершения pending Package Manager operations, использует ограниченные по времени основной и резервный способы получения package dump, а при их отказе продолжает logcat/screen/PCAP и завершает сессию как `partial`.
 
-Обычный GitHub-hosted `windows-latest` сохраняется для build/provisioning checks, но больше не считается доказательством реального Windows/WHPX boot.
+Также release contract усилен отдельным `Windows WHPX Acceptance`: он использует именно собранный `MobileResearchSetup.exe` того же commit SHA, устанавливает приложение на выделенный Windows x64 runner, начинает с чистого `%LOCALAPPDATA%\MobileResearch`, требует реальный WHPX, загружает managed Android, через установленный EXE определяет package и устанавливает фиксированный проверяемый APK Appium ApiDemos, запускает его и завершает полноценную research-сессию с проверкой и semantic audit Research ZIP.
+
+Обычный GitHub-hosted `windows-latest` сохраняется для build/provisioning checks, но не считается доказательством реального Windows/WHPX boot.
 
 ## Stable core baseline
 
@@ -22,7 +24,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.2.0 — Desktop Application** — стабильный self-contained Windows release: GUI, managed Android runtime, автоматическая установка APK и встроенный Android без пользовательского Python/Android Studio/ADB.
+**v0.2.1 — Desktop Application** — стабильный self-contained Windows release: GUI, managed Android runtime, автоматическая установка APK и встроенный Android без пользовательского Python/Android Studio/ADB.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

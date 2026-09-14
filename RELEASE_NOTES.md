@@ -1,58 +1,71 @@
-# Mobile Research v0.2.0
+# Mobile Research v0.2.1
 
-First stable **Desktop Application** release.
+Stable Windows desktop hardening release.
 
-## What changed
+## Main fix from real application testing
 
-Mobile Research is now a self-contained Windows application rather than a command-line research core.
+Testing against `com.evrasia` exposed a failure before collectors started: a full `dumpsys package` call could stall until the host ADB timeout and abort the entire research session.
 
-Normal use does not require the user to install Python, Android Studio, ADB, SDK Manager or create an AVD manually.
+v0.2.1 changes that behavior:
 
-The primary workflow is:
+- Mobile Research best-effort waits for Package Manager main/background handlers before collecting package metadata.
+- The primary package dump is bounded with Android-side timeout semantics.
+- A second bounded Package Manager dump path is used as fallback.
+- If both full-dump methods fail, the failure is recorded as degraded metadata rather than destroying the research run.
+- Logcat, screen recording and raw PCAP are still allowed to start.
+- Such a session ends as `partial`, not falsely `complete`, while preserving all successfully captured evidence.
 
-```text
-install MobileResearchSetup.exe
-→ launch Mobile Research
-→ choose APK
-→ Mobile Research prepares Android automatically
-→ START RESEARCH
-→ interact with Android inside the application
-→ STOP / SAVE
-→ verified Research ZIP
-```
+This prevents the 1–2 KB failed Research ZIP observed in the real `com.evrasia` test from being the only surviving evidence when extended package metadata stalls.
 
-## Managed Android runtime
+## Windows runtime hardening
 
-Mobile Research owns a private Android environment under `%LOCALAPPDATA%\MobileResearch\components`.
+- Windows desktop runtime requires Windows Hypervisor Platform (WHPX) for the supported hardware-accelerated path.
+- Hypervisor diagnostics distinguish WHPX from AEHD/GVM, KVM and other providers.
+- Runtime acceptance can require the packaged/frozen installed executable, the exact installed executable path and a clean managed component root.
 
-It automatically provisions:
+## Exact-SHA Windows WHPX acceptance
 
-- Android platform-tools / ADB
-- stable Android Emulator from Google repository `channel-0`
-- build-tools 35.0.0 / aapt2
-- Android 15 / API 35 AOSP default x86_64 system image
-- private `mobile_research_api35` AVD
+v0.2.1 adds a dedicated `Windows WHPX Acceptance` release gate for a hardware-capable Windows x64 runner.
 
-Downloads are checksum-verified before extraction. The GUI shows first-run download progress in MiB and percent.
+The gate:
 
-Android Studio is not required.
+1. waits for the exact-SHA Desktop Build;
+2. downloads that exact `MobileResearchSetup.exe`;
+3. verifies its SHA-256;
+4. removes previous Mobile Research user state;
+5. installs the application as a normal user installation;
+6. launches acceptance through the installed frozen `MobileResearch.exe`;
+7. provisions the managed Android runtime from a clean component directory;
+8. requires WHPX from Android Emulator acceleration diagnostics;
+9. boots the private Android 15 / API 35 AVD;
+10. proves root ADB, tcpdump and framebuffer access;
+11. downloads the pinned Appium ApiDemos v6.0.17 APK and verifies its SHA-256;
+12. makes Mobile Research itself identify, install and launch `io.appium.android.apis`;
+13. records logcat, screen and raw PCAP;
+14. exports, verifies and semantically audits the Research ZIP.
 
-## Desktop experience
+The stable release workflow requires this gate for the same release commit SHA in addition to Windows CI, Desktop Build and the real Ubuntu/KVM AVD Research Acceptance.
 
-- Native Qt Windows GUI.
-- APK selection and automatic package detection.
-- Automatic APK installation.
-- Headless Android rendered inside the Mobile Research window.
-- Mouse, wheel and keyboard input mapped to Android.
-- START / STOP research controls.
-- Research ZIP history, integrity verification and semantic audit.
-- Diagnostics showing ADB, Emulator and aapt2 versions, acceleration state, root and tcpdump readiness.
-- One-click Android userdata reset.
-- One-click managed Android component repair without deleting research data.
+## Distribution
 
-## Evidence guarantees preserved from v0.1.0
+Release assets:
 
-v0.2.0 does not weaken the research core:
+- `MobileResearchSetup.exe`
+- `SHA256SUMS.txt`
+
+Python, Android Studio and a separately installed ADB are not user dependencies.
+
+## Runtime requirements
+
+- Windows desktop x64
+- hardware virtualization enabled
+- Windows Hypervisor Platform usable by Android Emulator
+- internet access during first Android provisioning
+- approximately 1.3 GB of Android component downloads on first setup
+
+## Evidence contract
+
+v0.2.1 preserves the existing RAW-first guarantees:
 
 - immutable raw evidence
 - device/package metadata
@@ -63,52 +76,3 @@ v0.2.0 does not weaken the research core:
 - SHA-256 Research ZIP
 - post-export integrity verification
 - semantic lifecycle/timeline/evidence audit
-
-If an active GUI research run encounters an unexpected runtime error, Mobile Research makes a best-effort attempt to stop active collectors and preserve a partial/failed Research ZIP instead of abandoning captured evidence.
-
-## Release validation
-
-The exact release commit must pass all of the following before publication:
-
-- Windows CI
-- Desktop Build
-  - unit tests with desktop dependencies
-  - live Google Android catalog resolution
-  - standalone EXE build
-  - standalone self-test
-  - GUI smoke-test
-  - Inno Setup build
-  - installed-application self-test and GUI smoke-test
-  - clean Windows managed-Android provisioning acceptance
-- Real AVD Research Acceptance on Ubuntu/KVM
-  - Android boot
-  - root ADB
-  - tcpdump/raw PCAP
-  - logcat
-  - screen recording
-  - Research ZIP export and audit
-
-The release workflow publishes only artifacts produced by the successful Desktop Build for the same commit SHA.
-
-## Distribution
-
-Release assets:
-
-- `MobileResearchSetup.exe`
-- `SHA256SUMS.txt`
-
-Python is bundled into the application and is not a user dependency.
-
-## Runtime requirements
-
-- Windows desktop
-- hardware virtualization enabled
-- Windows Hypervisor Platform usable by Android Emulator
-- internet access on first provisioning of Android components
-- approximately 1.3 GB of Android component downloads on first setup
-
-Mobile Research can best-effort enable required Windows virtualization features. A Windows reboot or BIOS/UEFI virtualization change can still be required by the operating system/hardware.
-
-## Scope boundaries
-
-v0.2.0 does not yet release-accept AVD-PLAY or Physical Device backends. MITM/TLS decryption, static APK analysis, protocol decoding and an Android Research Agent remain future work.
