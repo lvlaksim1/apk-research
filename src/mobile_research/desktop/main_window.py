@@ -723,20 +723,29 @@ class MainWindow(QMainWindow):
         current,
         total,
     ) -> None:
-        self.progress_label.setText(message)
         if current is None or not total:
+            self.progress_label.setText(message)
             self.progress_bar.setRange(0, 0)
-        else:
-            self.progress_bar.setRange(0, 1000)
-            value = min(
-                1000,
-                int(
-                    1000
-                    * int(current)
-                    / max(1, int(total))
-                ),
-            )
-            self.progress_bar.setValue(value)
+            return
+
+        current_value = max(0, int(current))
+        total_value = max(1, int(total))
+        ratio = min(
+            1.0,
+            current_value / total_value,
+        )
+        self.progress_bar.setRange(0, 1000)
+        self.progress_bar.setValue(
+            int(1000 * ratio)
+        )
+
+        current_mb = current_value / (1024 * 1024)
+        total_mb = total_value / (1024 * 1024)
+        self.progress_label.setText(
+            f"{message} — "
+            f"{current_mb:.1f} / {total_mb:.1f} МБ "
+            f"({ratio * 100:.0f}%)"
+        )
 
     def _on_busy(self, busy: bool) -> None:
         self._busy = busy
