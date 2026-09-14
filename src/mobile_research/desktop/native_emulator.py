@@ -581,7 +581,7 @@ class NativeEmulatorEmbedder(QObject):
             )
 
         self.hwnd = int(hwnd)
-        self.thumbnail = int(thumbnail)
+        self.thumbnail = int(thumbnail.value or 0)
         try:
             self._update_thumbnail()
             self._move_source_offscreen()
