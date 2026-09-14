@@ -77,6 +77,7 @@ class AndroidRuntime:
         self._grpc_input_failures = 0
         self._software_acceleration = False
         self._gpu_mode = "auto"
+        self._display_mode = "headless"
 
     @property
     def paths(self):
@@ -115,6 +116,7 @@ class AndroidRuntime:
         else:
             self._wait_for_boot(progress)
         self._ensure_root(progress)
+        self._normalize_initial_orientation(progress)
         self._ensure_live_transport(progress)
 
     def package_name_from_apk(
@@ -220,8 +222,8 @@ class AndroidRuntime:
         self,
         stop_event: threading.Event,
         *,
-        width: int = 360,
-        height: int = 640,
+        width: int = 405,
+        height: int = 720,
     ):
         client = self._get_grpc_client()
         if client is not None:
@@ -385,13 +387,19 @@ class AndroidRuntime:
             "device_online": self._device_online(),
             "interactive_transport": {
                 "active": (
-                    "grpc"
+                    self._get_grpc_client().frame_transport
                     if self._get_grpc_client() is not None
                     else "adb-screencap"
                 ),
                 "grpc_port": self._grpc_port,
                 "gpu_mode": self._gpu_mode,
+                "display_mode": self._display_mode,
                 "input_rpc_failures": self._grpc_input_failures,
+                "frame_transport_error": (
+                    self._get_grpc_client().frame_transport_error
+                    if self._get_grpc_client() is not None
+                    else ""
+                ),
             },
         }
 
@@ -560,7 +568,6 @@ class AndroidRuntime:
             f"@{AVD_NAME}",
             "-port",
             str(self.PORT),
-            "-no-window",
             "-gpu",
             (
                 "swiftshader"
@@ -573,6 +580,17 @@ class AndroidRuntime:
             "-noaudio",
             "-no-boot-anim",
         ]
+
+        if (
+            self._is_windows()
+            and not self._software_acceleration
+        ):
+            command.append("-qt-hide-window")
+            self._display_mode = "qt-hide-window"
+        else:
+            command.append("-no-window")
+            self._display_mode = "headless"
+
         if self._software_acceleration:
             command.extend(
                 [
@@ -866,6 +884,45 @@ class AndroidRuntime:
             subprocess.TimeoutExpired,
         ):
             return None
+
+    def _normalize_initial_orientation(
+        self,
+        progress: RuntimeProgress | None,
+    ) -> None:
+        self._emit(
+            progress,
+            "Нормализация ориентации Android",
+            None,
+            None,
+        )
+        commands = (
+            (
+                "wm",
+                "user-rotation",
+                "lock",
+                "0",
+            ),
+            (
+                "settings",
+                "put",
+                "system",
+                "accelerometer_rotation",
+                "0",
+            ),
+            (
+                "settings",
+                "put",
+                "system",
+                "user_rotation",
+                "0",
+            ),
+        )
+        for command in commands:
+            self._adb_shell(
+                *command,
+                timeout=10.0,
+                check=False,
+            )
 
     def _ensure_live_transport(
         self,
