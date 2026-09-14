@@ -358,7 +358,7 @@ def test_windows_emulator_uses_qt_hidden_window(
 
     assert "-qt-hide-window" in command
     assert "-no-window" not in command
-    assert runtime._display_mode == "qt-hide-window"
+    assert runtime._display_mode == "native-hwnd-pending"
 
 
 def test_non_windows_emulator_remains_headless(
@@ -379,3 +379,21 @@ def test_non_windows_emulator_remains_headless(
 
     assert "-no-window" in command
     assert "-qt-hide-window" not in command
+
+
+
+def test_windows_runtime_reports_native_display_metadata(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+    monkeypatch.setattr(
+        runtime,
+        "_is_windows",
+        lambda: True,
+    )
+
+    assert runtime.native_display_supported is True
+    assert runtime.emulator_pid == 0
