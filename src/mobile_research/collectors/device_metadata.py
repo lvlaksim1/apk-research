@@ -316,8 +316,6 @@ class DeviceMetadataCollector:
             (
                 "cmd-package-dump-package",
                 (
-                    "timeout",
-                    "30s",
                     "cmd",
                     "package",
                     "dump-package",
