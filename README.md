@@ -1,5 +1,12 @@
 # Mobile Research
 
+## Development — v0.3.0
+
+Встроенный Android переведён с периодических ADB/PNG screenshots на постоянный локальный Android Emulator gRPC stream. Кадры передаются как RGB, GUI показывает только самый свежий кадр с частотой до ~30 fps, а touch/key input отправляется напрямую в Emulator. ADB сохраняется как fallback и как независимый research transport для collectors.
+
+Для исследования доступны два режима запуска APK: **чистый запуск** и **продолжить текущее состояние**.
+
+
 ## v0.2.2 — Desktop Application
 
 После стабильного v0.1.0 проект перешёл к полноценному Windows-приложению.
