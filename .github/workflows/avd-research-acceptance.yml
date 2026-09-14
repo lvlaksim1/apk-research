@@ -142,13 +142,13 @@ jobs:
             kill "$(cat emulator.pid)" || true
           fi
 
-      - name: Upload acceptance evidence
-        if: always()
+      - name: Upload acceptance diagnostics on failure
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: avd-research-acceptance
+          name: avd-research-acceptance-failure
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 3
           path: |
             emulator.log
             acceptance-output/**

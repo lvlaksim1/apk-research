@@ -240,3 +240,7 @@ v0.3.0 выполнял bytes → QImage.copy → mirrored image → QPixmap →
 
 ### ADR-063 — Reverse framebuffer rotation снова нормализуется
 Реальный тест v0.5.2 показал reverse-portrait первый кадр. Для raw bottom-up RGBA/RGB кадров rotation 2/3 снова трактуется как reverse orientation: применяется коррекция, эквивалентная bottom-up flip + 180-degree normalization, а input ratios инвертируются по обеим осям.
+
+
+### ADR-064 — GitHub Release хранит дистрибутивы, Actions artifacts являются эфемерными
+Постоянным хранилищем пользовательских бинарников считаются только GitHub Releases. Успешные AVD/provisioning/WHPX acceptance runs не создают диагностические Actions artifacts; их статус и стандартные Actions logs достаточны для подтверждения gate. При failure диагностические evidence artifacts сохраняются на 3 дня. Единственный успешный временный artifact — `mobile-research-windows-desktop` с проверенным installer и SHA-256 — создаётся только для release-candidate commit, имеет retention 1 день, используется Release workflow для публикации и удаляется API-вызовом сразу после успешного GitHub Release. Windows WHPX Acceptance больше не зависит от этого artifact и скачивает `MobileResearchSetup.exe` и `SHA256SUMS.txt` непосредственно из уже опубликованного exact-SHA GitHub Release; тем самым аппаратный gate проверяет тот же EXE, который получает пользователь.

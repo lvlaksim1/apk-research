@@ -7,13 +7,10 @@ on:
     paths:
       - "pyproject.toml"
       - "src/mobile_research/__init__.py"
-      - "CHANGELOG.md"
-      - "RELEASE_NOTES.md"
-      - ".github/workflows/release.yml"
 
 permissions:
   contents: write
-  actions: read
+  actions: write
 
 jobs:
   publish:
@@ -121,3 +118,17 @@ jobs:
           set -euo pipefail
           TAG="${{ steps.version.outputs.tag }}"
           gh release create "$TAG" release-assets/MobileResearchSetup.exe release-assets/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Mobile Research $TAG" --notes-file RELEASE_NOTES.md
+
+      - name: Delete temporary installer artifact
+        if: steps.version.outputs.stable == 'true' && success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_ID="${{ steps.gates.outputs.desktop_run_id }}"
+          ARTIFACT_ID="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | select(.name == "mobile-research-windows-desktop") | .id' | head -n 1)"
+          if [[ -n "$ARTIFACT_ID" ]]; then
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID"
+            echo "Deleted temporary installer artifact $ARTIFACT_ID"
+          else
+            echo "Temporary installer artifact already absent"
+          fi
