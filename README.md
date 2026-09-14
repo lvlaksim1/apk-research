@@ -1,5 +1,10 @@
 # Mobile Research
 
+## Development — v0.4.0
+
+Интерактивный Android переводится на тот же класс embedded transport, для которого сам Android Emulator предусматривает side-channel framebuffer: gRPC уведомляет о новых кадрах, а pixel data передаются через MMAP/shared memory без упаковки полного кадра в protobuf. GUI работает с целевой частотой ~60 Hz. Input передаётся через постоянный `streamInputEvent`, а Windows Emulator запускается через `-qt-hide-window`, как embedded Emulator в Android Studio. gRPC byte-stream и ADB остаются fallback.
+
+
 ## v0.3.1 — Emulator rendering and latency hotfix
 
 v0.3.1 исправляет обнаруженные на реальном Windows-ПК проблемы v0.3.0: reverse-orientation framebuffer теперь нормализуется, а embedded Android rendering переведён на более лёгкий 360×640 RGBA stream и прямой QPainter без цепочки QImage copy → mirror → QPixmap → scaled pixmap. Windows hardware path сначала использует GPU host с автоматическим fallback на GPU auto.
