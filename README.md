@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.7.0 — DWM live Emulator composition
+
+Основной Windows display path больше не использует cross-process `SetParent`. Android Emulator остаётся обычным standalone GPU-окном, а Windows Desktop Window Manager композитит его live-содержимое прямо в Android-панель Mobile Research. Исходное окно после успешного DWM attach перемещается за пределы видимого рабочего стола, не скрывается и не минимизируется. Управление остаётся через gRPC. gRPC/MMAP сохраняется как автоматический fallback.
+
 ## v0.6.0 — Real standalone Emulator HWND
 
 Основной Windows display path теперь использует настоящее видимое standalone Qt/GPU-окно Android Emulator и встраивает именно его top-level HWND. `-qt-hide-window` больше не используется как источник native HWND. gRPC/MMAP framebuffer остаётся страховкой до подтверждённого native attach и автоматическим fallback. Также восстановлена коррекция reverse rotation, исправляющая перевёрнутый первый framebuffer-кадр.
@@ -63,7 +67,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.6.0 — Desktop Application** — self-contained Windows release с primary native standalone Emulator HWND для максимально плавного интерфейса и автоматическим gRPC/MMAP framebuffer fallback. Native attach принимается только после проверок реального видимого standalone-окна.
+**v0.7.0 — Desktop Application** — self-contained Windows release с primary DWM live composition: реальный standalone Android Emulator сохраняет свой GPU/top-level window, а DWM отображает его live preview внутри Mobile Research без `SetParent` и без Python/QPainter frame-copy. gRPC/MMAP остаётся fallback.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

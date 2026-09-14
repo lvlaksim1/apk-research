@@ -2,6 +2,23 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.7.0] - 2026-09-15
+
+### DWM live display
+
+- Removed cross-process Win32 `SetParent` from the active display path after the real v0.6.0 test proved that re-parenting the Emulator Qt window leaves its GPU surface black.
+- Windows now keeps the real Android Emulator as an independent top-level GPU window and registers it as a live Desktop Window Manager thumbnail in the Mobile Research top-level window.
+- The source Emulator window is moved outside the virtual desktop only after DWM registration succeeds; it remains visible/non-minimized for composition and is never restored during shutdown, eliminating the second-window flash.
+- DWM renders directly into the Android panel region; Mobile Research does not copy the Emulator GPU frame through Python or QPainter.
+- Emulator side-toolbar pixels are cropped from the DWM source region when the normal phone aspect can be inferred.
+- Mouse, swipe, keyboard and text input continue through Emulator gRPC, independent of the DWM presentation path.
+- gRPC/MMAP remains the automatic fallback if DWM composition, thumbnail registration, or source-window discovery fails.
+
+### Validation
+
+- Added pure geometry tests for DWM destination fitting and Emulator toolbar cropping.
+- Native-window tests now validate only discovery of a real visible top-level source; no test or runtime code re-parents the Emulator window.
+
 ## [0.6.0] - 2026-09-15
 
 ### Native display

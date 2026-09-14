@@ -366,7 +366,7 @@ def test_windows_grpc_embedded_uses_qt_hidden_window(
     assert runtime._display_mode == "grpc-embedded"
 
 
-def test_windows_standalone_native_has_real_window(
+def test_windows_dwm_live_has_real_window(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -375,7 +375,7 @@ def test_windows_standalone_native_has_real_window(
     runtime = AndroidRuntime(manager)
     runtime._grpc_port = 8554
     runtime._software_acceleration = False
-    runtime._display_mode = "standalone-native"
+    runtime._display_mode = "dwm-live"
     runtime._gpu_mode = "host"
     monkeypatch.setattr(
         runtime,
@@ -509,8 +509,8 @@ def test_windows_boot_falls_back_across_embedded_gpu_modes(
     runtime._boot_managed_emulator(None)
 
     assert attempts == [
-        ("host", "standalone-native"),
-        ("auto", "standalone-native"),
+        ("host", "dwm-live"),
+        ("auto", "dwm-live"),
         ("host", "grpc-embedded"),
         ("auto", "grpc-embedded"),
         ("swiftshader", "headless"),

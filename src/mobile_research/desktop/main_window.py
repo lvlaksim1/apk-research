@@ -926,11 +926,11 @@ class MainWindow(QMainWindow):
     ) -> None:
         if (
             str(details.get("display_mode", ""))
-            != "standalone-native"
+            != "dwm-live"
         ):
             return
         self.android_hint.setText(
-            "Подключение настоящего окна Android Emulator…"
+            "Подключение DWM live Android Emulator…"
         )
         attached = self.android_view.attach_native(
             int(details.get("process_id", 0) or 0),
@@ -948,7 +948,7 @@ class MainWindow(QMainWindow):
         self.controller.set_native_display_attached(
             True
         )
-        suffix = " • native"
+        suffix = " • DWM live"
         if self._last_gpu_mode:
             suffix += (
                 f" • GPU {self._last_gpu_mode}"
@@ -957,12 +957,12 @@ class MainWindow(QMainWindow):
             "● Android готов" + suffix
         )
         self.android_hint.setText(
-            "Нативный Android Emulator • "
-            "мышь/клавиатура напрямую"
+            "DWM live Android Emulator • "
+            "управление через gRPC"
         )
         self._append_log(
-            "Нативное окно Android Emulator встроено "
-            "в Mobile Research"
+            "DWM live Android Emulator подключён "
+            "без SetParent"
         )
 
     def _on_native_display_failed(

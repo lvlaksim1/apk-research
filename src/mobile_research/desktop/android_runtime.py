@@ -93,7 +93,7 @@ class AndroidRuntime:
     def native_display_supported(self) -> bool:
         return (
             self._is_windows()
-            and self._display_mode == "standalone-native"
+            and self._display_mode == "dwm-live"
         )
 
     @property
@@ -148,13 +148,13 @@ class AndroidRuntime:
             return [
                 (
                     "host",
-                    "standalone-native",
-                    "native standalone GPU host",
+                    "dwm-live",
+                    "DWM live GPU host",
                 ),
                 (
                     "auto",
-                    "standalone-native",
-                    "native standalone GPU auto",
+                    "dwm-live",
+                    "DWM live GPU auto",
                 ),
                 (
                     "host",
@@ -272,9 +272,9 @@ class AndroidRuntime:
                 }
             )
             if self._is_windows():
-                if display_mode == "standalone-native":
+                if display_mode == "dwm-live":
                     message = (
-                        "Android запущен: native standalone "
+                        "Android запущен: DWM live "
                         f"(GPU {gpu_mode})"
                     )
                 else:
@@ -595,7 +595,7 @@ class AndroidRuntime:
                 "process_id": self.emulator_pid,
                 "avd_name": AVD_NAME,
                 "preferred": (
-                    "native-hwnd"
+                    "dwm-live"
                     if self.native_display_supported
                     else "framebuffer"
                 ),
@@ -787,7 +787,7 @@ class AndroidRuntime:
             self._is_windows()
             and not self._software_acceleration
         ):
-            if self._display_mode == "standalone-native":
+            if self._display_mode == "dwm-live":
                 pass
             elif self._display_mode == "grpc-embedded":
                 command.append("-qt-hide-window")

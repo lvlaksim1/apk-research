@@ -98,7 +98,7 @@ class AndroidView(QLabel):
         self._source_image = None
         self._frame_owner = None
         self.setText(
-            "Подключение нативного Android Emulator…"
+            "Подключение DWM live Android Emulator…"
         )
         self.update()
         self._native_embedder.attach(
@@ -246,6 +246,11 @@ class AndroidView(QLabel):
         if self._native_embedder is not None:
             self._native_embedder.resize_embedded()
 
+    def moveEvent(self, event) -> None:  # noqa: N802
+        super().moveEvent(event)
+        if self._native_embedder is not None:
+            self._native_embedder.resize_embedded()
+
     def mousePressEvent(
         self,
         event: QMouseEvent,
@@ -370,6 +375,21 @@ class AndroidView(QLabel):
     ) -> None:
         self._source_image = None
         self._frame_owner = None
+        self._source_width = int(
+            details.get("source_width", 9) or 9
+        )
+        self._source_height = int(
+            details.get("source_height", 16) or 16
+        )
+        self._input_width = int(
+            details.get("input_width", 1080) or 1080
+        )
+        self._input_height = int(
+            details.get("input_height", 1920) or 1920
+        )
+        self._rotation = 0
+        self._bottom_up = False
+        self._update_display_rect()
         self.setText("")
         self.nativeAttached.emit(details)
 
@@ -380,7 +400,7 @@ class AndroidView(QLabel):
         self.nativeAttachFailed.emit(message)
         if self._source_image is None:
             self.setText(
-                "Нативное окно недоступно\n"
+                "DWM live недоступен\n"
                 "Переход на framebuffer fallback…"
             )
 
