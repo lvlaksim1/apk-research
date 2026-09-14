@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import os
 import re
+import socket
 import subprocess
 import threading
 import time
@@ -12,6 +13,10 @@ from typing import Callable, Sequence
 from mobile_research.desktop.components import (
     AVD_NAME,
     ComponentManager,
+)
+from mobile_research.desktop.emulator_grpc import (
+    EmulatorGrpcClient,
+    LiveFrame,
 )
 
 RuntimeProgress = Callable[
@@ -66,6 +71,9 @@ class AndroidRuntime:
         self.components = components or ComponentManager()
         self.process: subprocess.Popen[bytes] | None = None
         self._process_lock = threading.Lock()
+        self._grpc_lock = threading.Lock()
+        self._grpc_client: EmulatorGrpcClient | None = None
+        self._grpc_port: int | None = None
         self._software_acceleration = False
 
     @property
@@ -88,6 +96,7 @@ class AndroidRuntime:
             self._start_emulator(progress)
         self._wait_for_boot(progress)
         self._ensure_root(progress)
+        self._ensure_live_transport(progress)
 
     def package_name_from_apk(
         self,
@@ -233,6 +242,8 @@ class AndroidRuntime:
         )
 
     def stop(self) -> None:
+        self._drop_grpc_client()
+        self._grpc_port = None
         if self.paths.adb.is_file():
             try:
                 self._run(
@@ -402,6 +413,8 @@ class AndroidRuntime:
             exist_ok=True,
         )
         log_handle = log_path.open("ab")
+        self._drop_grpc_client()
+        self._grpc_port = self._find_free_tcp_port()
         command = self._emulator_command()
         creation_flags = getattr(
             subprocess,
@@ -439,7 +452,9 @@ class AndroidRuntime:
             str(self.PORT),
             "-no-window",
             "-gpu",
-            "swiftshader",
+            "auto",
+            "-grpc",
+            str(self._grpc_port or self._find_free_tcp_port()),
             "-no-snapshot",
             "-noaudio",
             "-no-boot-anim",
