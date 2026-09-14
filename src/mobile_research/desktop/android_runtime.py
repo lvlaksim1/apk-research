@@ -256,6 +256,59 @@ class AndroidRuntime:
             "serial": self.SERIAL,
             "device_online": self._device_online(),
         }
+
+        versions: dict[str, object] = {}
+        version_commands = (
+            (
+                "adb",
+                state.platform_tools,
+                [str(self.paths.adb), "version"],
+            ),
+            (
+                "emulator",
+                state.emulator,
+                [str(self.paths.emulator), "-version"],
+            ),
+            (
+                "aapt2",
+                state.build_tools,
+                [str(self.paths.aapt2), "version"],
+            ),
+        )
+        for name, available, command in version_commands:
+            if not available:
+                versions[name] = {
+                    "available": False,
+                    "version": "",
+                }
+                continue
+            try:
+                result = self._run(
+                    command,
+                    timeout=20.0,
+                    check=False,
+                )
+                text = (
+                    result.stdout
+                    or result.stderr
+                ).strip()
+                versions[name] = {
+                    "available": result.returncode == 0,
+                    "returncode": result.returncode,
+                    "version": (
+                        text.splitlines()[0]
+                        if text
+                        else ""
+                    ),
+                }
+            except Exception as exc:
+                versions[name] = {
+                    "available": False,
+                    "version": "",
+                    "error": str(exc),
+                }
+        data["versions"] = versions
+
         if state.emulator:
             try:
                 result = self._run(
@@ -266,15 +319,23 @@ class AndroidRuntime:
                     timeout=20.0,
                     check=False,
                 )
+                detail = (
+                    result.stdout
+                    or result.stderr
+                ).strip()
                 data["acceleration"] = {
+                    "available": result.returncode == 0,
                     "returncode": result.returncode,
+                    "detail": detail,
                     "stdout": result.stdout,
                     "stderr": result.stderr,
                 }
             except Exception as exc:
                 data["acceleration"] = {
-                    "error": str(exc)
+                    "available": False,
+                    "error": str(exc),
                 }
+
         if data["device_online"]:
             try:
                 uid = self._adb_shell(
