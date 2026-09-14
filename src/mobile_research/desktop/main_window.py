@@ -837,8 +837,27 @@ class MainWindow(QMainWindow):
     ) -> None:
         self._refresh_component_state()
         if data.get("device_online"):
+            transport = (
+                data.get("interactive_transport")
+                or {}
+            )
+            transport_name = (
+                transport.get("active")
+                if isinstance(transport, dict)
+                else ""
+            )
+            gpu_mode = (
+                transport.get("gpu_mode")
+                if isinstance(transport, dict)
+                else ""
+            )
+            suffix = ""
+            if transport_name:
+                suffix += f" • {transport_name}"
+            if gpu_mode:
+                suffix += f" • GPU {gpu_mode}"
             self.status_android.setText(
-                "● Android готов"
+                "● Android готов" + suffix
             )
             self.status_android.setStyleSheet(
                 "color: #238636;"

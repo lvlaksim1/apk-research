@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import queue
 import threading
 from pathlib import Path
 
@@ -54,6 +55,14 @@ class DesktopController(QObject):
             threading.Thread | None
         ) = None
         self._clean_launch = True
+        self._input_queue: queue.Queue[
+            tuple[str, tuple] | None
+        ] = queue.Queue()
+        self._input_thread = threading.Thread(
+            target=self._input_worker,
+            daemon=True,
+        )
+        self._input_thread.start()
         self._frame_lock = threading.Lock()
         self._latest_frame = None
         self._latest_frame_id = 0
@@ -147,8 +156,8 @@ class DesktopController(QObject):
         )
 
     def tap(self, x: int, y: int) -> None:
-        self._thread_quiet(
-            self.runtime.tap,
+        self._queue_input(
+            "tap",
             x,
             y,
         )
@@ -161,8 +170,8 @@ class DesktopController(QObject):
         y2: int,
         duration: int,
     ) -> None:
-        self._thread_quiet(
-            self.runtime.swipe,
+        self._queue_input(
+            "swipe",
             x1,
             y1,
             x2,
@@ -171,20 +180,21 @@ class DesktopController(QObject):
         )
 
     def keyevent(self, keycode: int) -> None:
-        self._thread_quiet(
-            self.runtime.keyevent,
+        self._queue_input(
+            "keyevent",
             keycode,
         )
 
     def text_input(self, value: str) -> None:
-        self._thread_quiet(
-            self.runtime.text,
+        self._queue_input(
+            "text",
             value,
         )
 
     def close(self) -> None:
         self._stop_research.set()
         self._stop_screen.set()
+        self._input_queue.put(None)
         self.runtime.stop()
 
     def _prepare_environment_worker(self) -> None:
@@ -538,8 +548,8 @@ class DesktopController(QObject):
         try:
             for frame in self.runtime.screen_frames(
                 self._stop_screen,
-                width=540,
-                height=960,
+                width=360,
+                height=640,
             ):
                 if self._stop_screen.is_set():
                     break
@@ -591,6 +601,30 @@ class DesktopController(QObject):
             daemon=True,
         )
         thread.start()
+
+    def _queue_input(
+        self,
+        method: str,
+        *args,
+    ) -> None:
+        self._input_queue.put(
+            (method, tuple(args))
+        )
+
+    def _input_worker(self) -> None:
+        while True:
+            item = self._input_queue.get()
+            if item is None:
+                return
+            method, args = item
+            try:
+                function = getattr(
+                    self.runtime,
+                    method,
+                )
+                function(*args)
+            except Exception:
+                pass
 
     def _thread_quiet(
         self,

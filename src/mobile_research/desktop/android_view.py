@@ -5,10 +5,37 @@ from PySide6.QtGui import (
     QImage,
     QKeyEvent,
     QMouseEvent,
-    QPixmap,
+    QPainter,
     QWheelEvent,
 )
 from PySide6.QtWidgets import QLabel
+
+
+def is_reverse_rotation(rotation: int) -> bool:
+    return int(rotation) in {2, 3}
+
+
+def map_display_ratio_to_input(
+    x_ratio: float,
+    y_ratio: float,
+    input_width: int,
+    input_height: int,
+    rotation: int,
+) -> tuple[int, int]:
+    x_ratio = min(1.0, max(0.0, x_ratio))
+    y_ratio = min(1.0, max(0.0, y_ratio))
+    if is_reverse_rotation(rotation):
+        x_ratio = 1.0 - x_ratio
+        y_ratio = 1.0 - y_ratio
+    x = min(
+        input_width - 1,
+        max(0, int(x_ratio * input_width)),
+    )
+    y = min(
+        input_height - 1,
+        max(0, int(y_ratio * input_height)),
+    )
+    return x, y
 
 
 class AndroidView(QLabel):
@@ -43,13 +70,16 @@ class AndroidView(QLabel):
         self.setFocusPolicy(
             Qt.FocusPolicy.StrongFocus
         )
-        self._source_pixmap: QPixmap | None = None
+        self._source_image: QImage | None = None
+        self._frame_owner = None
         self._display_rect = QRect()
         self._press_pos: QPoint | None = None
         self._source_width = 0
         self._source_height = 0
         self._input_width = 0
         self._input_height = 0
+        self._rotation = 0
+        self._bottom_up = False
 
     def set_frame(self, frame) -> None:
         encoding = getattr(
@@ -63,24 +93,39 @@ class AndroidView(QLabel):
             frame if isinstance(frame, bytes) else b"",
         )
 
-        if encoding == "rgb888":
+        if encoding in {"rgba8888", "rgb888"}:
             width = int(getattr(frame, "width", 0))
             height = int(getattr(frame, "height", 0))
+            bytes_per_pixel = (
+                4
+                if encoding == "rgba8888"
+                else 3
+            )
             if (
                 width <= 0
                 or height <= 0
-                or len(data) != width * height * 3
+                or len(data)
+                != width * height * bytes_per_pixel
             ):
                 return
+            image_format = (
+                QImage.Format.Format_RGBA8888
+                if encoding == "rgba8888"
+                else QImage.Format.Format_RGB888
+            )
             image = QImage(
                 data,
                 width,
                 height,
-                width * 3,
-                QImage.Format.Format_RGB888,
-            ).copy()
-            image = image.mirrored(False, True)
-            pixmap = QPixmap.fromImage(image)
+                width * bytes_per_pixel,
+                image_format,
+            )
+            self._frame_owner = frame
+            self._bottom_up = True
+            self._rotation = int(
+                getattr(frame, "rotation", 0)
+                or 0
+            )
             self._input_width = int(
                 getattr(frame, "input_width", width)
                 or width
@@ -90,23 +135,82 @@ class AndroidView(QLabel):
                 or height
             )
         else:
-            pixmap = QPixmap()
+            image = QImage()
             if (
                 not data
-                or not pixmap.loadFromData(data, "PNG")
+                or not image.loadFromData(
+                    data,
+                    "PNG",
+                )
             ):
                 return
-            self._input_width = pixmap.width()
-            self._input_height = pixmap.height()
+            self._frame_owner = frame
+            self._bottom_up = False
+            self._rotation = 0
+            self._input_width = image.width()
+            self._input_height = image.height()
 
-        self._source_pixmap = pixmap
-        self._source_width = pixmap.width()
-        self._source_height = pixmap.height()
-        self._render_pixmap()
+        self._source_image = image
+        self._source_width = image.width()
+        self._source_height = image.height()
+        self.setText("")
+        self._update_display_rect()
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        super().paintEvent(event)
+        image = self._source_image
+        if image is None:
+            return
+        self._update_display_rect()
+        target = self._display_rect
+        if (
+            target.width() <= 0
+            or target.height() <= 0
+        ):
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(
+            QPainter.RenderHint.SmoothPixmapTransform,
+            False,
+        )
+        painter.setClipRect(target)
+        painter.translate(
+            target.x(),
+            target.y(),
+        )
+        painter.scale(
+            target.width() / self._source_width,
+            target.height() / self._source_height,
+        )
+
+        if self._bottom_up:
+            if is_reverse_rotation(
+                self._rotation
+            ):
+                painter.translate(
+                    self._source_width,
+                    0,
+                )
+                painter.scale(-1.0, 1.0)
+            else:
+                painter.translate(
+                    0,
+                    self._source_height,
+                )
+                painter.scale(1.0, -1.0)
+
+        painter.drawImage(
+            0,
+            0,
+            image,
+        )
+        painter.end()
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
-        self._render_pixmap()
+        self._update_display_rect()
 
     def mousePressEvent(
         self,
@@ -178,7 +282,7 @@ class AndroidView(QLabel):
         )
         distance = max(
             180,
-            self._source_height // 4,
+            self._input_height // 4,
         )
         y2 = max(
             0,
@@ -226,33 +330,42 @@ class AndroidView(QLabel):
             return
         super().keyPressEvent(event)
 
-    def _render_pixmap(self) -> None:
-        pixmap = self._source_pixmap
-        if pixmap is None:
+    def _update_display_rect(self) -> None:
+        if (
+            self._source_width <= 0
+            or self._source_height <= 0
+        ):
+            self._display_rect = QRect()
             return
         available = self.contentsRect()
-        scaled = pixmap.scaled(
-            available.size(),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.FastTransformation,
+        scale = min(
+            available.width()
+            / self._source_width,
+            available.height()
+            / self._source_height,
+        )
+        width = max(
+            1,
+            int(self._source_width * scale),
+        )
+        height = max(
+            1,
+            int(self._source_height * scale),
         )
         x = (
             available.x()
-            + (available.width() - scaled.width())
-            // 2
+            + (available.width() - width) // 2
         )
         y = (
             available.y()
-            + (available.height() - scaled.height())
-            // 2
+            + (available.height() - height) // 2
         )
         self._display_rect = QRect(
             x,
             y,
-            scaled.width(),
-            scaled.height(),
+            width,
+            height,
         )
-        self.setPixmap(scaled)
 
     def _map_to_android(
         self,
@@ -270,18 +383,10 @@ class AndroidView(QLabel):
         y_ratio = (
             point.y() - self._display_rect.y()
         ) / self._display_rect.height()
-        x = min(
-            self._input_width - 1,
-            max(
-                0,
-                int(x_ratio * self._input_width),
-            ),
+        return map_display_ratio_to_input(
+            x_ratio,
+            y_ratio,
+            self._input_width,
+            self._input_height,
+            self._rotation,
         )
-        y = min(
-            self._source_height - 1,
-            max(
-                0,
-                int(y_ratio * self._input_height),
-            ),
-        )
-        return x, y

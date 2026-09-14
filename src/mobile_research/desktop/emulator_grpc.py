@@ -28,6 +28,7 @@ class LiveFrame:
     height: int
     input_width: int
     input_height: int
+    rotation: int = 0
     seq: int = 0
     timestamp_us: int = 0
     transport: str = "grpc"
@@ -60,9 +61,43 @@ def _build_messages():
         if type_name:
             field.type_name = type_name
 
+    rotation = file_proto.message_type.add()
+    rotation.name = "Rotation"
+    add_field(
+        rotation,
+        "rotation",
+        1,
+        descriptor_pb2.FieldDescriptorProto.TYPE_INT32,
+    )
+    add_field(
+        rotation,
+        "xAxis",
+        2,
+        descriptor_pb2.FieldDescriptorProto.TYPE_DOUBLE,
+    )
+    add_field(
+        rotation,
+        "yAxis",
+        3,
+        descriptor_pb2.FieldDescriptorProto.TYPE_DOUBLE,
+    )
+    add_field(
+        rotation,
+        "zAxis",
+        4,
+        descriptor_pb2.FieldDescriptorProto.TYPE_DOUBLE,
+    )
+
     image_format = file_proto.message_type.add()
     image_format.name = "ImageFormat"
     add_field(image_format, "format", 1, descriptor_pb2.FieldDescriptorProto.TYPE_INT32)
+    add_field(
+        image_format,
+        "rotation",
+        2,
+        descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,
+        type_name=".android.emulation.control.Rotation",
+    )
     add_field(image_format, "width", 3, descriptor_pb2.FieldDescriptorProto.TYPE_UINT32)
     add_field(image_format, "height", 4, descriptor_pb2.FieldDescriptorProto.TYPE_UINT32)
     add_field(image_format, "display", 5, descriptor_pb2.FieldDescriptorProto.TYPE_UINT32)
@@ -126,6 +161,7 @@ def _build_messages():
         return message_factory.GetMessageClass(descriptor)
 
     return (
+        message("Rotation"),
         message("ImageFormat"),
         message("Image"),
         message("Touch"),
@@ -134,13 +170,20 @@ def _build_messages():
     )
 
 
-ImageFormat, Image, Touch, TouchEvent, KeyboardEvent = _build_messages()
+(
+    Rotation,
+    ImageFormat,
+    Image,
+    Touch,
+    TouchEvent,
+    KeyboardEvent,
+) = _build_messages()
 
 
 class EmulatorGrpcClient:
     """Small local gRPC client for live Emulator video and input."""
 
-    RGB888 = 2
+    RGBA8888 = 1
     KEYPRESS = 2
 
     def __init__(
@@ -191,12 +234,12 @@ class EmulatorGrpcClient:
     def stream_frames(
         self,
         *,
-        width: int = 540,
-        height: int = 960,
+        width: int = 360,
+        height: int = 640,
         timeout: float | None = None,
     ) -> Iterator[LiveFrame]:
         request = ImageFormat(
-            format=self.RGB888,
+            format=self.RGBA8888,
             width=max(1, int(width)),
             height=max(1, int(height)),
             display=0,
@@ -216,7 +259,7 @@ class EmulatorGrpcClient:
                 if (
                     frame_width <= 0
                     or frame_height <= 0
-                    or len(data) != frame_width * frame_height * 3
+                    or len(data) != frame_width * frame_height * 4
                 ):
                     continue
 
@@ -227,13 +270,25 @@ class EmulatorGrpcClient:
                     input_width = self.device_height
                     input_height = self.device_width
 
+                rotation = int(
+                    getattr(
+                        getattr(
+                            reply.format,
+                            "rotation",
+                            None,
+                        ),
+                        "rotation",
+                        0,
+                    )
+                )
                 yield LiveFrame(
-                    encoding="rgb888",
+                    encoding="rgba8888",
                     data=data,
                     width=frame_width,
                     height=frame_height,
                     input_width=input_width,
                     input_height=input_height,
+                    rotation=rotation,
                     seq=int(reply.seq),
                     timestamp_us=int(reply.timestampUs),
                     transport="grpc",

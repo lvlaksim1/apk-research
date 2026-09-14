@@ -1,5 +1,9 @@
 # Mobile Research
 
+## Development — v0.3.1
+
+v0.3.1 исправляет обнаруженные на реальном Windows-ПК проблемы v0.3.0: reverse-orientation framebuffer теперь нормализуется, а embedded Android rendering переведён на более лёгкий 360×640 RGBA stream и прямой QPainter без цепочки QImage copy → mirror → QPixmap → scaled pixmap. Windows hardware path сначала использует GPU host с автоматическим fallback на GPU auto.
+
 ## v0.3.0 — Live Emulator Interaction
 
 Встроенный Android переведён с периодических ADB/PNG screenshots на постоянный локальный Android Emulator gRPC stream. Кадры передаются как RGB, GUI показывает только самый свежий кадр с частотой до ~30 fps, а touch/key input отправляется напрямую в Emulator. ADB сохраняется как fallback и как независимый research transport для collectors.

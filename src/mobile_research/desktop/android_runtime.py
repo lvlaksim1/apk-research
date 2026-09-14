@@ -74,7 +74,9 @@ class AndroidRuntime:
         self._grpc_lock = threading.Lock()
         self._grpc_client: EmulatorGrpcClient | None = None
         self._grpc_port: int | None = None
+        self._grpc_input_failures = 0
         self._software_acceleration = False
+        self._gpu_mode = "auto"
 
     @property
     def paths(self):
@@ -93,8 +95,25 @@ class AndroidRuntime:
         )
         self._check_acceleration(progress)
         if not self._device_online():
+            self._gpu_mode = self._preferred_gpu_mode()
             self._start_emulator(progress)
-        self._wait_for_boot(progress)
+            try:
+                self._wait_for_boot(progress)
+            except AndroidRuntimeError:
+                if self._gpu_mode != "host":
+                    raise
+                self.stop()
+                self._gpu_mode = "auto"
+                self._emit(
+                    progress,
+                    "GPU host недоступен, повтор с GPU auto",
+                    None,
+                    None,
+                )
+                self._start_emulator(progress)
+                self._wait_for_boot(progress)
+        else:
+            self._wait_for_boot(progress)
         self._ensure_root(progress)
         self._ensure_live_transport(progress)
 
@@ -201,8 +220,8 @@ class AndroidRuntime:
         self,
         stop_event: threading.Event,
         *,
-        width: int = 540,
-        height: int = 960,
+        width: int = 360,
+        height: int = 640,
     ):
         client = self._get_grpc_client()
         if client is not None:
@@ -239,7 +258,7 @@ class AndroidRuntime:
                 client.tap(x, y)
                 return
             except Exception:
-                self._drop_grpc_client()
+                self._grpc_input_failures += 1
         self._adb_shell(
             "input",
             "tap",
@@ -267,7 +286,7 @@ class AndroidRuntime:
                 )
                 return
             except Exception:
-                self._drop_grpc_client()
+                self._grpc_input_failures += 1
         self._adb_shell(
             "input",
             "swipe",
@@ -297,7 +316,7 @@ class AndroidRuntime:
                 client.send_key(key)
                 return
             except Exception:
-                self._drop_grpc_client()
+                self._grpc_input_failures += 1
         self._adb_shell(
             "input",
             "keyevent",
@@ -311,7 +330,7 @@ class AndroidRuntime:
                 client.send_text(value)
                 return
             except Exception:
-                self._drop_grpc_client()
+                self._grpc_input_failures += 1
         escaped = (
             value.replace("%", "%25")
             .replace(" ", "%s")
@@ -371,7 +390,8 @@ class AndroidRuntime:
                     else "adb-screencap"
                 ),
                 "grpc_port": self._grpc_port,
-                "gpu_mode": "auto",
+                "gpu_mode": self._gpu_mode,
+                "input_rpc_failures": self._grpc_input_failures,
             },
         }
 
@@ -542,11 +562,7 @@ class AndroidRuntime:
             str(self.PORT),
             "-no-window",
             "-gpu",
-            (
-                "swiftshader"
-                if self._software_acceleration
-                else "auto"
-            ),
+            self._gpu_mode,
             "-grpc",
             str(self._grpc_port or self._find_free_tcp_port()),
             "-no-snapshot",
@@ -916,6 +932,13 @@ class AndroidRuntime:
         ) as handle:
             handle.bind(("127.0.0.1", 0))
             return int(handle.getsockname()[1])
+
+    def _preferred_gpu_mode(self) -> str:
+        if self._software_acceleration:
+            return "swiftshader"
+        if self._is_windows():
+            return "host"
+        return "auto"
 
     def _device_online(self) -> bool:
         if not self.paths.adb.is_file():

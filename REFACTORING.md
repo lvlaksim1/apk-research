@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.3.0 — low-latency embedded Android interaction.  
+**Этап:** v0.3.1.dev0 — Windows embedded Android latency/orientation hardening.  
 **Stable baseline:** v0.3.0 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -198,3 +198,13 @@ WHPX остаётся предпочтительным Microsoft-backed Windows 
 
 ### ADR-051 — Clean launch является отдельным research mode
 Режим clean останавливает текущий экземпляр target package до preflight, затем запускает collectors и только после перехода capture в ACTIVE запускает APK. Режим continue сохраняет уже существующее состояние приложения. Выбранный режим фиксируется в session event log.
+
+
+### ADR-052 — Framebuffer orientation берётся из Emulator rotation metadata
+ImageFormat.rotation является частью официального Emulator gRPC protocol. Server уже поворачивает logical screenshot по coarse device orientation, но raw pixel buffer остаётся bottom-up. Для normal portrait/landscape GUI исправляет только bottom-up memory order; для reverse portrait/reverse landscape дополнительно нормализует 180° orientation и инвертирует touch coordinates в input space.
+
+### ADR-053 — GUI не материализует несколько полных копий каждого кадра
+v0.3.0 выполнял bytes → QImage.copy → mirrored image → QPixmap → scaled QPixmap на каждом кадре. v0.3.1 хранит owner объекта frame, создаёт QImage поверх его buffer без deep copy и выполняет bottom-up/reverse transform плюс scale непосредственно QPainter-ом. Live stream уменьшен до 360×640 RGBA, что соответствует фактическому размеру embedded view и снижает bandwidth/CPU.
+
+### ADR-054 — Windows GPU host с автоматическим fallback
+На hardware-accelerated Windows runtime сначала запускается Emulator с GPU host. Если Emulator не может загрузиться с host backend, runtime автоматически останавливает его и повторяет запуск с GPU auto. Software-emulation path сохраняет SwiftShader.

@@ -2,6 +2,21 @@
 
 All notable Mobile Research changes are recorded here.
 
+## Unreleased — 0.3.1.dev0
+
+### Fixed
+
+- Reverse portrait/landscape startup frames are normalized before display and touch coordinates are transformed consistently.
+- Corrected the Android input Y clamp to use input-space height rather than framebuffer height.
+- gRPC input failures no longer tear down the framebuffer stream and force the whole UI back to ADB screenshot polling.
+
+### Performance
+
+- Reduced the live stream target from 540×960 RGB to 360×640 RGBA, cutting transferred framebuffer volume substantially while closely matching the embedded view size.
+- Replaced per-frame QImage copy + mirror + QPixmap conversion + scaled-pixmap allocation with zero-copy QImage ownership and direct QPainter scaling/flip at paint time.
+- Replaced one new Python thread per input event with a single ordered input worker.
+- Windows hardware-accelerated Emulator now tries `-gpu host` first and automatically retries with `-gpu auto` if the host backend cannot boot.
+
 ## [0.3.0] - 2026-09-14
 
 ### Added

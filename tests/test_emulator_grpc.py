@@ -4,6 +4,7 @@ from mobile_research.desktop.emulator_grpc import (
     Image,
     ImageFormat,
     KeyboardEvent,
+    Rotation,
     Touch,
     TouchEvent,
 )
@@ -11,17 +12,21 @@ from mobile_research.desktop.emulator_grpc import (
 
 def test_minimal_emulator_proto_round_trip() -> None:
     request = ImageFormat(
-        format=2,
-        width=540,
-        height=960,
+        format=1,
+        width=360,
+        height=640,
         display=0,
+    )
+    request.rotation.CopyFrom(
+        Rotation(rotation=2)
     )
     restored = ImageFormat.FromString(
         request.SerializeToString()
     )
-    assert restored.format == 2
-    assert restored.width == 540
-    assert restored.height == 960
+    assert restored.format == 1
+    assert restored.width == 360
+    assert restored.height == 640
+    assert restored.rotation.rotation == 2
     assert restored.display == 0
 
     reply = Image(

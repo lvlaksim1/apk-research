@@ -308,3 +308,31 @@ def test_emulator_command_uses_auto_gpu_and_grpc(
     assert command[gpu_index + 1] == "auto"
     assert command[grpc_index + 1] == "8554"
     assert "swiftshader" not in command
+
+
+
+def test_windows_prefers_host_gpu(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    runtime = AndroidRuntime(manager)
+    runtime._software_acceleration = False
+    monkeypatch.setattr(
+        runtime,
+        "_is_windows",
+        lambda: True,
+    )
+    assert runtime._preferred_gpu_mode() == "host"
+
+
+def test_software_mode_keeps_swiftshader(
+    tmp_path,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    runtime = AndroidRuntime(manager)
+    runtime._software_acceleration = True
+    assert (
+        runtime._preferred_gpu_mode()
+        == "swiftshader"
+    )
