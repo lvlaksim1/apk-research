@@ -22,6 +22,7 @@ def test_minimal_emulator_proto_round_trip() -> None:
     assert restored.format == 2
     assert restored.width == 540
     assert restored.height == 960
+    assert restored.display == 0
 
     reply = Image(
         format=request,
