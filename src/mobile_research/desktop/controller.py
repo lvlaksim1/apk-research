@@ -194,6 +194,15 @@ class DesktopController(QObject):
             value,
         )
 
+    def set_native_display_attached(
+        self,
+        attached: bool,
+    ) -> None:
+        if attached:
+            self._stop_screen.set()
+            return
+        self._start_screen_stream()
+
     def close(self) -> None:
         self._stop_research.set()
         self._stop_screen.set()
@@ -206,7 +215,7 @@ class DesktopController(QObject):
             self.runtime.ensure_ready(
                 self._progress_callback
             )
-            self._start_screen_stream()
+            self._prepare_display_transport()
             self.environmentReady.emit(
                 self.runtime.diagnostics()
             )
@@ -532,6 +541,12 @@ class DesktopController(QObject):
             )
         finally:
             self._set_busy(False)
+
+    def _prepare_display_transport(self) -> None:
+        if self.runtime.native_display_supported:
+            self._stop_screen.set()
+            return
+        self._start_screen_stream()
 
     def _start_screen_stream(self) -> None:
         if (
