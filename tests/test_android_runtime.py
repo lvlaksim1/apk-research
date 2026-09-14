@@ -336,3 +336,46 @@ def test_software_mode_keeps_swiftshader(
         runtime._preferred_gpu_mode()
         == "swiftshader"
     )
+
+
+
+def test_windows_emulator_uses_qt_hidden_window(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+    runtime._grpc_port = 8554
+    runtime._software_acceleration = False
+    monkeypatch.setattr(
+        runtime,
+        "_is_windows",
+        lambda: True,
+    )
+
+    command = runtime._emulator_command()
+
+    assert "-qt-hide-window" in command
+    assert "-no-window" not in command
+    assert runtime._display_mode == "qt-hide-window"
+
+
+def test_non_windows_emulator_remains_headless(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+    runtime._grpc_port = 8554
+    monkeypatch.setattr(
+        runtime,
+        "_is_windows",
+        lambda: False,
+    )
+
+    command = runtime._emulator_command()
+
+    assert "-no-window" in command
+    assert "-qt-hide-window" not in command
