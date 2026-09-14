@@ -197,7 +197,49 @@ class AndroidRuntime:
             else b""
         )
 
+    def screen_frames(
+        self,
+        stop_event: threading.Event,
+        *,
+        width: int = 540,
+        height: int = 960,
+    ):
+        client = self._get_grpc_client()
+        if client is not None:
+            try:
+                for frame in client.stream_frames(
+                    width=width,
+                    height=height,
+                ):
+                    if stop_event.is_set():
+                        return
+                    yield frame
+                return
+            except Exception:
+                self._drop_grpc_client()
+
+        while not stop_event.is_set():
+            png = self.screenshot_png()
+            if png:
+                yield LiveFrame(
+                    encoding="png",
+                    data=png,
+                    width=0,
+                    height=0,
+                    input_width=0,
+                    input_height=0,
+                    transport="adb-screencap",
+                )
+            stop_event.wait(0.12)
+
     def tap(self, x: int, y: int) -> None:
+        client = self._get_grpc_client()
+        if client is not None:
+            try:
+                client.tap(x, y)
+                return
+            except Exception:
+                self._drop_grpc_client()
         self._adb_shell(
             "input",
             "tap",
@@ -213,6 +255,19 @@ class AndroidRuntime:
         y2: int,
         duration_ms: int = 250,
     ) -> None:
+        client = self._get_grpc_client()
+        if client is not None:
+            try:
+                client.swipe(
+                    x1,
+                    y1,
+                    x2,
+                    y2,
+                    duration_ms,
+                )
+                return
+            except Exception:
+                self._drop_grpc_client()
         self._adb_shell(
             "input",
             "swipe",
@@ -224,6 +279,25 @@ class AndroidRuntime:
         )
 
     def keyevent(self, keycode: int) -> None:
+        key_map = {
+            3: "GoHome",
+            4: "GoBack",
+            19: "ArrowUp",
+            20: "ArrowDown",
+            21: "ArrowLeft",
+            22: "ArrowRight",
+            61: "Tab",
+            66: "Enter",
+            67: "Backspace",
+        }
+        client = self._get_grpc_client()
+        key = key_map.get(int(keycode))
+        if client is not None and key:
+            try:
+                client.send_key(key)
+                return
+            except Exception:
+                self._drop_grpc_client()
         self._adb_shell(
             "input",
             "keyevent",
@@ -231,6 +305,13 @@ class AndroidRuntime:
         )
 
     def text(self, value: str) -> None:
+        client = self._get_grpc_client()
+        if client is not None:
+            try:
+                client.send_text(value)
+                return
+            except Exception:
+                self._drop_grpc_client()
         escaped = (
             value.replace("%", "%25")
             .replace(" ", "%s")
