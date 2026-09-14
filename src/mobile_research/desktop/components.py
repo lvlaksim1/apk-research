@@ -358,6 +358,19 @@ class ComponentManager:
             else:
                 child.unlink(missing_ok=True)
 
+    def remove_all(self) -> None:
+        """Remove every Mobile Research managed Android component.
+
+        Research sessions are stored outside this tree, so repairing the
+        Android runtime never deletes captured research data.
+        """
+
+        if self.paths.root.exists():
+            shutil.rmtree(
+                self.paths.root,
+                ignore_errors=False,
+            )
+
     def create_avd_profile(self) -> None:
         image = self.paths.system_image
         if not (image / "system.img").is_file():
