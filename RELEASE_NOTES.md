@@ -1,50 +1,46 @@
-# Mobile Research v0.2.1
+# Mobile Research v0.2.2
 
-Stable Windows desktop hardening release.
+Hotfix for Windows hypervisor compatibility discovered during real-user testing of v0.2.1.
 
-## Main fix from real application testing
+## Fixed
 
-Testing against `com.evrasia` exposed a failure before collectors started: a full `dumpsys package` call could stall until the host ADB timeout and abort the entire research session.
+On a Windows 10 machine with **AEHD 2.2 already installed and usable**, v0.2.1 incorrectly rejected Android Emulator because it required WHPX at runtime. It then attempted to enable two Windows features separately, producing two UAC prompts, and immediately rechecked acceleration before a reboot could activate the Windows hypervisor.
 
-v0.2.1 changes that behavior:
+v0.2.2 fixes that behavior:
 
-- Mobile Research best-effort waits for Package Manager main/background handlers before collecting package metadata.
-- The primary package dump is bounded with Android-side timeout semantics.
-- A second bounded Package Manager dump path is used as fallback.
-- If both full-dump methods fail, the failure is recorded as degraded metadata rather than destroying the research run.
-- Logcat, screen recording and raw PCAP are still allowed to start.
-- Such a session ends as `partial`, not falsely `complete`, while preserving all successfully captured evidence.
+- **WHPX remains the preferred Windows hypervisor.**
+- An already-installed and usable **AEHD/GVM is accepted as a compatible transition fallback** and no longer blocks Mobile Research.
+- A usable AEHD system does **not** trigger UAC and does **not** require an immediate reboot.
+- Automatic Windows hypervisor setup runs only when Android Emulator reports no usable hypervisor at all.
+- Windows setup now uses **one UAC prompt**, not two.
+- Mobile Research enables only `HypervisorPlatform`; it no longer enables unrelated `VirtualMachinePlatform`.
+- The setup also ensures `hypervisorlaunchtype=Auto`.
+- If Windows configuration genuinely requires a reboot, Mobile Research explicitly tells the user that a reboot is required, even when Windows itself does not show a restart prompt.
 
-This prevents the 1–2 KB failed Research ZIP observed in the real `com.evrasia` test from being the only surviving evidence when extended package metadata stalls.
+## Preserved from v0.2.1
 
-## Windows runtime hardening
+The real-application `com.evrasia` package-metadata fix remains in place:
 
-- Windows desktop runtime requires Windows Hypervisor Platform (WHPX) for the supported hardware-accelerated path.
-- Hypervisor diagnostics distinguish WHPX from AEHD/GVM, KVM and other providers.
-- Runtime acceptance can require the packaged/frozen installed executable, the exact installed executable path and a clean managed component root.
+- bounded Package Manager metadata collection;
+- fallback package dump path;
+- a failed full package dump degrades the session instead of destroying the entire research run;
+- logcat, screen recording and raw PCAP can continue;
+- degraded evidence resolves to `partial`, not falsely `complete`.
 
-## Exact-SHA Windows WHPX acceptance
+## Validation
 
-v0.2.1 adds a dedicated `Windows WHPX Acceptance` release gate for a hardware-capable Windows x64 runner.
+The development hotfix passed:
 
-The gate:
+- Windows CI;
+- unit tests including explicit AEHD/WHPX compatibility cases;
+- standalone EXE build;
+- standalone self-test;
+- GUI smoke-test;
+- Inno Setup build;
+- installed-application smoke-test;
+- clean Windows managed-Android provisioning.
 
-1. waits for the exact-SHA Desktop Build;
-2. downloads that exact `MobileResearchSetup.exe`;
-3. verifies its SHA-256;
-4. removes previous Mobile Research user state;
-5. installs the application as a normal user installation;
-6. launches acceptance through the installed frozen `MobileResearch.exe`;
-7. provisions the managed Android runtime from a clean component directory;
-8. requires WHPX from Android Emulator acceleration diagnostics;
-9. boots the private Android 15 / API 35 AVD;
-10. proves root ADB, tcpdump and framebuffer access;
-11. downloads the pinned Appium ApiDemos v6.0.17 APK and verifies its SHA-256;
-12. makes Mobile Research itself identify, install and launch `io.appium.android.apis`;
-13. records logcat, screen and raw PCAP;
-14. exports, verifies and semantically audits the Research ZIP.
-
-The stable release workflow requires this gate for the same release commit SHA in addition to Windows CI, Desktop Build and the real Ubuntu/KVM AVD Research Acceptance.
+The normal release commit is revalidated again by CI, Desktop Build and real Android/KVM acceptance before publication.
 
 ## Distribution
 
@@ -53,26 +49,4 @@ Release assets:
 - `MobileResearchSetup.exe`
 - `SHA256SUMS.txt`
 
-Python, Android Studio and a separately installed ADB are not user dependencies.
-
-## Runtime requirements
-
-- Windows desktop x64
-- hardware virtualization enabled
-- Windows Hypervisor Platform usable by Android Emulator
-- internet access during first Android provisioning
-- approximately 1.3 GB of Android component downloads on first setup
-
-## Evidence contract
-
-v0.2.1 preserves the existing RAW-first guarantees:
-
-- immutable raw evidence
-- device/package metadata
-- continuous logcat
-- chunked screen recording
-- mandatory raw PCAP for AVD-RESEARCH
-- complete / partial / failed session semantics
-- SHA-256 Research ZIP
-- post-export integrity verification
-- semantic lifecycle/timeline/evidence audit
+Normal use requires no separately installed Python, Android Studio or ADB.

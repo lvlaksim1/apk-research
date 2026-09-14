@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.2.2.dev0 — Windows hypervisor compatibility hardening.  
-**Stable baseline:** v0.2.1 Desktop Application.  
+**Этап:** v0.2.2 — Windows hypervisor compatibility hardening.  
+**Stable baseline:** v0.2.2 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.

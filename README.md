@@ -1,6 +1,6 @@
 # Mobile Research
 
-## v0.2.1 — Desktop Application
+## v0.2.2 — Desktop Application
 
 После стабильного v0.1.0 проект перешёл к полноценному Windows-приложению.
 Штатный пользовательский сценарий v0.2 не требует Python, PowerShell, Android Studio, отдельного ADB или ручного AVD.
@@ -10,9 +10,9 @@ Desktop Build собирает автономный MobileResearchSetup.exe. And
 
 Подробный desktop contract: docs/V0.2_DESKTOP.md.
 
-## Development after v0.2.1
+## v0.2.2 — Windows hypervisor compatibility hotfix
 
-Текущая development-линия — **0.2.2.dev0**. WHPX остаётся предпочтительным Windows hypervisor и обязательным hardware release-acceptance path, но пользовательский runtime снова принимает уже установленный и рабочий AEHD/GVM как совместимый fallback до завершения его официального переходного периода. Это разделяет две разные задачи: release должен доказать современный WHPX path, а приложение не должно ломать уже рабочий компьютер пользователя только из-за наличия поддерживаемого legacy hypervisor.
+В v0.2.2 исправлена регрессия v0.2.1: рабочий AEHD/GVM снова является допустимым пользовательским fallback, при этом WHPX остаётся предпочтительным и обязательным для dedicated Windows hardware acceptance. WHPX остаётся предпочтительным Windows hypervisor и обязательным hardware release-acceptance path, но пользовательский runtime снова принимает уже установленный и рабочий AEHD/GVM как совместимый fallback до завершения его официального переходного периода. Это разделяет две разные задачи: release должен доказать современный WHPX path, а приложение не должно ломать уже рабочий компьютер пользователя только из-за наличия поддерживаемого legacy hypervisor.
 
 При отсутствии любого usable hypervisor Mobile Research включает только Windows Hypervisor Platform одним UAC-запросом, выставляет `hypervisorlaunchtype=Auto` и явно сообщает о необходимости перезагрузки, если она требуется.
 
@@ -31,7 +31,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.2.1 — Desktop Application** — стабильный self-contained Windows release: GUI, managed Android runtime, автоматическая установка APK и встроенный Android без пользовательского Python/Android Studio/ADB.
+**v0.2.2 — Desktop Application** — стабильный self-contained Windows release: GUI, managed Android runtime, автоматическая установка APK и встроенный Android без пользовательского Python/Android Studio/ADB.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 
