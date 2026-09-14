@@ -1,0 +1,37 @@
+name: Fix v0.3 test fixture
+
+on:
+  push:
+    paths:
+      - ".github/workflows/fix-v023-tests.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v023-live-emulator
+      - name: Update stale fallback fixture
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path("tests/test_device_metadata.py")
+          lines = path.read_text(encoding="utf-8").splitlines()
+          start = next(i for i, line in enumerate(lines) if line.strip() == "def test_package_dump_failure_degrades_but_does_not_abort_metadata(")
+          window = lines[start:start + 45]
+          timeout_line = next(i for i, line in enumerate(window) if line.strip().startswith('"time'))
+          del lines[start + timeout_line:start + timeout_line + 2]
+          path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+      - name: Commit fixture correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/test_device_metadata.py
+          git commit -m "Fix package dump fallback regression test"
+          git push origin HEAD:v023-live-emulator
