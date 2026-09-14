@@ -4,9 +4,10 @@
 
 ## Текущее состояние
 
-**Этап:** v0.2.0.dev0 — Desktop Application.  
-**Stable baseline:** v0.1.0 Research Session Core.  
-**Реализуется:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, desktop build/release gates.  
+**Этап:** v0.2.0 — Desktop Application.  
+**Stable baseline:** v0.2.0 Desktop Application.  
+**Core evidence baseline:** v0.1.0 Research Session Core.  
+**Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
 
 ## Зафиксированные решения
@@ -162,3 +163,16 @@ Google Emulator запускается headless. Mobile Research получае�
 
 ### ADR-041 — Stable desktop release публикует installer
 Начиная с v0.2 основным release asset является `MobileResearchSetup.exe` + SHA-256. Stable publication требует exact-SHA Windows CI, real AVD acceptance и Desktop Build.
+
+
+### ADR-042 — Managed Android использует только stable repository channel
+Desktop provisioning выбирает Android SDK packages только из Google repository `channel-0`. Более новые beta/dev/canary revisions не имеют права автоматически попадать в пользовательский runtime. Это решение принято после того, как выбор не-stable Emulator привёл к отдельному crash на Windows.
+
+### ADR-043 — Windows hosted CI проверяет provisioning, а не неподдерживаемый software boot
+GitHub-hosted Windows runner без аппаратной виртуализации не является надёжным Android boot target. Windows gate обязан доказать download/checksum/extraction, executable versions и private AVD creation. Настоящий Android boot/root/tcpdump/Research ZIP остаётся обязательным real AVD gate на KVM. Пользовательский Windows runtime использует аппаратное ускорение/WHPX, а не `-accel off` как штатный fallback.
+
+### ADR-044 — GUI авария не должна бросать уже собранные evidence
+Если после старта research session GUI получает неожиданное исключение, controller best-effort вызывает штатный stop/export и публикует partial/failed Research ZIP. Если startup failure уже сформировал failed archive внутри orchestrator, GUI повторно его не экспортирует, а использует существующий архив.
+
+### ADR-045 — Managed Android можно полностью восстановить без ручного удаления файлов
+Настройки Mobile Research содержат repair action для удаления только managed Android SDK/Emulator/system image/AVD. Research sessions хранятся отдельно и не удаляются. Следующая подготовка заново скачивает официальные компоненты и проверяет checksums.

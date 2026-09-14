@@ -2,7 +2,7 @@
 
 All notable Mobile Research changes are recorded here.
 
-## [Unreleased] — v0.2 Desktop Application
+## [0.2.0] - 2026-09-14
 
 ### Added
 
@@ -18,6 +18,12 @@ All notable Mobile Research changes are recorded here.
 - GUI session history, Research ZIP verify/audit and diagnostics.
 - Desktop Build workflow producing `MobileResearchSetup.exe` plus SHA-256.
 - Stable release gate extended to exact-SHA CI + AVD acceptance + Desktop Build.
+- Stable-only Android repository selection (`channel-0`), preventing beta/dev/canary Emulator packages from entering the managed runtime.
+- Clean Windows Android provisioning acceptance: download, checksum verification, extraction, private AVD creation and executable/version checks.
+- User-visible first-run download progress in MiB and percent.
+- Runtime diagnostics for installed ADB, Emulator and aapt2 versions plus normalized acceleration availability.
+- GUI repair action that removes only managed Android components and preserves all research sessions.
+- Best-effort GUI recovery that stops active collectors and preserves partial/failed Research ZIP after runtime exceptions.
 
 ### Preserved
 

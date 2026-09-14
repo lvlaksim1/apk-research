@@ -1,6 +1,6 @@
 # Mobile Research
 
-## v0.2.0.dev0 — Desktop Application
+## v0.2.0 — Desktop Application
 
 После стабильного v0.1.0 проект перешёл к полноценному Windows-приложению.
 Штатный пользовательский сценарий v0.2 не требует Python, PowerShell, Android Studio, отдельного ADB или ручного AVD.
@@ -16,7 +16,9 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.1.0 — Research Session Core** — первый стабильный release baseline проекта.
+**v0.2.0 — Desktop Application** — стабильный self-contained Windows release: GUI, managed Android runtime, автоматическая установка APK и встроенный Android без пользовательского Python/Android Studio/ADB.
+
+**v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 
 Release gate включает Windows CI, реальный AVD-RESEARCH acceptance и semantic audit итогового Research ZIP. Перед release freeze получены два последовательных реальных `complete` результата на Android 15 / API 35.
 

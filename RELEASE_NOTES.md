@@ -1,59 +1,114 @@
-# Mobile Research v0.1.0
+# Mobile Research v0.2.0
 
-First stable **Research Session Core** release.
+First stable **Desktop Application** release.
 
-## What this release proves
+## What changed
 
-Mobile Research can execute the complete evidence pipeline against a real rooted Android Emulator:
+Mobile Research is now a self-contained Windows application rather than a command-line research core.
+
+Normal use does not require the user to install Python, Android Studio, ADB, SDK Manager or create an AVD manually.
+
+The primary workflow is:
 
 ```text
-target/package preflight
-→ metadata
-→ logcat + screen + raw PCAP
-→ package launch
-→ health checks
-→ STOP
-→ complete/partial state resolution
-→ SHA-256 Research ZIP
-→ semantic timeline/evidence audit
+install MobileResearchSetup.exe
+→ launch Mobile Research
+→ choose APK
+→ Mobile Research prepares Android automatically
+→ START RESEARCH
+→ interact with Android inside the application
+→ STOP / SAVE
+→ verified Research ZIP
 ```
 
-## Main capabilities
+## Managed Android runtime
 
-- ADB target discovery and metadata.
-- Atomic research-session state machine.
-- Full raw device/package metadata.
-- Continuous logcat capture.
-- Chunked Android screenrecord capture with Winscope-v2 absolute frame timing.
-- Raw tcpdump PCAP independent of MITM.
-- Preservation of partial evidence on collector failures.
-- Verified Research ZIP with full checksum coverage.
-- Semantic audit of collector state, lifecycle sequence, host/target clock skew, PCAP/logcat coverage and screen timing.
+Mobile Research owns a private Android environment under `%LOCALAPPDATA%\MobileResearch\components`.
 
-## Real acceptance evidence
+It automatically provisions:
 
-Before release freeze, two consecutive real AVD-RESEARCH runs completed successfully. The stricter second acceptance reported:
+- Android platform-tools / ADB
+- stable Android Emulator from Google repository `channel-0`
+- build-tools 35.0.0 / aapt2
+- Android 15 / API 35 AOSP default x86_64 system image
+- private `mobile_research_api35` AVD
 
-- session status: `complete`
-- validation issues: `0`
-- PCAP packets: `12`
-- logcat entries: `914`
-- screen frames: `139`
-- last screen frame → STOP gap: `0.536 s`
-- max host/target clock skew: `0.942 s`
+Downloads are checksum-verified before extraction. The GUI shows first-run download progress in MiB and percent.
 
-The release workflow also requires fresh Windows CI and real AVD acceptance success for the exact release commit before it creates the tag/release.
+Android Studio is not required.
+
+## Desktop experience
+
+- Native Qt Windows GUI.
+- APK selection and automatic package detection.
+- Automatic APK installation.
+- Headless Android rendered inside the Mobile Research window.
+- Mouse, wheel and keyboard input mapped to Android.
+- START / STOP research controls.
+- Research ZIP history, integrity verification and semantic audit.
+- Diagnostics showing ADB, Emulator and aapt2 versions, acceleration state, root and tcpdump readiness.
+- One-click Android userdata reset.
+- One-click managed Android component repair without deleting research data.
+
+## Evidence guarantees preserved from v0.1.0
+
+v0.2.0 does not weaken the research core:
+
+- immutable raw evidence
+- device/package metadata
+- continuous logcat
+- chunked screen recording
+- mandatory raw PCAP for AVD-RESEARCH
+- complete / partial / failed session semantics
+- SHA-256 Research ZIP
+- post-export integrity verification
+- semantic lifecycle/timeline/evidence audit
+
+If an active GUI research run encounters an unexpected runtime error, Mobile Research makes a best-effort attempt to stop active collectors and preserve a partial/failed Research ZIP instead of abandoning captured evidence.
+
+## Release validation
+
+The exact release commit must pass all of the following before publication:
+
+- Windows CI
+- Desktop Build
+  - unit tests with desktop dependencies
+  - live Google Android catalog resolution
+  - standalone EXE build
+  - standalone self-test
+  - GUI smoke-test
+  - Inno Setup build
+  - installed-application self-test and GUI smoke-test
+  - clean Windows managed-Android provisioning acceptance
+- Real AVD Research Acceptance on Ubuntu/KVM
+  - Android boot
+  - root ADB
+  - tcpdump/raw PCAP
+  - logcat
+  - screen recording
+  - Research ZIP export and audit
+
+The release workflow publishes only artifacts produced by the successful Desktop Build for the same commit SHA.
 
 ## Distribution
 
 Release assets:
 
-- Python wheel
-- source distribution (sdist)
+- `MobileResearchSetup.exe`
 - `SHA256SUMS.txt`
 
-Python requirement: **3.11+**. ADB is an external runtime dependency.
+Python is bundled into the application and is not a user dependency.
+
+## Runtime requirements
+
+- Windows desktop
+- hardware virtualization enabled
+- Windows Hypervisor Platform usable by Android Emulator
+- internet access on first provisioning of Android components
+- approximately 1.3 GB of Android component downloads on first setup
+
+Mobile Research can best-effort enable required Windows virtualization features. A Windows reboot or BIOS/UEFI virtualization change can still be required by the operating system/hardware.
 
 ## Scope boundaries
 
-v0.1.0 intentionally does not include GUI, MITM/TLS decryption, AVD-PLAY acceptance, Physical Device acceptance, static APK analysis, Android Research Agent, runtime instrumentation or automatic protocol interpretation.
+v0.2.0 does not yet release-accept AVD-PLAY or Physical Device backends. MITM/TLS decryption, static APK analysis, protocol decoding and an Android Research Agent remain future work.
