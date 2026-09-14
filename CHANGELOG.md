@@ -2,6 +2,21 @@
 
 All notable Mobile Research changes are recorded here.
 
+## Unreleased — 0.4.0.dev0
+
+### Changed
+
+- Embedded Android framebuffer now uses Emulator gRPC MMAP/shared-memory transport first, with byte-stream gRPC as compatibility fallback.
+- GUI presentation cadence increased to a precise ~60 Hz instead of 30 Hz.
+- Touch/key input uses one persistent `streamInputEvent` gRPC stream instead of a unary RPC per event when supported.
+- Hardware-accelerated Windows Emulator uses the Android-Studio-style `-qt-hide-window` mode rather than `-no-window`.
+
+### Fixed
+
+- Removed the incorrect second rotation transform: Emulator screenshots are already logically rotated by the server; only the documented bottom-up raw-memory correction is applied.
+- Android boot is normalized to portrait with WindowManager/user rotation lock before the embedded display is shown.
+
+
 ## [0.3.1] - 2026-09-14
 
 ### Fixed
