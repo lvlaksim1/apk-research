@@ -12,7 +12,7 @@ All notable Mobile Research changes are recorded here.
 ### CI / Acceptance
 
 - Added a dedicated Windows WHPX end-to-end gate for a hardware-capable self-hosted Windows x64 runner.
-- The gate downloads the exact-SHA `Desktop Build` installer, performs a clean per-user installation, provisions Android through the installed `MobileResearch.exe`, boots the private AVD with WHPX, validates root/tcpdump/framebuffer, records a real research session, and verifies plus semantically audits the resulting Research ZIP.
+- The gate downloads the exact-SHA `Desktop Build` installer, performs a clean per-user installation, provisions Android through the installed `MobileResearch.exe`, boots the private AVD with WHPX, validates root/tcpdump/framebuffer, downloads the pinned Appium ApiDemos v6.0.17 fixture with SHA-256 verification, makes Mobile Research detect/install/launch that APK, records a real research session, and verifies plus semantically audits the resulting Research ZIP.
 - Future stable releases must pass `Windows WHPX Acceptance` for the exact release SHA in addition to CI, Linux/KVM AVD acceptance and Desktop Build.
 
 ## [0.2.0] - 2026-09-14

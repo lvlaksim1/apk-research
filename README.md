@@ -12,7 +12,7 @@ Desktop Build собирает автономный MobileResearchSetup.exe. And
 
 ## Development after v0.2.0
 
-Текущая development-линия — **0.2.1.dev0**. Для следующего stable release добавлен обязательный hardware gate `Windows WHPX Acceptance`: он использует именно собранный `MobileResearchSetup.exe` того же commit SHA, устанавливает приложение на выделенный Windows x64 runner, начинает с чистого `%LOCALAPPDATA%\MobileResearch`, требует реальный WHPX, загружает managed Android и завершает полноценную research-сессию с проверкой и semantic audit Research ZIP.
+Текущая development-линия — **0.2.1.dev0**. Для следующего stable release добавлен обязательный hardware gate `Windows WHPX Acceptance`: он использует именно собранный `MobileResearchSetup.exe` того же commit SHA, устанавливает приложение на выделенный Windows x64 runner, начинает с чистого `%LOCALAPPDATA%\MobileResearch`, требует реальный WHPX, загружает managed Android, через установленный EXE определяет package и устанавливает фиксированный проверяемый APK Appium ApiDemos, запускает его и завершает полноценную research-сессию с проверкой и semantic audit Research ZIP.
 
 Обычный GitHub-hosted `windows-latest` сохраняется для build/provisioning checks, но больше не считается доказательством реального Windows/WHPX boot.
 

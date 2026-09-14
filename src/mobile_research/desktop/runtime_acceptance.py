@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -63,6 +64,17 @@ def run_runtime_acceptance() -> int:
     archive = root / "windows-runtime.research.zip"
     screenshot = root / "android.png"
     log_path = root / "acceptance.log"
+    acceptance_apk_value = os.environ.get(
+        "MOBILE_RESEARCH_ACCEPTANCE_APK"
+    )
+    acceptance_apk = (
+        Path(acceptance_apk_value).expanduser().resolve()
+        if acceptance_apk_value
+        else None
+    )
+    expected_package = os.environ.get(
+        "MOBILE_RESEARCH_ACCEPTANCE_EXPECT_PACKAGE"
+    )
 
     root.mkdir(parents=True, exist_ok=True)
     sessions_root.mkdir(parents=True, exist_ok=True)
@@ -226,6 +238,40 @@ def run_runtime_acceptance() -> int:
 
         client = AdbClient(runtime.paths.adb)
         package = "com.android.settings"
+
+        if acceptance_apk is not None:
+            if not acceptance_apk.is_file():
+                raise RuntimeError(
+                    "Acceptance APK was not found: "
+                    f"{acceptance_apk}"
+                )
+            digest = hashlib.sha256(
+                acceptance_apk.read_bytes()
+            ).hexdigest()
+            package = runtime.install_apk(
+                acceptance_apk,
+                progress,
+            )
+            payload["acceptance_apk"] = {
+                "path": str(acceptance_apk),
+                "size": acceptance_apk.stat().st_size,
+                "sha256": digest,
+                "package": package,
+                "expected_package": expected_package or "",
+            }
+            if (
+                expected_package
+                and package != expected_package
+            ):
+                raise RuntimeError(
+                    "Acceptance APK package mismatch: "
+                    f"expected {expected_package}, got {package}"
+                )
+            log(
+                "Acceptance APK installed: "
+                f"{package} sha256={digest}"
+            )
+
         if not client.is_package_installed(
             runtime.SERIAL,
             package,
