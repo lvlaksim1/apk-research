@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mobile_research.desktop.android_view import (
+from mobile_research.desktop.emulator_grpc import (
     is_reverse_rotation,
     map_display_ratio_to_input,
 )
