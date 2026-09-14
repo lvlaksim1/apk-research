@@ -34,6 +34,7 @@ class FakeDetails:
 class FakeAdb:
     def __init__(self) -> None:
         self.launched: list[tuple[str, str]] = []
+        self.force_stopped: list[tuple[str, str]] = []
 
     def get_target_details(self, serial: str) -> FakeDetails:
         assert serial == "emulator-5554"
@@ -48,6 +49,15 @@ class FakeAdb:
 
     def get_utc_time(self, serial: str) -> str:
         return "2026-09-13T19:00:00Z"
+
+    def force_stop_package(
+        self,
+        serial: str,
+        package_name: str,
+    ) -> None:
+        self.force_stopped.append(
+            (serial, package_name)
+        )
 
     def launch_package(
         self,
@@ -323,3 +333,47 @@ def test_start_failure_creates_failed_research_zip(
     assert error.value.archive is not None
     verification = verify_research_zip(error.value.archive)
     assert verification.session_status == "failed"
+
+
+
+def test_clean_launch_force_stops_before_launch(
+    tmp_path: Path,
+) -> None:
+    adb = FakeAdb()
+
+    def metadata_factory(a, s):
+        assert adb.force_stopped == [
+            ("emulator-5554", "com.example.app")
+        ]
+        return FakeMetadata(a, s)
+
+    orchestrator = ResearchOrchestrator(
+        adb,  # type: ignore[arg-type]
+        "emulator-5554",
+        "com.example.app",
+        runtime_root=tmp_path / "sessions-clean",
+        output_path=tmp_path / "clean.research.zip",
+        launch_mode="clean",
+        metadata_factory=metadata_factory,
+        logcat_factory=lambda a, s: FakeContinuous(
+            "logcat",
+            s,
+        ),
+        screen_factory=lambda a, s, c: FakeContinuous(
+            "screen_recording",
+            s,
+        ),
+        network_factory=lambda a, s: FakeNetwork(
+            "raw_network",
+            s,
+        ),
+    )
+
+    orchestrator.start()
+
+    assert adb.force_stopped == [
+        ("emulator-5554", "com.example.app")
+    ]
+    assert adb.launched == [
+        ("emulator-5554", "com.example.app")
+    ]
