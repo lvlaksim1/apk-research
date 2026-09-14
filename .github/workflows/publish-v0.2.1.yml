@@ -1,0 +1,83 @@
+name: Publish v0.2.1
+
+on:
+  push:
+    paths:
+      - ".github/workflows/publish-v0.2.1.yml"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_SHA: df4f2dc8af8c25256f687cb4ba46280650454cb6
+      DESKTOP_RUN_ID: "34856221068"
+      RELEASE_TAG: v0.2.1
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify exact tested Desktop Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_JSON="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$DESKTOP_RUN_ID")"
+          HEAD_SHA="$(jq -r '.head_sha' <<<"$RUN_JSON")"
+          STATUS="$(jq -r '.status' <<<"$RUN_JSON")"
+          CONCLUSION="$(jq -r '.conclusion' <<<"$RUN_JSON")"
+          WORKFLOW_NAME="$(jq -r '.name' <<<"$RUN_JSON")"
+
+          test "$WORKFLOW_NAME" = "Desktop Build"
+          test "$HEAD_SHA" = "$RELEASE_SHA"
+          test "$STATUS" = "completed"
+          test "$CONCLUSION" = "success"
+
+      - name: Verify CI and real AVD acceptance for release SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUNS="$(gh run list --commit "$RELEASE_SHA" --limit 30 --json workflowName,status,conclusion,headSha)"
+          for NAME in "CI" "AVD Research Acceptance" "Desktop Build"; do
+            STATE="$(jq -r --arg name "$NAME" '[.[] | select(.workflowName == $name and .headSha == env.RELEASE_SHA)][0] | if . == null then "missing" else (.status + ":" + (.conclusion // "")) end' <<<"$RUNS")"
+            echo "$NAME=$STATE"
+            test "$STATE" = "completed:success"
+          done
+
+      - name: Download tested installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          gh run download "$DESKTOP_RUN_ID" -n mobile-research-windows-desktop -D release-assets
+          test -f release-assets/MobileResearchSetup.exe
+          test -f release-assets/SHA256SUMS.txt
+
+      - name: Verify installer checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-assets
+          sha256sum -c SHA256SUMS.txt
+
+      - name: Build release notes from exact release commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/contents/RELEASE_NOTES.md?ref=$RELEASE_SHA" --jq '.content' | base64 -d > release-notes.md
+          grep -F "# Mobile Research v0.2.1" release-notes.md
+
+      - name: Publish GitHub Release v0.2.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release already exists: $RELEASE_TAG"
+            exit 0
+          fi
+
+          gh release create "$RELEASE_TAG"             release-assets/MobileResearchSetup.exe             release-assets/SHA256SUMS.txt             --target "$RELEASE_SHA"             --title "Mobile Research v0.2.1"             --notes-file release-notes.md             --latest
