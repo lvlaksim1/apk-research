@@ -1,57 +1,24 @@
-# Mobile Research v0.5.2
+# Mobile Research v0.6.0
 
-This hotfix corrects the blank Android panel found during the real-PC test of v0.5.1.
+v0.6.0 introduces a fundamentally different native-display path for Windows.
 
-## Root cause
+The Emulator is now launched as a normal visible standalone Qt/GPU window. Mobile Research starts locating that real top-level window immediately after process creation and embeds it into the Android panel. The hidden Qt HWND created by `-qt-hide-window` is no longer treated as a native video surface.
 
-v0.5.0/v0.5.1 treated the hidden Qt window created by Android Emulator `-qt-hide-window` as if it were a normal standalone video HWND that could be embedded with Win32 `SetParent`.
+A native attach is accepted only after Win32 parent, client-area and visibility checks. The existing gRPC/MMAP framebuffer stays available until attach is confirmed, and remains the automatic fallback.
 
-That assumption was wrong.
+Windows startup order is:
 
-`-qt-hide-window` is the Android Studio embedded-emulator launch mode. The hidden Qt window is not a supported native video surface for third-party HWND reparenting. Mobile Research could therefore find an HWND, call `SetParent`, and report a successful native attach while no Android pixels were visible.
+1. standalone native + GPU host;
+2. standalone native + GPU auto;
+3. hidden gRPC/MMAP + GPU host;
+4. hidden gRPC/MMAP + GPU auto;
+5. headless SwiftShader.
 
-## Stable Windows display path
+The framebuffer fallback also restores reverse-rotation normalization for rotation 2/3, fixing the upside-down first frame observed in v0.5.2 and keeping touch coordinates aligned.
 
-v0.5.2 uses the supported embedded architecture:
-
-`Android Emulator → -qt-hide-window → gRPC/MMAP framebuffer → Mobile Research AndroidView`
-
-The existing low-latency framebuffer implementation is again the stable Windows display path.
-
-Input continues through the persistent Emulator gRPC input stream, with ADB fallback.
-
-## Startup fallback
-
-On hardware-accelerated Windows the managed runtime now tries:
-
-1. host GPU + embedded gRPC/MMAP;
-2. GPU auto + embedded gRPC/MMAP;
-3. SwiftShader + headless framebuffer compatibility mode.
-
-The Android research core remains independent of display transport.
-
-## Native HWND
-
-The Win32 native-HWND experiment is disabled in stable runtime behavior. It is not used merely because an Emulator Qt HWND exists, so it can no longer suppress the working framebuffer stream or produce a false successful attach.
-
-## Research evidence
-
-No evidence collector changed:
-
-- ADB target management;
-- root;
-- logcat;
-- screen recording;
-- raw PCAP/tcpdump;
-- package metadata;
-- Research ZIP;
-- semantic audit.
-
-## Distribution
+The research core is unchanged: ADB, root, logcat, screen recording, raw PCAP/tcpdump, package metadata, Research ZIP and semantic audit remain independent from display transport.
 
 Release assets:
 
 - `MobileResearchSetup.exe`
 - `SHA256SUMS.txt`
-
-No separately installed Python, Android Studio or ADB is required.

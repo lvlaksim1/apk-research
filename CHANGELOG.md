@@ -2,6 +2,21 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.6.0] - 2026-09-15
+
+### Native display
+
+- Primary Windows mode now launches the real visible standalone Android Emulator Qt/GPU window and embeds that top-level HWND instead of trying to reuse a hidden `-qt-hide-window` HWND.
+- Window discovery begins immediately after Emulator process creation, while Android is still booting.
+- Native attach verifies Win32 `SetParent`, actual parent HWND, non-empty client area and visibility before success.
+- Framebuffer remains available until native attach is confirmed; failed native attach automatically continues through gRPC/MMAP.
+- Windows fallback order: standalone/native host → standalone/native auto → hidden gRPC/MMAP host → hidden gRPC/MMAP auto → headless SwiftShader.
+
+### Orientation
+
+- Reverse framebuffer rotation normalization is restored for rotation 2/3, including matching touch-coordinate transformation.
+- Fixes the upside-down first framebuffer frame reproduced on the real Windows test of v0.5.2.
+
 ## [0.5.2] - 2026-09-14
 
 ### Fixed

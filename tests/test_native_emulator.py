@@ -37,6 +37,7 @@ def test_native_emulator_window_can_be_found_and_reparented() -> None:
     found = find_emulator_window(
         os.getpid(),
         "AVD_RESEARCH",
+        require_visible=True,
     )
     assert found is not None
     hwnd, details = found
@@ -55,4 +56,30 @@ def test_native_emulator_window_can_be_found_and_reparented() -> None:
     embedder.detach()
     fake_emulator.close()
     host.close()
+    app.processEvents()
+
+
+
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="Win32 HWND embedding is Windows-only",
+)
+def test_hidden_qt_window_is_not_a_native_candidate() -> None:
+    app = QApplication.instance() or QApplication([])
+    fake_emulator = QWidget()
+    fake_emulator.setWindowTitle(
+        "Android Emulator - AVD_RESEARCH:5554"
+    )
+    fake_emulator.resize(420, 760)
+    fake_emulator.show()
+    app.processEvents()
+    fake_emulator.hide()
+    app.processEvents()
+    found = find_emulator_window(
+        os.getpid(),
+        "AVD_RESEARCH",
+        require_visible=True,
+    )
+    assert found is None
+    fake_emulator.close()
     app.processEvents()

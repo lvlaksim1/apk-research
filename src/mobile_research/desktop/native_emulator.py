@@ -40,6 +40,7 @@ if WINDOWS:
     SWP_NOZORDER = 0x0004
     SWP_NOACTIVATE = 0x0010
     SWP_FRAMECHANGED = 0x0020
+    SWP_SHOWWINDOW = 0x0040
 
     class PROCESSENTRY32W(ctypes.Structure):
         _fields_ = [
@@ -115,6 +116,11 @@ if WINDOWS:
         ctypes.POINTER(RECT),
     ]
     user32.GetWindowRect.restype = wintypes.BOOL
+    user32.GetClientRect.argtypes = [
+        wintypes.HWND,
+        ctypes.POINTER(RECT),
+    ]
+    user32.GetClientRect.restype = wintypes.BOOL
     user32.IsWindow.argtypes = [wintypes.HWND]
     user32.IsWindow.restype = wintypes.BOOL
     user32.IsWindowVisible.argtypes = [wintypes.HWND]
@@ -140,6 +146,16 @@ if WINDOWS:
         wintypes.BOOL,
     ]
     user32.MoveWindow.restype = wintypes.BOOL
+    user32.SetWindowPos.argtypes = [
+        wintypes.HWND,
+        wintypes.HWND,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        wintypes.UINT,
+    ]
+    user32.SetWindowPos.restype = wintypes.BOOL
     user32.SetFocus.argtypes = [wintypes.HWND]
     user32.SetFocus.restype = wintypes.HWND
 
@@ -273,6 +289,8 @@ def _window_area(hwnd: int) -> int:
 def find_emulator_window(
     root_pid: int,
     avd_name: str,
+    *,
+    require_visible: bool = False,
 ) -> tuple[int, dict] | None:
     if not WINDOWS:
         return None
@@ -311,6 +329,12 @@ def find_emulator_window(
         if not pid_match and not title_match:
             return True
 
+        visible = bool(
+            user32.IsWindowVisible(hwnd)
+        )
+        if require_visible and not visible:
+            return True
+
         area = _window_area(hwnd)
         if area <= 0:
             return True
@@ -338,9 +362,7 @@ def find_emulator_window(
                     "pid": window_pid,
                     "title": title,
                     "class_name": class_name,
-                    "visible_before_attach": bool(
-                        user32.IsWindowVisible(hwnd)
-                    ),
+                    "visible_before_attach": visible,
                     "area": area,
                 },
             )
@@ -463,6 +485,7 @@ class NativeEmulatorEmbedder(QObject):
         found = find_emulator_window(
             self._root_pid,
             self._avd_name,
+            require_visible=True,
         )
         if found is not None:
             hwnd, details = found
@@ -470,13 +493,21 @@ class NativeEmulatorEmbedder(QObject):
                 self._embed(hwnd)
             except Exception as exc:
                 self._timer.stop()
+                try:
+                    if self.active:
+                        self.detach(restore=True)
+                    elif user32.IsWindow(hwnd):
+                        user32.ShowWindow(hwnd, SW_HIDE)
+                except Exception:
+                    pass
                 self.failed.emit(
-                    "Не удалось встроить нативное окно "
+                    "Не удалось встроить настоящее окно "
                     "Android Emulator: "
                     + (
                         str(exc)
                         or exc.__class__.__name__
                     )
+                    + "; используется framebuffer fallback"
                 )
                 return
             details = {
@@ -490,9 +521,20 @@ class NativeEmulatorEmbedder(QObject):
 
         if time.monotonic() >= self._deadline:
             self._timer.stop()
+            candidate = find_emulator_window(
+                self._root_pid,
+                self._avd_name,
+                require_visible=False,
+            )
+            if candidate is not None:
+                try:
+                    hwnd, _details = candidate
+                    user32.ShowWindow(hwnd, SW_HIDE)
+                except Exception:
+                    pass
             self.failed.emit(
-                "Нативное окно Android Emulator не найдено; "
-                "используется framebuffer fallback"
+                "Настоящее standalone-окно Android Emulator "
+                "не найдено; используется framebuffer fallback"
             )
 
     def _embed(self, hwnd: int) -> None:
@@ -518,7 +560,29 @@ class NativeEmulatorEmbedder(QObject):
             )
         )
 
+        if not user32.IsWindowVisible(hwnd):
+            raise RuntimeError(
+                "Emulator window is not a visible standalone window"
+            )
+
         user32.ShowWindow(hwnd, SW_HIDE)
+
+        ctypes.set_last_error(0)
+        previous_parent = user32.SetParent(
+            hwnd,
+            parent_hwnd,
+        )
+        parent_error = ctypes.get_last_error()
+        if (
+            not previous_parent
+            and parent_error
+        ):
+            raise OSError(
+                parent_error,
+                "SetParent failed",
+            )
+
+        self.hwnd = int(hwnd)
 
         style = self._old_style
         style &= ~(
@@ -550,15 +614,48 @@ class NativeEmulatorEmbedder(QObject):
             GWL_EXSTYLE,
             exstyle,
         )
-        user32.SetParent(
-            hwnd,
-            parent_hwnd,
-        )
 
-        self.hwnd = int(hwnd)
-        self.resize_embedded()
-        user32.ShowWindow(
+        rect = self.host.contentsRect()
+        if not user32.SetWindowPos(
             hwnd,
-            SW_SHOW,
+            0,
+            0,
+            0,
+            max(1, rect.width()),
+            max(1, rect.height()),
+            SWP_NOZORDER
+            | SWP_NOACTIVATE
+            | SWP_FRAMECHANGED
+            | SWP_SHOWWINDOW,
+        ):
+            raise RuntimeError(
+                "SetWindowPos failed after SetParent"
+            )
+
+        actual_parent = int(
+            user32.GetParent(hwnd) or 0
         )
+        if actual_parent != parent_hwnd:
+            raise RuntimeError(
+                "Emulator window parent verification failed"
+            )
+
+        client_rect = RECT()
+        if (
+            not user32.GetClientRect(
+                hwnd,
+                ctypes.byref(client_rect),
+            )
+            or client_rect.right <= client_rect.left
+            or client_rect.bottom <= client_rect.top
+        ):
+            raise RuntimeError(
+                "Embedded Emulator client area is empty"
+            )
+
+        if not user32.IsWindowVisible(hwnd):
+            raise RuntimeError(
+                "Embedded Emulator window is not visible"
+            )
+
         self.focus_embedded()

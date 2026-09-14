@@ -340,7 +340,7 @@ def test_software_mode_keeps_swiftshader(
 
 
 
-def test_windows_emulator_uses_qt_hidden_window(
+def test_windows_grpc_embedded_uses_qt_hidden_window(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -364,6 +364,32 @@ def test_windows_emulator_uses_qt_hidden_window(
     crash_index = command.index("-crash-report-mode")
     assert command[crash_index + 1] == "disabled"
     assert runtime._display_mode == "grpc-embedded"
+
+
+def test_windows_standalone_native_has_real_window(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+    runtime._grpc_port = 8554
+    runtime._software_acceleration = False
+    runtime._display_mode = "standalone-native"
+    runtime._gpu_mode = "host"
+    monkeypatch.setattr(
+        runtime,
+        "_is_windows",
+        lambda: True,
+    )
+
+    command = runtime._emulator_command()
+
+    assert "-qt-hide-window" not in command
+    assert "-no-window" not in command
+    assert runtime.native_display_supported is True
+    gpu_index = command.index("-gpu")
+    assert command[gpu_index + 1] == "host"
 
 
 def test_non_windows_emulator_remains_headless(
@@ -459,7 +485,7 @@ def test_windows_boot_falls_back_across_embedded_gpu_modes(
         ]
 
     def fake_wait(progress):
-        if len(attempts) < 3:
+        if len(attempts) < 5:
             raise AndroidRuntimeError(
                 "synthetic graphics startup failure"
             )
@@ -483,6 +509,8 @@ def test_windows_boot_falls_back_across_embedded_gpu_modes(
     runtime._boot_managed_emulator(None)
 
     assert attempts == [
+        ("host", "standalone-native"),
+        ("auto", "standalone-native"),
         ("host", "grpc-embedded"),
         ("auto", "grpc-embedded"),
         ("swiftshader", "headless"),
@@ -491,6 +519,8 @@ def test_windows_boot_falls_back_across_embedded_gpu_modes(
         item["status"]
         for item in runtime._startup_attempts
     ] == [
+        "failed",
+        "failed",
         "failed",
         "failed",
         "completed",

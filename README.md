@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.6.0 — Real standalone Emulator HWND
+
+Основной Windows display path теперь использует настоящее видимое standalone Qt/GPU-окно Android Emulator и встраивает именно его top-level HWND. `-qt-hide-window` больше не используется как источник native HWND. gRPC/MMAP framebuffer остаётся страховкой до подтверждённого native attach и автоматическим fallback. Также восстановлена коррекция reverse rotation, исправляющая перевёрнутый первый framebuffer-кадр.
+
 ## v0.5.2 — Reliable embedded Android display
 
 Реальный тест v0.5.1 выявил ложный native attach: скрытый Qt HWND, созданный `-qt-hide-window`, успешно переподчинялся через Win32, но не являлся пригодной видеоповерхностью, поэтому GUI показывал пустой Android-контейнер. В v0.5.2 stable Windows path исправлен: `-qt-hide-window` используется только как штатный embedded-режим Emulator, а изображение передаётся через gRPC/MMAP framebuffer. Native HWND/SetParent отключён в стабильном runtime. GPU fallback: host → auto → SwiftShader/headless.
@@ -59,7 +63,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.5.2 — Desktop Application** — стабильный self-contained Windows release с embedded Android через Emulator gRPC/MMAP framebuffer. `-qt-hide-window` используется в штатном embedded-режиме, Win32 native-HWND reparenting отключён из-за ложного успешного attach на реальном Windows-ПК. GUI, managed Android runtime, установка APK и исследовательский core работают без пользовательского Python/Android Studio/ADB.
+**v0.6.0 — Desktop Application** — self-contained Windows release с primary native standalone Emulator HWND для максимально плавного интерфейса и автоматическим gRPC/MMAP framebuffer fallback. Native attach принимается только после проверок реального видимого standalone-окна.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

@@ -9,6 +9,8 @@ from mobile_research.desktop.emulator_grpc import (
     Rotation,
     Touch,
     TouchEvent,
+    is_reverse_rotation,
+    map_display_ratio_to_input,
 )
 
 
@@ -112,3 +114,17 @@ def test_stream_input_event_wire_format() -> None:
     )
     assert restored.touch_event.touches[0].x == 12
     assert restored.touch_event.touches[0].y == 34
+
+
+
+def test_reverse_rotation_mapping_is_normalized() -> None:
+    assert is_reverse_rotation(2)
+    assert is_reverse_rotation(3)
+    assert not is_reverse_rotation(0)
+    assert not is_reverse_rotation(1)
+    assert map_display_ratio_to_input(
+        0.25, 0.20, 1000, 2000, 0
+    ) == (250, 400)
+    assert map_display_ratio_to_input(
+        0.25, 0.20, 1000, 2000, 2
+    ) == (750, 1600)

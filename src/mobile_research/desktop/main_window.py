@@ -648,6 +648,9 @@ class MainWindow(QMainWindow):
         c.diagnosticsReady.connect(
             self._on_diagnostics
         )
+        c.nativeDisplayAvailable.connect(
+            self._on_native_display_available
+        )
 
         self.results_refresh.clicked.connect(
             self._refresh_results
@@ -862,16 +865,8 @@ class MainWindow(QMainWindow):
             self._last_gpu_mode = str(
                 gpu_mode or ""
             )
-            native = (
-                data.get("native_display")
-                or {}
-            )
-            native_supported = bool(
-                isinstance(native, dict)
-                and native.get("supported")
-            )
             suffix = ""
-            if native_supported:
+            if self.android_view.native_active:
                 suffix += " • native"
             elif transport_name:
                 suffix += f" • {transport_name}"
@@ -889,29 +884,6 @@ class MainWindow(QMainWindow):
             self.status_adb.setStyleSheet(
                 "color: #238636;"
             )
-            if (
-                native_supported
-                and not self.android_view.native_active
-            ):
-                self.android_hint.setText(
-                    "Подключение нативного Android Emulator…"
-                )
-                self.android_view.attach_native(
-                    int(
-                        native.get(
-                            "process_id",
-                            0,
-                        )
-                        or 0
-                    ),
-                    str(
-                        native.get(
-                            "avd_name",
-                            "",
-                        )
-                        or ""
-                    ),
-                )
         target = (
             data.get("target_info")
             or {}
@@ -946,6 +918,27 @@ class MainWindow(QMainWindow):
         if data.get("device_online"):
             self.global_status.setText(
                 "Android готов"
+            )
+
+    def _on_native_display_available(
+        self,
+        details: dict,
+    ) -> None:
+        if (
+            str(details.get("display_mode", ""))
+            != "standalone-native"
+        ):
+            return
+        self.android_hint.setText(
+            "Подключение настоящего окна Android Emulator…"
+        )
+        attached = self.android_view.attach_native(
+            int(details.get("process_id", 0) or 0),
+            str(details.get("avd_name", "") or ""),
+        )
+        if not attached:
+            self.controller.set_native_display_attached(
+                False
             )
 
     def _on_native_display_attached(

@@ -37,6 +37,7 @@ class DesktopController(QObject):
     operationBusy = Signal(bool)
     archiveInspection = Signal(dict)
     diagnosticsReady = Signal(dict)
+    nativeDisplayAvailable = Signal(dict)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -55,6 +56,7 @@ class DesktopController(QObject):
             threading.Thread | None
         ) = None
         self._clean_launch = True
+        self._native_display_attached = False
         self._input_queue: queue.Queue[
             tuple[str, tuple] | None
         ] = queue.Queue()
@@ -198,6 +200,7 @@ class DesktopController(QObject):
         self,
         attached: bool,
     ) -> None:
+        self._native_display_attached = bool(attached)
         if attached:
             self._stop_screen.set()
             return
@@ -213,7 +216,8 @@ class DesktopController(QObject):
         try:
             self._set_busy(True)
             self.runtime.ensure_ready(
-                self._progress_callback
+                self._progress_callback,
+                self._native_display_callback,
             )
             self._prepare_display_transport()
             self.environmentReady.emit(
@@ -239,7 +243,8 @@ class DesktopController(QObject):
             self.apk_path = path
             self.package_name = None
             self.runtime.ensure_ready(
-                self._progress_callback
+                self._progress_callback,
+                self._native_display_callback,
             )
             self._prepare_display_transport()
             package = self.runtime.install_apk(
@@ -543,7 +548,7 @@ class DesktopController(QObject):
             self._set_busy(False)
 
     def _prepare_display_transport(self) -> None:
-        if self.runtime.native_display_supported:
+        if self._native_display_attached:
             self._stop_screen.set()
             return
         self._start_screen_stream()
@@ -590,6 +595,20 @@ class DesktopController(QObject):
                 self._latest_frame_id
             )
         self.screenFrame.emit(frame)
+
+    def _native_display_callback(
+        self,
+        process_id: int,
+        avd_name: str,
+        display_mode: str,
+    ) -> None:
+        self.nativeDisplayAvailable.emit(
+            {
+                "process_id": int(process_id or 0),
+                "avd_name": str(avd_name or ""),
+                "display_mode": str(display_mode or ""),
+            }
+        )
 
     def _progress_callback(
         self,

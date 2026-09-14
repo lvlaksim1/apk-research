@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.5.2 — reliable gRPC/MMAP embedded display.  
-**Stable baseline:** v0.5.2 Desktop Application.  
+**Этап:** v0.6.0 — verified standalone native Emulator embedding.  
+**Stable baseline:** v0.6.0 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -233,3 +233,10 @@ v0.3.0 выполнял bytes → QImage.copy → mirrored image → QPixmap →
 
 ### ADR-061 — `-qt-hide-window` не является контрактом native HWND embedding
 Реальный тест v0.5.1 показал ложный успех Win32 embedding: Mobile Research находила Qt HWND процесса Emulator, выполняла `SetParent` и считала display подключённым, но Android pixels в этом HWND не отображались. Официальный embedded режим Android Emulator использует `-qt-hide-window` совместно с control/framebuffer transport; скрытый Qt HWND не рассматривается как поддерживаемая внешняя native video surface. Поэтому stable runtime больше не активирует NativeEmulatorEmbedder и не останавливает framebuffer stream из-за существования такого HWND. На Windows основной display contract снова: `-qt-hide-window` + gRPC MMAP → gRPC bytes → ADB screenshot fallback. Win32 `SetParent` код остаётся изолированным экспериментом и не входит в stable path до появления отдельного доказательства корректной видеоотрисовки на реальном Windows hardware.
+
+
+### ADR-062 — Native display использует только реальное standalone-окно Emulator
+Для нативной плавности v0.6.0 запускает основной Windows profile без `-qt-hide-window` и без `-no-window`. Mobile Research ищет только видимое top-level окно Emulator сразу после создания процесса и переподчиняет именно его. Attach считается успешным только после проверки `SetParent`, фактического parent HWND, ненулевой client area и видимости. До подтверждения framebuffer stream не отключается; при ошибке native attach gRPC/MMAP продолжает работу.
+
+### ADR-063 — Reverse framebuffer rotation снова нормализуется
+Реальный тест v0.5.2 показал reverse-portrait первый кадр. Для raw bottom-up RGBA/RGB кадров rotation 2/3 снова трактуется как reverse orientation: применяется коррекция, эквивалентная bottom-up flip + 180-degree normalization, а input ratios инвертируются по обеим осям.

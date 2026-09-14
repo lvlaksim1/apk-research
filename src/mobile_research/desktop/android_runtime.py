@@ -23,6 +23,10 @@ RuntimeProgress = Callable[
     [str, int | None, int | None],
     None,
 ]
+RuntimeDisplayReady = Callable[
+    [int, str, str],
+    None,
+]
 _PACKAGE_BADGING_RE = re.compile(
     r"^package:\s+name='([^']+)'",
     re.MULTILINE,
@@ -87,11 +91,10 @@ class AndroidRuntime:
 
     @property
     def native_display_supported(self) -> bool:
-        # v0.5.x proved that a Qt window created with
-        # -qt-hide-window is not a reliable Win32 video surface.
-        # Stable builds therefore use the Emulator's supported
-        # embedded gRPC/MMAP transport instead of SetParent().
-        return False
+        return (
+            self._is_windows()
+            and self._display_mode == "standalone-native"
+        )
 
     @property
     def emulator_pid(self) -> int:
@@ -107,6 +110,7 @@ class AndroidRuntime:
     def ensure_ready(
         self,
         progress: RuntimeProgress | None = None,
+        display_ready: RuntimeDisplayReady | None = None,
     ) -> None:
         self.components.ensure_all(progress)
         self._emit(
@@ -117,7 +121,10 @@ class AndroidRuntime:
         )
         self._check_acceleration(progress)
         if not self._device_online():
-            self._boot_managed_emulator(progress)
+            self._boot_managed_emulator(
+                progress,
+                display_ready,
+            )
         else:
             self._wait_for_boot(progress)
         self._ensure_root(progress)
@@ -141,8 +148,18 @@ class AndroidRuntime:
             return [
                 (
                     "host",
+                    "standalone-native",
+                    "native standalone GPU host",
+                ),
+                (
+                    "auto",
+                    "standalone-native",
+                    "native standalone GPU auto",
+                ),
+                (
+                    "host",
                     "grpc-embedded",
-                    "embedded gRPC/MMAP display",
+                    "embedded gRPC/MMAP GPU host",
                 ),
                 (
                     "auto",
@@ -166,6 +183,7 @@ class AndroidRuntime:
     def _boot_managed_emulator(
         self,
         progress: RuntimeProgress | None,
+        display_ready: RuntimeDisplayReady | None = None,
     ) -> None:
         """Boot with automatic isolation of graphics/window failures."""
 
@@ -189,6 +207,15 @@ class AndroidRuntime:
             started = time.monotonic()
             try:
                 self._start_emulator(progress)
+                if (
+                    display_ready is not None
+                    and self.native_display_supported
+                ):
+                    display_ready(
+                        self.emulator_pid,
+                        AVD_NAME,
+                        self._display_mode,
+                    )
                 self._wait_for_boot(progress)
             except AndroidRuntimeError as exc:
                 process = self.process
@@ -245,11 +272,19 @@ class AndroidRuntime:
                 }
             )
             if self._is_windows():
+                if display_mode == "standalone-native":
+                    message = (
+                        "Android запущен: native standalone "
+                        f"(GPU {gpu_mode})"
+                    )
+                else:
+                    message = (
+                        "Android запущен: framebuffer "
+                        f"({display_mode}, GPU {gpu_mode})"
+                    )
                 self._emit(
                     progress,
-                    "Android запущен: "
-                    "встроенный framebuffer "
-                    f"({display_mode}, GPU {gpu_mode})",
+                    message,
                     None,
                     None,
                 )
@@ -751,12 +786,14 @@ class AndroidRuntime:
         if (
             self._is_windows()
             and not self._software_acceleration
-            and self._display_mode == "grpc-embedded"
         ):
-            # This is the supported embedded-Emulator mode used by
-            # Android Studio. Pixels are consumed through gRPC/MMAP;
-            # the hidden Qt HWND is intentionally not re-parented.
-            command.append("-qt-hide-window")
+            if self._display_mode == "standalone-native":
+                pass
+            elif self._display_mode == "grpc-embedded":
+                command.append("-qt-hide-window")
+            else:
+                command.append("-no-window")
+                self._display_mode = "headless"
         else:
             command.append("-no-window")
             self._display_mode = "headless"

@@ -25,6 +25,33 @@ class EmulatorGrpcError(RuntimeError):
     """Raised when the low-latency Emulator control plane is unavailable."""
 
 
+def is_reverse_rotation(rotation: int) -> bool:
+    return int(rotation) in {2, 3}
+
+
+def map_display_ratio_to_input(
+    x_ratio: float,
+    y_ratio: float,
+    input_width: int,
+    input_height: int,
+    rotation: int,
+) -> tuple[int, int]:
+    x_ratio = min(1.0, max(0.0, x_ratio))
+    y_ratio = min(1.0, max(0.0, y_ratio))
+    if is_reverse_rotation(rotation):
+        x_ratio = 1.0 - x_ratio
+        y_ratio = 1.0 - y_ratio
+    x = min(
+        input_width - 1,
+        max(0, int(x_ratio * input_width)),
+    )
+    y = min(
+        input_height - 1,
+        max(0, int(y_ratio * input_height)),
+    )
+    return x, y
+
+
 @dataclass(frozen=True)
 class LiveFrame:
     encoding: str

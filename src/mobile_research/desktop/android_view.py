@@ -10,6 +10,10 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QLabel
 
+from mobile_research.desktop.emulator_grpc import (
+    is_reverse_rotation,
+    map_display_ratio_to_input,
+)
 from mobile_research.desktop.native_emulator import (
     NativeEmulatorEmbedder,
     windows_native_embedding_available,
@@ -74,6 +78,7 @@ class AndroidView(QLabel):
         self._source_height = 0
         self._input_width = 0
         self._input_height = 0
+        self._rotation = 0
         self._bottom_up = False
 
     @property
@@ -149,6 +154,10 @@ class AndroidView(QLabel):
             )
             self._frame_owner = frame
             self._bottom_up = True
+            self._rotation = int(
+                getattr(frame, "rotation", 0)
+                or 0
+            )
             self._input_width = int(
                 getattr(frame, "input_width", width)
                 or width
@@ -169,6 +178,7 @@ class AndroidView(QLabel):
                 return
             self._frame_owner = frame
             self._bottom_up = False
+            self._rotation = 0
             self._input_width = image.width()
             self._input_height = image.height()
 
@@ -207,15 +217,21 @@ class AndroidView(QLabel):
             target.height() / self._source_height,
         )
 
-        # Emulator API already rotates the logical screenshot according
-        # to coarse device orientation. Raw non-PNG pixel memory is only
-        # bottom-up, so exactly one vertical flip is required.
         if self._bottom_up:
-            painter.translate(
-                0,
-                self._source_height,
-            )
-            painter.scale(1.0, -1.0)
+            if is_reverse_rotation(
+                self._rotation
+            ):
+                painter.translate(
+                    self._source_width,
+                    0,
+                )
+                painter.scale(-1.0, 1.0)
+            else:
+                painter.translate(
+                    0,
+                    self._source_height,
+                )
+                painter.scale(1.0, -1.0)
 
         painter.drawImage(
             0,
@@ -421,18 +437,10 @@ class AndroidView(QLabel):
         y_ratio = (
             point.y() - self._display_rect.y()
         ) / self._display_rect.height()
-        x = min(
-            self._input_width - 1,
-            max(
-                0,
-                int(x_ratio * self._input_width),
-            ),
+        return map_display_ratio_to_input(
+            x_ratio,
+            y_ratio,
+            self._input_width,
+            self._input_height,
+            self._rotation,
         )
-        y = min(
-            self._input_height - 1,
-            max(
-                0,
-                int(y_ratio * self._input_height),
-            ),
-        )
-        return x, y
