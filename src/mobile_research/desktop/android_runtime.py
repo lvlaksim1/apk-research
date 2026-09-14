@@ -676,18 +676,68 @@ class AndroidRuntime:
             "-Online -FeatureName HypervisorPlatform;"
             "$state=[string]$feature.State;"
             "if($state -eq 'EnablePending'){"
-            "$restart=$true"
+            "$restart=$true;"
             "}elseif($state -ne 'Enabled'){"
             "$r=Enable-WindowsOptionalFeature -Online "
             "-FeatureName HypervisorPlatform -All -NoRestart;"
             "$restart=$true;"
-            "if($r.RestartNeeded){$restart=$true}"
+            "if($r.RestartNeeded){$restart=$true;}"
             "};"
             "$bcd=(& bcdedit.exe /enum '{current}' 2>&1 "
             "| Out-String);"
             "if($LASTEXITCODE -ne 0){exit 22};"
             "if($bcd -notmatch "
-            "'(?im)^\\s*hypervisorlaunchtype\\s+Auto\\s*
+            "'hypervisorlaunchtype\\s+Auto'){"
+            "& bcdedit.exe /set hypervisorlaunchtype Auto "
+            "| Out-Null;"
+            "if($LASTEXITCODE -ne 0){exit 23};"
+            "$restart=$true;"
+            "};"
+            "if($restart){exit 10};"
+            "exit 0"
+        )
+        encoded = base64.b64encode(
+            elevated_script.encode("utf-16-le")
+        ).decode("ascii")
+        command = (
+            "$ErrorActionPreference='Stop';"
+            "try{"
+            "$p=Start-Process powershell.exe -Verb RunAs "
+            "-WindowStyle Hidden -Wait -PassThru "
+            "-ArgumentList @("
+            "'-NoProfile','-ExecutionPolicy','Bypass',"
+            "'-EncodedCommand','"
+            + encoded
+            + "');"
+            "exit $p.ExitCode;"
+            "}catch{exit 122;}"
+        )
+        creation_flags = getattr(
+            subprocess,
+            "CREATE_NO_WINDOW",
+            0,
+        )
+        try:
+            result = subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    command,
+                ],
+                timeout=240,
+                check=False,
+                creationflags=creation_flags,
+            )
+            return int(result.returncode)
+        except (
+            OSError,
+            subprocess.TimeoutExpired,
+        ):
+            return None
+
     def _device_online(self) -> bool:
         if not self.paths.adb.is_file():
             return False
