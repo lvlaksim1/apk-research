@@ -58,6 +58,7 @@ class MainWindow(QMainWindow):
         self._research_active = False
         self._busy = False
         self._last_archive: str | None = None
+        self._last_gpu_mode = ""
         self._build_ui()
         self._connect_signals()
         self._refresh_component_state()
@@ -94,6 +95,7 @@ class MainWindow(QMainWindow):
             )
             event.ignore()
             return
+        self.android_view.detach_native()
         self.controller.close()
         event.accept()
 
@@ -608,6 +610,12 @@ class MainWindow(QMainWindow):
         self.android_view.textRequested.connect(
             c.text_input
         )
+        self.android_view.nativeAttached.connect(
+            self._on_native_display_attached
+        )
+        self.android_view.nativeAttachFailed.connect(
+            self._on_native_display_failed
+        )
         c.progress.connect(
             self._on_progress
         )
@@ -851,8 +859,21 @@ class MainWindow(QMainWindow):
                 if isinstance(transport, dict)
                 else ""
             )
+            self._last_gpu_mode = str(
+                gpu_mode or ""
+            )
+            native = (
+                data.get("native_display")
+                or {}
+            )
+            native_supported = bool(
+                isinstance(native, dict)
+                and native.get("supported")
+            )
             suffix = ""
-            if transport_name:
+            if native_supported:
+                suffix += " • native"
+            elif transport_name:
                 suffix += f" • {transport_name}"
             if gpu_mode:
                 suffix += f" • GPU {gpu_mode}"
@@ -868,6 +889,29 @@ class MainWindow(QMainWindow):
             self.status_adb.setStyleSheet(
                 "color: #238636;"
             )
+            if (
+                native_supported
+                and not self.android_view.native_active
+            ):
+                self.android_hint.setText(
+                    "Подключение нативного Android Emulator…"
+                )
+                self.android_view.attach_native(
+                    int(
+                        native.get(
+                            "process_id",
+                            0,
+                        )
+                        or 0
+                    ),
+                    str(
+                        native.get(
+                            "avd_name",
+                            "",
+                        )
+                        or ""
+                    ),
+                )
         target = (
             data.get("target_info")
             or {}
@@ -903,6 +947,51 @@ class MainWindow(QMainWindow):
             self.global_status.setText(
                 "Android готов"
             )
+
+    def _on_native_display_attached(
+        self,
+        details: dict,
+    ) -> None:
+        self.controller.set_native_display_attached(
+            True
+        )
+        suffix = " • native"
+        if self._last_gpu_mode:
+            suffix += (
+                f" • GPU {self._last_gpu_mode}"
+            )
+        self.status_android.setText(
+            "● Android готов" + suffix
+        )
+        self.android_hint.setText(
+            "Нативный Android Emulator • "
+            "мышь/клавиатура напрямую"
+        )
+        self._append_log(
+            "Нативное окно Android Emulator встроено "
+            "в Mobile Research"
+        )
+
+    def _on_native_display_failed(
+        self,
+        message: str,
+    ) -> None:
+        self.controller.set_native_display_attached(
+            False
+        )
+        suffix = " • framebuffer fallback"
+        if self._last_gpu_mode:
+            suffix += (
+                f" • GPU {self._last_gpu_mode}"
+            )
+        self.status_android.setText(
+            "● Android готов" + suffix
+        )
+        self.android_hint.setText(
+            "Framebuffer fallback • мышь = touch • "
+            "колесо = swipe • клавиатура = ввод"
+        )
+        self._append_log(message)
 
     def _on_apk_ready(
         self,
