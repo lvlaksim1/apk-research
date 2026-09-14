@@ -345,8 +345,6 @@ def test_package_dump_failure_degrades_but_does_not_abort_metadata(
         "com.example.app",
     )
     fallback = (
-        "timeout",
-        "30s",
         "cmd",
         "package",
         "dump-package",
