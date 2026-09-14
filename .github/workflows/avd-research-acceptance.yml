@@ -7,6 +7,7 @@ on:
     paths:
       - "src/mobile_research/**"
       - "tools/acceptance_avd.py"
+      - "tools/check_emulator_grpc.py"
       - ".github/workflows/avd-research-acceptance.yml"
 
 permissions:
@@ -30,7 +31,7 @@ jobs:
           cache: pip
 
       - name: Install Mobile Research
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -e ".[dev,transport]"
 
       - name: Install Android SDK components
         shell: bash
@@ -66,7 +67,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          nohup "$ANDROID_HOME/emulator/emulator"             @mobile_research_api35             -port 5554             -no-window             -gpu swiftshader_indirect             -no-snapshot             -noaudio             -no-boot-anim             -wipe-data             > emulator.log 2>&1 &
+          nohup "$ANDROID_HOME/emulator/emulator"             @mobile_research_api35             -port 5554             -no-window             -gpu auto             -grpc 8554             -no-snapshot             -noaudio             -no-boot-anim             -wipe-data             > emulator.log 2>&1 &
           echo $! > emulator.pid
 
           sleep 5
@@ -122,6 +123,9 @@ jobs:
           adb -s emulator-5554 shell getprop ro.build.fingerprint
           adb -s emulator-5554 shell id
           adb -s emulator-5554 shell 'tcpdump --version || /system/bin/tcpdump --version || /system/xbin/tcpdump --version || /data/local/tmp/tcpdump --version'
+
+      - name: Validate live Emulator gRPC transport
+        run: python tools/check_emulator_grpc.py --port 8554
 
       - name: Run real AVD acceptance
         run: python tools/acceptance_avd.py
