@@ -118,4 +118,4 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ steps.version.outputs.tag }}"
-          gh release create "$TAG" release-assets/MobileResearchSetup.exe release-assets/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Mobile Research $TAG" --notes-file RELEASE_NOTES.md
+          gh release create "$TAG" release-assets/MobileResearchSetup.exe release-assets/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Mobile Research $TAG" --notes-file RELEASE_NOTES.md --prerelease
