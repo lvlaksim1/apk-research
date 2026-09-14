@@ -83,6 +83,21 @@ class AndroidRuntime:
     def paths(self):
         return self.components.paths
 
+    @property
+    def native_display_supported(self) -> bool:
+        return self._is_windows()
+
+    @property
+    def emulator_pid(self) -> int:
+        with self._process_lock:
+            process = self.process
+        if (
+            process is None
+            or process.poll() is not None
+        ):
+            return 0
+        return int(process.pid)
+
     def ensure_ready(
         self,
         progress: RuntimeProgress | None = None,
@@ -401,6 +416,16 @@ class AndroidRuntime:
                     else ""
                 ),
             },
+            "native_display": {
+                "supported": self.native_display_supported,
+                "process_id": self.emulator_pid,
+                "avd_name": AVD_NAME,
+                "preferred": (
+                    "native-hwnd"
+                    if self.native_display_supported
+                    else "framebuffer"
+                ),
+            },
         }
 
         versions: dict[str, object] = {}
@@ -586,7 +611,7 @@ class AndroidRuntime:
             and not self._software_acceleration
         ):
             command.append("-qt-hide-window")
-            self._display_mode = "qt-hide-window"
+            self._display_mode = "native-hwnd-pending"
         else:
             command.append("-no-window")
             self._display_mode = "headless"
