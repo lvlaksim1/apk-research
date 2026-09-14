@@ -31,6 +31,7 @@ def test_repository_xml_selects_windows_archive() -> None:
     result = select_archive_from_repository_xml(
         xml,
         "emulator",
+        host_os="windows",
         base_url="https://example.invalid/repository/",
     )
     assert result.url == "https://example.invalid/repository/windows.zip"
@@ -123,6 +124,7 @@ def test_repository_policy_prefers_latest_stable_over_canary() -> None:
     result = select_archive_from_repository_xml(
         xml,
         "emulator",
+        host_os="windows",
         base_url="https://example.invalid/repository/",
     )
 
@@ -146,6 +148,7 @@ def test_repository_policy_treats_missing_channel_as_stable() -> None:
     result = select_archive_from_repository_xml(
         xml,
         "platform-tools",
+        host_os="windows",
         base_url="https://example.invalid/repository/",
     )
 
