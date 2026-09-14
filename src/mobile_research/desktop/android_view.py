@@ -111,6 +111,15 @@ class AndroidView(QLabel):
         if self._native_embedder is not None:
             self._native_embedder.detach()
 
+    def set_native_visible(
+        self,
+        visible: bool,
+    ) -> None:
+        if self._native_embedder is not None:
+            self._native_embedder.set_presentation_visible(
+                visible
+            )
+
     def set_frame(self, frame) -> None:
         if self.native_active:
             return

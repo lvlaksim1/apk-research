@@ -1,33 +1,43 @@
-# Mobile Research v0.7.3
+# Mobile Research v0.7.4
 
-v0.7.3 completes the single-window DWM live UX.
+v0.7.4 keeps the working smooth DWM path from v0.7.2 while removing the separate Emulator window from the user experience.
 
-The v0.7.2 real-PC test confirmed that DWM live composition is smooth and correctly synchronized, but the original standalone Emulator window remained visible. The reason was that Mobile Research moved it off-screen only once; Android Emulator/Qt later restored or adjusted its geometry during boot.
+The v0.7.3 test proved that moving the standalone Emulator completely outside the Windows virtual desktop stops its DWM surface from updating and produces a black thumbnail. The source therefore remains on the active desktop in this release.
 
-## Single visible application window
+## Source window hidden by z-order
 
-The Emulator remains a real visible/non-minimized top-level GPU window for DWM, but Mobile Research now treats it as an internal source window:
+The primary display path is now:
 
-- the source is moved completely beyond the full Windows virtual desktop;
-- the position is re-enforced every 100 ms, so later Qt geometry changes cannot bring it back;
-- the source is marked TOOLWINDOW and APPWINDOW is removed, keeping it out of Alt+Tab/taskbar;
-- DWM continues rendering the live GPU surface into the Android panel;
-- the source is never re-parented, hidden or minimized.
+`Android Emulator visible GPU top-level window → kept directly behind Mobile Research → Windows DWM live thumbnail → Android panel`
 
-Window discovery uses a 15 ms polling interval during startup to minimize any initial standalone-window flash.
+The source window is not re-parented, hidden during normal operation, minimized, or moved off-screen.
 
-## Shutdown
+Instead Mobile Research continuously:
 
-The shutdown order is now:
+- places the Emulator source fully inside its own top-level screen rectangle;
+- scales the source down only when necessary so no edge can protrude beyond Mobile Research;
+- keeps the source immediately behind the Mobile Research top-level HWND;
+- removes APPWINDOW and applies TOOLWINDOW so the source is absent from taskbar/Alt+Tab.
 
-1. stop the Android Emulator while the DWM live relationship is still active;
-2. unregister the DWM thumbnail;
-3. close Mobile Research.
+This preserves the normal standalone GPU surface while ensuring the user only sees the DWM-rendered Android view inside Mobile Research.
 
-This prevents the standalone Emulator window from becoming visible for a moment when Mobile Research closes.
+## Minimize/restore
 
-## Input and fallback
+When Mobile Research is minimized, the source window is hidden because the covering window is no longer present.
 
-Input still uses the Emulator gRPC stream. If DWM live is unavailable, the existing gRPC/MMAP → gRPC bytes → ADB fallback remains unchanged.
+On restore, Mobile Research first places the source behind itself and only then shows it without activation, preserving the single-window UX.
+
+## Tabs
+
+DWM thumbnails are top-level DWM composition objects rather than Qt child widgets. v0.7.4 therefore explicitly controls thumbnail visibility from the tab selection:
+
+- Исследование → DWM live visible;
+- Результаты / История / Диагностика / Настройки → DWM live hidden.
+
+Returning to Исследование restores the same live view.
+
+## Fallback and evidence
+
+Input remains on the Emulator gRPC control stream. gRPC/MMAP → gRPC bytes → ADB remains the fallback if DWM is unavailable.
 
 The research evidence pipeline is unchanged.

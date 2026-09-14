@@ -20,6 +20,7 @@ if WINDOWS:
     INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
 
     SW_HIDE = 0
+    SW_SHOWNOACTIVATE = 4
 
     GWL_EXSTYLE = -20
     WS_EX_TOOLWINDOW = 0x00000080
@@ -137,6 +138,8 @@ if WINDOWS:
     user32.IsWindow.restype = wintypes.BOOL
     user32.IsWindowVisible.argtypes = [wintypes.HWND]
     user32.IsWindowVisible.restype = wintypes.BOOL
+    user32.IsIconic.argtypes = [wintypes.HWND]
+    user32.IsIconic.restype = wintypes.BOOL
     user32.ShowWindow.argtypes = [
         wintypes.HWND,
         ctypes.c_int,
@@ -316,32 +319,36 @@ def _phone_content_size(
     return width, height
 
 
-def _offscreen_position(
-    virtual_left: int,
-    virtual_top: int,
-    virtual_width: int,
-    virtual_height: int,
-    window_width: int,
-    window_height: int,
-) -> tuple[int, int]:
-    """Place a source window fully outside the complete virtual desktop."""
+def _covered_source_geometry(
+    cover_left: int,
+    cover_top: int,
+    cover_width: int,
+    cover_height: int,
+    source_width: int,
+    source_height: int,
+    *,
+    margin: int = 32,
+) -> tuple[int, int, int, int]:
+    """Fit the source fully inside the covering Mobile Research window."""
 
-    margin = 512
-    x = (
-        int(virtual_left)
-        + max(1, int(virtual_width))
-        + margin
+    cover_width = max(1, int(cover_width))
+    cover_height = max(1, int(cover_height))
+    source_width = max(1, int(source_width))
+    source_height = max(1, int(source_height))
+    margin = max(0, int(margin))
+
+    usable_width = max(1, cover_width - margin * 2)
+    usable_height = max(1, cover_height - margin * 2)
+    scale = min(
+        1.0,
+        usable_width / source_width,
+        usable_height / source_height,
     )
-    available_height = max(1, int(virtual_height))
-    y = int(virtual_top) + max(
-        0,
-        (
-            available_height
-            - max(1, int(window_height))
-        )
-        // 2,
-    )
-    return x, y
+    width = max(1, round(source_width * scale))
+    height = max(1, round(source_height * scale))
+    left = int(cover_left) + (cover_width - width) // 2
+    top = int(cover_top) + (cover_height - height) // 2
+    return left, top, width, height
 
 
 def _fit_rect(
@@ -477,6 +484,8 @@ class NativeEmulatorEmbedder(QObject):
         self._deadline = 0.0
         self._source_width = 0
         self._source_height = 0
+        self._presentation_visible = True
+        self._source_hidden_for_minimize = False
         self._timer = QTimer(self)
         self._timer.setInterval(15)
         self._timer.timeout.connect(self._poll)
@@ -527,6 +536,22 @@ class NativeEmulatorEmbedder(QObject):
         self.hwnd = 0
         self._source_width = 0
         self._source_height = 0
+        self._source_hidden_for_minimize = False
+
+    def set_presentation_visible(
+        self,
+        visible: bool,
+    ) -> None:
+        self._presentation_visible = bool(visible)
+        if not self.active:
+            return
+        try:
+            self._update_thumbnail()
+        except Exception as exc:
+            self._fail(
+                "DWM live visibility update failed: "
+                + (str(exc) or exc.__class__.__name__)
+            )
 
     def resize_embedded(self) -> None:
         if not self.active:
@@ -709,7 +734,9 @@ class NativeEmulatorEmbedder(QObject):
         properties.rcDestination = destination_rect
         properties.rcSource = source_rect
         properties.opacity = 255
-        properties.fVisible = True
+        properties.fVisible = bool(
+            self._presentation_visible
+        )
         properties.fSourceClientAreaOnly = True
 
         hr = dwmapi.DwmUpdateThumbnailProperties(
@@ -726,7 +753,7 @@ class NativeEmulatorEmbedder(QObject):
         self,
         hwnd: int,
     ) -> None:
-        """Keep the Emulator alive for DWM but invisible to the user shell."""
+        """Keep the Emulator as a normal GPU top-level window behind Mobile Research."""
 
         if not WINDOWS or not hwnd:
             return
@@ -747,20 +774,20 @@ class NativeEmulatorEmbedder(QObject):
                 GWL_EXSTYLE,
                 desired,
             )
-        user32.SetWindowPos(
-            hwnd,
-            0,
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE
-            | SWP_NOSIZE
-            | SWP_NOZORDER
-            | SWP_NOACTIVATE
-            | SWP_FRAMECHANGED,
-        )
-        self._move_source_offscreen(hwnd)
+            user32.SetWindowPos(
+                hwnd,
+                0,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE
+                | SWP_NOSIZE
+                | SWP_NOZORDER
+                | SWP_NOACTIVATE
+                | SWP_FRAMECHANGED,
+            )
+        self._cover_source_window(hwnd)
 
     def _maintain_source_window(self) -> None:
         if not self.hwnd:
@@ -768,8 +795,19 @@ class NativeEmulatorEmbedder(QObject):
         self._prepare_source_window(
             self.hwnd
         )
+        client_width, client_height = _client_size(
+            self.hwnd
+        )
+        if client_width > 0 and client_height > 0:
+            (
+                self._source_width,
+                self._source_height,
+            ) = _phone_content_size(
+                client_width,
+                client_height,
+            )
 
-    def _move_source_offscreen(
+    def _cover_source_window(
         self,
         hwnd: int | None = None,
     ) -> None:
@@ -777,52 +815,98 @@ class NativeEmulatorEmbedder(QObject):
         if not source:
             return
 
-        width, height = _window_size(source)
-        virtual_left = int(
-            user32.GetSystemMetrics(
-                SM_XVIRTUALSCREEN
-            )
+        destination_hwnd = int(
+            self.host.window().winId()
         )
-        virtual_top = int(
-            user32.GetSystemMetrics(
-                SM_YVIRTUALSCREEN
+        destination_rect = RECT()
+        if (
+            destination_hwnd <= 0
+            or not user32.GetWindowRect(
+                destination_hwnd,
+                ctypes.byref(destination_rect),
             )
-        )
-        virtual_width = int(
-            user32.GetSystemMetrics(
-                SM_CXVIRTUALSCREEN
-            )
-        )
-        virtual_height = int(
-            user32.GetSystemMetrics(
-                SM_CYVIRTUALSCREEN
-            )
-        )
-        offscreen_x, offscreen_y = (
-            _offscreen_position(
-                virtual_left,
-                virtual_top,
-                virtual_width,
-                virtual_height,
-                width,
-                height,
-            )
-        )
-        if not user32.SetWindowPos(
-            source,
-            0,
-            offscreen_x,
-            offscreen_y,
-            0,
-            0,
-            SWP_NOSIZE
-            | SWP_NOZORDER
-            | SWP_NOACTIVATE,
         ):
             raise RuntimeError(
-                "Не удалось убрать окно Emulator "
-                "за пределы рабочего стола"
+                "Не удалось определить окно Mobile Research"
             )
+
+        if (
+            not user32.IsWindowVisible(destination_hwnd)
+            or user32.IsIconic(destination_hwnd)
+        ):
+            if user32.IsWindowVisible(source):
+                user32.ShowWindow(
+                    source,
+                    SW_HIDE,
+                )
+            self._source_hidden_for_minimize = True
+            return
+
+        source_width, source_height = _window_size(
+            source
+        )
+        cover_width = max(
+            1,
+            int(
+                destination_rect.right
+                - destination_rect.left
+            ),
+        )
+        cover_height = max(
+            1,
+            int(
+                destination_rect.bottom
+                - destination_rect.top
+            ),
+        )
+        left, top, width, height = (
+            _covered_source_geometry(
+                int(destination_rect.left),
+                int(destination_rect.top),
+                cover_width,
+                cover_height,
+                source_width,
+                source_height,
+            )
+        )
+
+        # First establish geometry and z-order while still hidden, then show
+        # without activation. hWndInsertAfter=destination keeps the source
+        # immediately behind Mobile Research in the top-level z-order.
+        if not user32.SetWindowPos(
+            source,
+            destination_hwnd,
+            left,
+            top,
+            width,
+            height,
+            SWP_NOACTIVATE,
+        ):
+            raise RuntimeError(
+                "Не удалось разместить окно Emulator "
+                "за Mobile Research"
+            )
+        if (
+            self._source_hidden_for_minimize
+            or not user32.IsWindowVisible(source)
+        ):
+            user32.ShowWindow(
+                source,
+                SW_SHOWNOACTIVATE,
+            )
+            self._source_hidden_for_minimize = False
+            if not user32.SetWindowPos(
+                source,
+                destination_hwnd,
+                left,
+                top,
+                width,
+                height,
+                SWP_NOACTIVATE,
+            ):
+                raise RuntimeError(
+                    "Не удалось восстановить z-order Emulator"
+                )
 
     def _fail(self, message: str) -> None:
         self.detach()

@@ -2,6 +2,21 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.7.4] - 2026-09-15
+
+### Covered DWM source window
+
+- Reverted the v0.7.3 off-screen source-window strategy after the real-PC test showed that moving the Emulator completely outside the virtual desktop makes its DWM thumbnail black.
+- The real standalone Emulator GPU window now remains on the active desktop but is continuously positioned and, if necessary, scaled entirely inside the Mobile Research top-level bounds.
+- The source window is kept immediately behind Mobile Research in top-level z-order, remains visible/non-minimized for GPU/DWM rendering, and stays excluded from taskbar/Alt+Tab.
+- When Mobile Research is minimized, the source Emulator window is temporarily hidden; it is positioned behind Mobile Research before being shown again on restore.
+- DWM source geometry and z-order are maintained every 100 ms so later Qt geometry changes cannot expose the standalone Emulator window.
+
+### Tabs
+
+- DWM thumbnail visibility now follows the selected application tab. The live Android image is visible only on the Исследование tab and is explicitly disabled on Results, History, Diagnostics and Settings.
+- Returning to Исследование re-enables the same DWM thumbnail and recalculates its destination rectangle.
+
 ## [0.7.3] - 2026-09-15
 
 ### Single-window DWM UX

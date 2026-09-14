@@ -9,8 +9,8 @@ pytest.importorskip("PySide6.QtWidgets")
 from PySide6.QtWidgets import QApplication, QWidget
 
 from mobile_research.desktop.native_emulator import (
+    _covered_source_geometry,
     _fit_rect,
-    _offscreen_position,
     _phone_content_size,
     find_emulator_window,
     windows_native_embedding_available,
@@ -31,17 +31,20 @@ def test_fit_rect_preserves_source_aspect() -> None:
     ) == (275, 0, 450, 800)
 
 
-def test_offscreen_position_is_beyond_complete_virtual_desktop() -> None:
-    x, y = _offscreen_position(
-        -1920,
-        -200,
-        5760,
-        1440,
+def test_source_geometry_is_fully_covered_by_mobile_research() -> None:
+    left, top, width, height = _covered_source_geometry(
+        100,
+        50,
+        1000,
+        700,
         500,
         900,
     )
-    assert x > (-1920 + 5760)
-    assert -200 <= y <= (-200 + 1440)
+    assert left >= 100
+    assert top >= 50
+    assert left + width <= 1100
+    assert top + height <= 750
+    assert height < 900
 
 
 @pytest.mark.skipif(

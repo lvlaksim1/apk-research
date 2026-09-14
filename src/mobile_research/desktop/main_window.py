@@ -654,6 +654,9 @@ class MainWindow(QMainWindow):
         c.nativeDisplayAvailable.connect(
             self._on_native_display_available
         )
+        self.tabs.currentChanged.connect(
+            self._on_tab_changed
+        )
 
         self.results_refresh.clicked.connect(
             self._refresh_results
@@ -923,6 +926,14 @@ class MainWindow(QMainWindow):
                 "Android готов"
             )
 
+    def _on_tab_changed(
+        self,
+        index: int,
+    ) -> None:
+        self.android_view.set_native_visible(
+            index == 0
+        )
+
     def _on_native_display_available(
         self,
         details: dict,
@@ -962,6 +973,9 @@ class MainWindow(QMainWindow):
         self.android_hint.setText(
             "DWM live Android Emulator • "
             "управление через gRPC"
+        )
+        self.android_view.set_native_visible(
+            self.tabs.currentIndex() == 0
         )
         self._append_log(
             "DWM live Android Emulator подключён "

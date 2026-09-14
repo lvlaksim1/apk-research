@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.7.3 — single-window DWM live Emulator.  
-**Stable baseline:** v0.7.3 Desktop Application.  
+**Этап:** v0.7.4 — covered-source DWM live Emulator.  
+**Stable baseline:** v0.7.4 Desktop Application.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -256,3 +256,10 @@ v0.3.0 выполнял bytes → QImage.copy → mirrored image → QPixmap →
 
 ### ADR-067 — DWM source window постоянно исключено из пользовательского desktop UX
 Реальный тест v0.7.2 подтвердил плавность DWM live, но показал, что однократного `SetWindowPos` недостаточно: Qt/Emulator позднее меняет geometry и source window снова появляется на рабочем столе. v0.7.3 сохраняет source как visible/non-minimized top-level GPU window, но каждые 100 ms перемещает его полностью за правую границу всего Windows virtual desktop. Дополнительно source получает `WS_EX_TOOLWINDOW` и теряет `WS_EX_APPWINDOW`, поэтому не участвует в taskbar/Alt+Tab. Это не меняет parent, размер или GPU surface. При shutdown порядок строго обратный прежнему: сначала `runtime.stop()` завершает Emulator при ещё зарегистрированном DWM thumbnail, затем thumbnail удаляется. Это исключает вспышку standalone окна при закрытии Mobile Research.
+
+
+### ADR-068 — DWM source остаётся на active desktop и скрывается покрывающим top-level окном
+Реальный тест v0.7.3 показал, что полное перемещение standalone Emulator за пределы virtual desktop приводит к чёрному DWM thumbnail: Qt/GPU surface перестаёт нормально обновляться для DWM. Поэтому source window сохраняется visible/non-minimized на active desktop, но каждые 100 ms позиционируется полностью внутри screen rectangle Mobile Research и ставится непосредственно за его top-level HWND через `SetWindowPos(source, destination_hwnd, ...)`. При нехватке места source пропорционально уменьшается, чтобы ни одна его граница не могла выступить из-под Mobile Research. `WS_EX_TOOLWINDOW`/отсутствие `WS_EX_APPWINDOW` сохраняют отсутствие source в taskbar/Alt+Tab. При minimize covering window source временно скрывается; при restore сначала восстанавливаются geometry/z-order, затем source показывается без activation.
+
+### ADR-069 — DWM thumbnail visibility управляется выбранной Qt-вкладкой
+DWM thumbnail композитится в top-level HWND и не является дочерним Qt widget, поэтому QTabWidget не может автоматически clip/hide его. Начиная с v0.7.4 `tabs.currentChanged` явно переключает `DWM_THUMBNAIL_PROPERTIES.fVisible`: только индекс вкладки Исследование имеет visible=true. Это исключает наложение Android изображения поверх Настроек, Диагностики, Истории и Результатов.

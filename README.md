@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.7.4 — Covered DWM source window
+
+После теста v0.7.3 source Emulator больше не уводится за virtual desktop: это обнуляло его DWM/GPU surface. Вместо этого настоящее standalone GPU-окно постоянно располагается полностью внутри границ Mobile Research и непосредственно за ним по Z-order. Пользователь видит только DWM live внутри вкладки Исследование. При переключении на другие вкладки DWM thumbnail явно скрывается; при возврате включается снова.
+
 ## v0.7.3 — Single-window DWM live
 
 DWM live теперь работает как единое пользовательское окно: standalone Emulator остаётся техническим top-level GPU source для Windows, но постоянно удерживается за пределами всего virtual desktop и исключается из taskbar/Alt+Tab. Mobile Research поддерживает это состояние на протяжении всей загрузки и работы, поэтому Qt Emulator не может вернуть окно на экран. При закрытии сначала завершается Emulator, затем отключается DWM — без вспышки второго окна.
@@ -79,7 +83,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.7.3 — Desktop Application** — self-contained Windows release с single-window DWM live composition: техническое standalone GPU-окно Emulator постоянно находится за пределами virtual desktop и исключено из taskbar/Alt+Tab; пользователь видит Android только внутри Mobile Research. gRPC/MMAP остаётся fallback.
+**v0.7.4 — Desktop Application** — self-contained Windows release с DWM live composition и covered source window: настоящее standalone GPU-окно Emulator остаётся на desktop ради стабильной DWM/GPU surface, но постоянно находится непосредственно за Mobile Research и полностью внутри его границ. На не-исследовательских вкладках DWM thumbnail скрывается. gRPC/MMAP остаётся fallback.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 
