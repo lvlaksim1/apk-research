@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mobile-research"
-version = "0.2.2"
+version = "0.3.0.dev0"
 description = "Self-contained Windows desktop environment for reproducible Android application research"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,6 +17,12 @@ mobile-research-gui = "mobile_research.desktop_entry:main"
 [project.optional-dependencies]
 desktop = [
     "PySide6-Essentials>=6.8,<7",
+    "grpcio>=1.66,<2",
+    "protobuf>=5.27,<7",
+]
+transport = [
+    "grpcio>=1.66,<2",
+    "protobuf>=5.27,<7",
 ]
 build = [
     "PyInstaller>=6.10,<7",
