@@ -1,4 +1,16 @@
+from pathlib import Path
+import tomllib
+
+
 def test_package_import() -> None:
     import mobile_research
 
-    assert mobile_research.__version__ == "0.2.0.dev0"
+    pyproject = tomllib.loads(
+        Path("pyproject.toml").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert (
+        mobile_research.__version__
+        == pyproject["project"]["version"]
+    )
