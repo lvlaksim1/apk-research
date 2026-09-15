@@ -67,12 +67,12 @@ jobs:
           while IFS= read -r file; do
             [[ -z "$file" ]] && continue
             case "$file" in
-              src/mobile_research/*|packaging/*|pyproject.toml|tests/*|tools/check_desktop_android_components.py|.github/workflows/*)
+              src/mobile_research/*|packaging/*|pyproject.toml|tests/*|tools/check_desktop_android_components.py|.github/workflows/desktop-build.yml)
                 DESKTOP=true
                 ;;
             esac
             case "$file" in
-              src/mobile_research/*|tools/acceptance_avd.py|tools/check_emulator_grpc.py|.github/workflows/*)
+              src/mobile_research/*|tools/acceptance_avd.py|tools/check_emulator_grpc.py|.github/workflows/avd-research-acceptance.yml)
                 AVD=true
                 ;;
             esac
@@ -152,7 +152,7 @@ jobs:
 
             DELETE=false
             case "$artifact_name" in
-              mobile-research-windows-desktop|mobile-research-windows-provisioning|avd-research-acceptance)
+              mobile-research-windows-desktop|mobile-research-windows-provisioning|avd-research-acceptance|mobile-research-windows-runtime-acceptance|windows-stable-emulator-probe-v2)
                 DELETE=true
                 ;;
               mobile-research-windows-whpx-*)
