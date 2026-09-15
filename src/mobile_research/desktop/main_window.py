@@ -887,6 +887,15 @@ class MainWindow(QMainWindow):
                 suffix += f" • {transport_name}"
             if gpu_mode:
                 suffix += f" • GPU {gpu_mode}"
+            if (
+                transport_name
+                and str(transport_name).startswith("grpc")
+                and not self.android_view.native_active
+            ):
+                self.android_hint.setText(
+                    "Embedded gRPC/MMAP • мышь = touch • "
+                    "колесо = swipe • клавиатура = ввод"
+                )
             self.status_android.setText(
                 "● Android готов" + suffix
             )

@@ -2,15 +2,17 @@
 
 All notable Mobile Research changes are recorded here.
 
-## [0.7.12] - 2026-09-15
+## [0.8.0] - 2026-09-15
 
-### Boot-stall recovery loop fix
+### Embedded Emulator becomes the primary display architecture
 
-- Removes the soft Emulator restart because the real-PC test confirmed it does not recover the affected AVD.
-- A guest boot timeout is now classified as an AVD/guest-state failure, not a graphics-profile failure.
-- On the first boot stall Mobile Research performs exactly one official `-wipe-data` recovery launch.
-- If the clean AVD still fails to boot, Mobile Research stops and reports the recovery failure instead of cycling through additional 150-second host/auto/gRPC/headless profiles.
-- Existing DWM source handling and real-time touch behavior are unchanged.
+- Windows now starts with `grpc-embedded` profiles before any DWM profile. The normal Emulator command uses `-qt-hide-window`, so successful normal startup never exposes a standalone Emulator window.
+- Ordered Windows profiles: gRPC/MMAP + host GPU, gRPC/MMAP + auto GPU, headless SwiftShader, then DWM compatibility profiles only as last-resort fallbacks.
+- DWM source-window code is retained unchanged for compatibility fallback, but is no longer part of the normal startup path.
+- gRPC is primed immediately after the hidden Emulator process starts, before Android reaches `sys.boot_completed`.
+- Embedded/headless display readiness now starts the framebuffer worker immediately, so boot frames can appear inside Mobile Research while Android is still loading.
+- The framebuffer worker can dynamically upgrade from temporary ADB screencap to gRPC/MMAP if gRPC becomes ready after the worker starts.
+- Existing 60 Hz Qt publication and real-time DOWN/MOVE/UP input are retained.
 
 ## [0.7.11] - 2026-09-15
 

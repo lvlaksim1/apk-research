@@ -1,8 +1,8 @@
 # Mobile Research
 
-## v0.7.12 — Single wipe recovery, no 150s loop
+## v0.8.0 — Native embedded Emulator path
 
-После подтверждения на реальном ПК мягкий restart удалён. Boot stall теперь не считается graphics failure: выполняется ровно один `-wipe-data` launch. Если чистый AVD не загрузился, Mobile Research выдаёт ошибку и останавливается, а не запускает следующие 150-секундные host/auto/gRPC/headless циклы. DWM и потоковый swipe не изменены.
+Основной Windows display path больше не использует видимое standalone-окно Emulator. Emulator стартует через `-qt-hide-window`, изображение идёт напрямую через Emulator gRPC/MMAP в `AndroidView`, ввод — через persistent gRPC DOWN/MOVE/UP. DWM сохранён только как последний compatibility fallback. В нормальном embedded-path отдельному окну Emulator нечему мигать на рабочем столе.
 
 ## v0.7.11 — Self-healing Android boot
 
@@ -103,7 +103,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.7.12 — Desktop Application** — baseline v0.7.9 плюс строго одноэтапный boot self-healing: при guest boot stall один штатный `-wipe-data` launch без soft restart и без последующего graphics-profile loop. DWM, input и evidence path не меняются.
+**v0.8.0 — Desktop Application** — primary Windows architecture переведена на `-qt-hide-window + gRPC/MMAP`. DWM больше не участвует в нормальном startup и остаётся только compatibility fallback. Потоковый touch и evidence pipeline сохранены.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

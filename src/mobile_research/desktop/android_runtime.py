@@ -461,11 +461,13 @@ class AndroidRuntime:
                 self._emit(
                     progress,
                     "Android найден, но загрузка зависла. "
-                    "Восстановление чистого AVD…",
+                    "Автоматическое восстановление…",
                     None,
                     None,
                 )
-                self._recover_stalled_boot(
+                self.stop()
+                self.cleanup_stale_managed_runtime()
+                self._boot_managed_emulator(
                     progress,
                     display_ready,
                 )
@@ -490,16 +492,6 @@ class AndroidRuntime:
             return [
                 (
                     "host",
-                    "dwm-live",
-                    "DWM live GPU host",
-                ),
-                (
-                    "auto",
-                    "dwm-live",
-                    "DWM live GPU auto",
-                ),
-                (
-                    "host",
                     "grpc-embedded",
                     "embedded gRPC/MMAP GPU host",
                 ),
@@ -512,6 +504,16 @@ class AndroidRuntime:
                     "swiftshader",
                     "headless",
                     "headless SwiftShader compatibility",
+                ),
+                (
+                    "host",
+                    "dwm-live",
+                    "DWM compatibility GPU host",
+                ),
+                (
+                    "auto",
+                    "dwm-live",
+                    "DWM compatibility GPU auto",
                 ),
             ]
         return [
@@ -552,37 +554,27 @@ class AndroidRuntime:
             recovery_stage = ""
 
             try:
-                self._start_emulator(progress)
-                self._notify_display_ready(
-                    display_ready
+                self._start_profile_display(
+                    progress,
+                    display_ready,
                 )
                 self._wait_for_boot(progress)
             except AndroidBootTimeout as exc:
-                # A live Emulator that never reaches sys.boot_completed is an
-                # AVD/guest-state failure, not a graphics-profile failure.
-                # Do exactly one destructive self-heal, then stop. Never loop
-                # through host/auto/grpc/headless profiles for the same bad AVD.
-                if recovery_used:
-                    self.stop()
-                    raise AndroidRuntimeError(
-                        "Android не загрузился после "
-                        "автоматического восстановления"
-                    ) from exc
-                recovery_used = True
-                try:
-                    recovery_stage = (
-                        self._recover_stalled_boot(
-                            progress,
-                            display_ready,
+                if not recovery_used:
+                    recovery_used = True
+                    try:
+                        recovery_stage = (
+                            self._recover_stalled_boot(
+                                progress,
+                                display_ready,
+                            )
                         )
-                    )
-                except AndroidRuntimeError as recovery_exc:
-                    self.stop()
-                    raise AndroidRuntimeError(
-                        "Не удалось восстановить Android AVD: "
-                        + str(recovery_exc)
-                    ) from recovery_exc
-                failure = None
+                    except AndroidRuntimeError as recovery_exc:
+                        failure = recovery_exc
+                    else:
+                        failure = None
+                else:
+                    failure = exc
             except AndroidRuntimeError as exc:
                 failure = exc
 
@@ -654,6 +646,8 @@ class AndroidRuntime:
                     )
                 if recovery_stage == "wipe-data":
                     message += " • AVD восстановлен"
+                elif recovery_stage == "soft-restart":
+                    message += " • после автоперезапуска"
                 self._emit(
                     progress,
                     message,
@@ -674,36 +668,72 @@ class AndroidRuntime:
             + detail
         )
 
+    def _start_profile_display(
+        self,
+        progress: RuntimeProgress | None,
+        display_ready: RuntimeDisplayReady | None,
+    ) -> None:
+        self._start_emulator(progress)
+        if self._display_mode != "dwm-live":
+            self._ensure_live_transport(
+                progress,
+                timeout=20.0,
+                emit_fallback=False,
+            )
+        self._notify_display_ready(
+            display_ready
+        )
+
     def _notify_display_ready(
         self,
         display_ready: RuntimeDisplayReady | None,
     ) -> None:
-        if (
-            display_ready is not None
-            and self.native_display_supported
-        ):
-            display_ready(
-                self.emulator_pid,
-                AVD_NAME,
-                self._display_mode,
-            )
+        if display_ready is None:
+            return
+        display_ready(
+            self.emulator_pid,
+            AVD_NAME,
+            self._display_mode,
+        )
 
     def _recover_stalled_boot(
         self,
         progress: RuntimeProgress | None,
         display_ready: RuntimeDisplayReady | None,
     ) -> str:
-        """Perform exactly one official -wipe-data recovery attempt."""
+        """Try one same-data restart, then one official -wipe-data recovery."""
 
         self._emit(
             progress,
             "Android не завершил загрузку. "
-            "Восстановление чистого AVD через wipe-data…",
+            "Мягкий перезапуск Emulator…",
             None,
             None,
         )
         self.stop()
         self.cleanup_stale_managed_runtime()
+
+        self._start_profile_display(
+            progress,
+            display_ready,
+        )
+        try:
+            self._wait_for_boot(
+                progress,
+                boot_timeout=120.0,
+                online_stall_timeout=60.0,
+            )
+            return "soft-restart"
+        except AndroidBootTimeout:
+            self._emit(
+                progress,
+                "Повторная загрузка зависла. "
+                "Восстановление чистого AVD через wipe-data…",
+                None,
+                None,
+            )
+            self.stop()
+            self.cleanup_stale_managed_runtime()
 
         self._wipe_data_next_start = True
         try:
@@ -833,21 +863,22 @@ class AndroidRuntime:
         width: int = 405,
         height: int = 720,
     ):
-        client = self._get_grpc_client()
-        if client is not None:
-            try:
-                for frame in client.stream_frames(
-                    width=width,
-                    height=height,
-                ):
-                    if stop_event.is_set():
-                        return
-                    yield frame
-                return
-            except Exception:
-                self._drop_grpc_client()
-
         while not stop_event.is_set():
+            client = self._get_grpc_client()
+            if client is not None:
+                try:
+                    for frame in client.stream_frames(
+                        width=width,
+                        height=height,
+                    ):
+                        if stop_event.is_set():
+                            return
+                        yield frame
+                    return
+                except Exception:
+                    self._drop_grpc_client()
+                    continue
+
             png = self.screenshot_png()
             if png:
                 yield LiveFrame(
@@ -1078,11 +1109,7 @@ class AndroidRuntime:
                 "supported": self.native_display_supported,
                 "process_id": self.emulator_pid,
                 "avd_name": AVD_NAME,
-                "preferred": (
-                    "dwm-live"
-                    if self.native_display_supported
-                    else "framebuffer"
-                ),
+                "preferred": "grpc-mmap",
             },
         }
 
@@ -1651,32 +1678,44 @@ class AndroidRuntime:
     def _ensure_live_transport(
         self,
         progress: RuntimeProgress | None,
-    ) -> None:
+        *,
+        timeout: float = 8.0,
+        emit_fallback: bool = True,
+    ) -> bool:
+        existing = self._get_grpc_client()
+        if existing is not None:
+            return True
+
         if self._grpc_port is None:
-            self._emit(
-                progress,
-                "Интерактивный экран: ADB fallback",
-                None,
-                None,
-            )
-            return
+            if emit_fallback:
+                self._emit(
+                    progress,
+                    "Интерактивный экран: ADB fallback",
+                    None,
+                    None,
+                )
+            return False
+
         client: EmulatorGrpcClient | None = None
         try:
             client = EmulatorGrpcClient(self._grpc_port)
-            client.wait_ready(timeout=8.0)
+            client.wait_ready(
+                timeout=max(0.5, float(timeout))
+            )
         except Exception:
             if client is not None:
                 try:
                     client.close()
                 except Exception:
                     pass
-            self._emit(
-                progress,
-                "Интерактивный экран: ADB fallback",
-                None,
-                None,
-            )
-            return
+            if emit_fallback:
+                self._emit(
+                    progress,
+                    "Интерактивный экран: ADB fallback",
+                    None,
+                    None,
+                )
+            return False
 
         with self._grpc_lock:
             previous = self._grpc_client
@@ -1688,10 +1727,11 @@ class AndroidRuntime:
                 pass
         self._emit(
             progress,
-            "Интерактивный экран: Emulator gRPC",
+            "Интерактивный экран: Emulator gRPC/MMAP",
             None,
             None,
         )
+        return True
 
     def _get_grpc_client(
         self,

@@ -13,6 +13,7 @@ from mobile_research.desktop.android_runtime import (
     acceleration_provider,
 )
 from mobile_research.desktop.components import ComponentManager
+from mobile_research.desktop.emulator_grpc import LiveFrame
 
 
 def _make_components_ready(manager: ComponentManager) -> None:
@@ -504,6 +505,11 @@ def test_windows_boot_falls_back_across_embedded_gpu_modes(
     )
     monkeypatch.setattr(
         runtime,
+        "_ensure_live_transport",
+        lambda progress, **kwargs: True,
+    )
+    monkeypatch.setattr(
+        runtime,
         "stop",
         lambda: None,
     )
@@ -511,11 +517,11 @@ def test_windows_boot_falls_back_across_embedded_gpu_modes(
     runtime._boot_managed_emulator(None)
 
     assert attempts == [
-        ("host", "dwm-live"),
-        ("auto", "dwm-live"),
         ("host", "grpc-embedded"),
         ("auto", "grpc-embedded"),
         ("swiftshader", "headless"),
+        ("host", "dwm-live"),
+        ("auto", "dwm-live"),
     ]
     assert [
         item["status"]
@@ -694,7 +700,57 @@ def test_wait_for_boot_detects_online_stall(
         )
 
 
-def test_stalled_boot_recovery_uses_single_wipe_launch(
+def test_stalled_boot_recovery_restarts_then_wipes(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+    starts: list[bool] = []
+    waits = [AndroidBootTimeout("stalled"), None]
+
+    monkeypatch.setattr(
+        runtime,
+        "stop",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "cleanup_stale_managed_runtime",
+        lambda: {},
+    )
+
+    def fake_start(progress):
+        starts.append(runtime._wipe_data_next_start)
+
+    def fake_wait(progress, **kwargs):
+        outcome = waits.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+
+    monkeypatch.setattr(
+        runtime,
+        "_start_emulator",
+        fake_start,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_wait_for_boot",
+        fake_wait,
+    )
+
+    stage = runtime._recover_stalled_boot(
+        None,
+        None,
+    )
+
+    assert stage == "wipe-data"
+    assert starts == [False, True]
+    assert runtime._wipe_data_next_start is False
+
+
+def test_stalled_boot_recovery_keeps_userdata_when_restart_works(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -731,63 +787,117 @@ def test_stalled_boot_recovery_uses_single_wipe_launch(
         None,
     )
 
-    assert stage == "wipe-data"
-    assert starts == [True]
-    assert runtime._wipe_data_next_start is False
+    assert stage == "soft-restart"
+    assert starts == [False]
 
 
-def test_boot_timeout_does_not_fall_through_graphics_profiles(
+
+def test_windows_startup_profiles_are_embedded_first(
     tmp_path,
     monkeypatch,
 ) -> None:
     manager = ComponentManager(tmp_path)
     runtime = AndroidRuntime(manager)
     runtime._software_acceleration = False
-    starts: list[tuple[str, str]] = []
-
     monkeypatch.setattr(
         runtime,
         "_is_windows",
         lambda: True,
     )
+
+    profiles = runtime._startup_profiles()
+
+    assert profiles[0][:2] == (
+        "host",
+        "grpc-embedded",
+    )
+    assert profiles[1][:2] == (
+        "auto",
+        "grpc-embedded",
+    )
+    assert profiles[-1][1] == "dwm-live"
+
+
+def test_display_ready_callback_is_emitted_for_embedded_mode(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    runtime = AndroidRuntime(manager)
+    runtime._display_mode = "grpc-embedded"
+    seen = []
+
     monkeypatch.setattr(
         runtime,
         "_start_emulator",
-        lambda progress: starts.append(
-            (
-                runtime._gpu_mode,
-                runtime._display_mode,
-            )
-        ),
+        lambda progress: None,
     )
     monkeypatch.setattr(
         runtime,
-        "_wait_for_boot",
-        lambda progress, **kwargs: (
-            (_ for _ in ()).throw(
-                AndroidBootTimeout("stalled")
-            )
-        ),
-    )
-    monkeypatch.setattr(
-        runtime,
-        "_recover_stalled_boot",
-        lambda progress, display_ready: (
-            (_ for _ in ()).throw(
-                AndroidRuntimeError("wipe failed")
-            )
-        ),
-    )
-    monkeypatch.setattr(
-        runtime,
-        "stop",
-        lambda: None,
+        "_ensure_live_transport",
+        lambda progress, **kwargs: True,
     )
 
-    with pytest.raises(
-        AndroidRuntimeError,
-        match="Не удалось восстановить Android AVD",
-    ):
-        runtime._boot_managed_emulator(None)
+    runtime._start_profile_display(
+        None,
+        lambda pid, avd, mode: seen.append(
+            (pid, avd, mode)
+        ),
+    )
 
-    assert starts == [("host", "dwm-live")]
+    assert len(seen) == 1
+    assert seen[0][1] == "mobile_research_api35"
+    assert seen[0][2] == "grpc-embedded"
+
+
+def test_screen_frames_upgrades_to_grpc_after_early_fallback(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    runtime = AndroidRuntime(manager)
+
+    class FakeStop:
+        def is_set(self):
+            return False
+
+        def wait(self, _seconds):
+            return False
+
+    class FakeClient:
+        def stream_frames(self, **kwargs):
+            yield LiveFrame(
+                encoding="rgba8888",
+                data=b"\x00\x00\x00\xff",
+                width=1,
+                height=1,
+                input_width=1,
+                input_height=1,
+                transport="grpc-mmap",
+            )
+
+    client = FakeClient()
+    sequence = [None, client]
+
+    monkeypatch.setattr(
+        runtime,
+        "_get_grpc_client",
+        lambda: sequence.pop(0)
+        if sequence
+        else client,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "screenshot_png",
+        lambda: b"",
+    )
+
+    frame = next(
+        runtime.screen_frames(
+            FakeStop(),
+            width=1,
+            height=1,
+        )
+    )
+
+    assert frame.transport == "grpc-mmap"

@@ -623,13 +623,19 @@ class DesktopController(QObject):
         avd_name: str,
         display_mode: str,
     ) -> None:
-        self.nativeDisplayAvailable.emit(
-            {
-                "process_id": int(process_id or 0),
-                "avd_name": str(avd_name or ""),
-                "display_mode": str(display_mode or ""),
-            }
-        )
+        mode = str(display_mode or "")
+        if mode == "dwm-live":
+            self.nativeDisplayAvailable.emit(
+                {
+                    "process_id": int(process_id or 0),
+                    "avd_name": str(avd_name or ""),
+                    "display_mode": mode,
+                }
+            )
+            return
+
+        self._native_display_attached = False
+        self._start_screen_stream()
 
     def _progress_callback(
         self,

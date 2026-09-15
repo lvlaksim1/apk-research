@@ -1,31 +1,42 @@
-# Mobile Research v0.7.12
+# Mobile Research v0.8.0
 
-v0.7.12 fixes the repeated 150-second recovery cycle observed in the real-PC test.
+v0.8.0 removes the startup-window race from the normal architecture instead of trying to hide a visible Emulator window after it appears.
 
-## What was wrong
+## Primary startup sequence
 
-The previous self-healing logic correctly detected an Android boot timeout, but a failed recovery could then fall back into the existing graphics-profile loop.
+On Windows the normal startup sequence is now:
 
-That was inappropriate for this failure class: the Emulator process and DWM were alive, while the guest Android itself was not reaching `sys.boot_completed=1`.
+1. Mobile Research starts the managed Android Emulator with `-qt-hide-window`.
+2. The Emulator therefore has no normal user-visible desktop window.
+3. Mobile Research waits briefly for the local Emulator gRPC service.
+4. As soon as gRPC is ready, the controller starts the framebuffer worker.
+5. The worker consumes `streamScreenshot`, preferring MMAP transport.
+6. Android boot frames are painted directly by `AndroidView`.
+7. Input continues through persistent gRPC `streamInputEvent`.
+8. Android boot completion, root ADB and APK preparation continue independently.
 
-As a result the program could repeatedly start another normal 150-second boot under the next graphics profile.
+There is no HWND discovery, Z-order manipulation or DWM thumbnail in the successful primary path.
 
-## v0.7.12 behavior
+## Windows compatibility order
 
-A boot stall is now treated as an AVD/guest-state failure.
+1. embedded gRPC/MMAP + GPU host;
+2. embedded gRPC/MMAP + GPU auto;
+3. headless SwiftShader compatibility;
+4. DWM live + GPU host compatibility;
+5. DWM live + GPU auto compatibility.
 
-The recovery path is strictly bounded:
+DWM remains available only as a last-resort compatibility fallback.
 
-1. normal boot stalls;
-2. Mobile Research stops the managed Emulator;
-3. stale private processes/locks are cleaned;
-4. the same private AVD is launched exactly once with official `-wipe-data`;
-5. the clean boot gets up to 240 seconds;
-6. if it succeeds, normal APK preparation continues;
-7. if it fails, Mobile Research stops and reports an error.
+## Early display
 
-There is no soft restart and no graphics-profile fallback after a boot stall.
+The framebuffer worker starts before `sys.boot_completed`, so the user can see the actual boot framebuffer inside Mobile Research.
 
-Graphics-profile fallback is still retained for genuine Emulator startup/graphics failures where the process exits or fails before Android boot can be evaluated.
+If gRPC is not ready at the instant the worker starts, the worker can temporarily use ADB screenshots and automatically upgrade to gRPC/MMAP when the client becomes available.
 
-DWM and real-time swipe code are unchanged.
+## Unchanged
+
+- real-time mouse DOWN/MOVE/UP swipe behavior;
+- evidence collection;
+- root/ADB preparation;
+- research ZIP pipeline;
+- DWM fallback implementation itself.
