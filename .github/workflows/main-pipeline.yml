@@ -23,6 +23,24 @@ jobs:
       avd: ${{ steps.filter.outputs.avd }}
       release: ${{ steps.filter.outputs.release }}
     steps:
+      - name: Cancel superseded pipeline runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run list --workflow main-pipeline.yml --branch main --limit 50 \
+            --json databaseId,status \
+            --jq '.[] | select(.status == "in_progress" or .status == "queued") | .databaseId' |
+          while read -r run_id; do
+            [[ -z "$run_id" ]] && continue
+            if [[ "$run_id" == "$GITHUB_RUN_ID" ]]; then
+              continue
+            fi
+            echo "Cancel superseded Main Pipeline run $run_id"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/cancel" || true
+          done
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
