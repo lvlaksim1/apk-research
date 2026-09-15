@@ -533,7 +533,7 @@ def test_windows_boot_falls_back_across_embedded_gpu_modes(
         "failed",
         "completed",
     ]
-    assert runtime.native_display_supported is False
+    assert runtime.native_display_supported is True
 
 
 

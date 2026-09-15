@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.8.1 — Native embedded Emulator path
+
+Release-ready сборка новой архитектуры: основной Windows startup использует `-qt-hide-window + gRPC/MMAP`; DWM остаётся только последним compatibility fallback. Runtime соответствует v0.8.0, исправлен только release test gate.
+
 ## v0.8.0 — Native embedded Emulator path
 
 Основной Windows display path больше не использует видимое standalone-окно Emulator. Emulator стартует через `-qt-hide-window`, изображение идёт напрямую через Emulator gRPC/MMAP в `AndroidView`, ввод — через persistent gRPC DOWN/MOVE/UP. DWM сохранён только как последний compatibility fallback. В нормальном embedded-path отдельному окну Emulator нечему мигать на рабочем столе.
@@ -103,7 +107,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.8.0 — Desktop Application** — primary Windows architecture переведена на `-qt-hide-window + gRPC/MMAP`. DWM больше не участвует в нормальном startup и остаётся только compatibility fallback. Потоковый touch и evidence pipeline сохранены.
+**v0.8.1 — Desktop Application** — release-ready primary Windows architecture на `-qt-hide-window + gRPC/MMAP`. DWM не участвует в нормальном startup и остаётся только последним compatibility fallback. Потоковый touch и evidence pipeline сохранены.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

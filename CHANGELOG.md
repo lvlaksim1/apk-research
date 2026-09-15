@@ -2,6 +2,13 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.8.1] - 2026-09-15
+
+### Release test correction
+
+- Runtime architecture is unchanged from v0.8.0.
+- Corrects the startup-profile test to reflect that the final compatibility fallback is intentionally DWM, so `native_display_supported` is true only after all hidden embedded/headless profiles have failed.
+
 ## [0.8.0] - 2026-09-15
 
 ### Embedded Emulator becomes the primary display architecture

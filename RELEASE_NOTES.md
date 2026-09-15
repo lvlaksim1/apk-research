@@ -1,6 +1,6 @@
-# Mobile Research v0.8.0
+# Mobile Research v0.8.1
 
-v0.8.0 removes the startup-window race from the normal architecture instead of trying to hide a visible Emulator window after it appears.
+v0.8.1 is the release-ready embedded-display build. Runtime behavior is the v0.8.0 architecture; this commit corrects the exact-SHA test gate.
 
 ## Primary startup sequence
 

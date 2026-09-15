@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.8.0 — embedded gRPC/MMAP becomes primary display architecture.  
+**Этап:** v0.8.1 — release-ready embedded gRPC/MMAP primary display.  
 **Stable baseline:** hidden Emulator + gRPC/MMAP display/input; DWM compatibility fallback only.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
