@@ -102,6 +102,26 @@ class TimelineMainWindow(MainWindow):
             )
             if "T" in time_value:
                 time_value = time_value.split("T", 1)[1]
+            package_attribution = network.get(
+                "package_attribution"
+            )
+            if not isinstance(package_attribution, dict):
+                package_attribution = {}
+            packet_counts = package_attribution.get(
+                "packet_counts"
+            )
+            if not isinstance(packet_counts, dict):
+                packet_counts = {}
+            attributed_count = int(
+                package_attribution.get(
+                    "attributed_packet_count"
+                )
+                or 0
+            )
+            owner_breakdown = "/".join(
+                str(int(packet_counts.get(key) or 0))
+                for key in ("EXACT", "HIGH", "MEDIUM")
+            )
             values = [
                 time_value.replace("Z", "")[:12],
                 str(event.get("kind") or ""),
@@ -109,8 +129,18 @@ class TimelineMainWindow(MainWindow):
                 (
                     (
                         f"{int(network.get('packet_count') or 0)} pkt"
-                        f" • {correlation.get('causal_confidence', '')}"
-                    ).rstrip(" •")
+                        + (
+                            f" • app {attributed_count}"
+                            f" [{owner_breakdown}]"
+                            if attributed_count
+                            else ""
+                        )
+                        + (
+                            f" • {correlation.get('causal_confidence', '')}"
+                            if correlation.get("causal_confidence")
+                            else ""
+                        )
+                    )
                     if network
                     else ""
                 ),
