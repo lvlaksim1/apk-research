@@ -1,12 +1,8 @@
 name: Release
+run-name: "Publish Release • ${{ github.event.head_commit.message || github.ref_name }}"
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "pyproject.toml"
-      - "src/mobile_research/__init__.py"
+  workflow_call:
 
 permissions:
   contents: write
@@ -55,36 +51,7 @@ jobs:
           grep -F "[$VERSION]" CHANGELOG.md
           grep -F "v$VERSION" RELEASE_NOTES.md
           grep -F "__version__ = \"$VERSION\"" src/mobile_research/__init__.py
-      - name: Wait for exact-SHA gates
-        if: steps.version.outputs.stable == 'true'
-        id: gates
-        shell: bash
-        run: |
-          set -euo pipefail
-          for attempt in $(seq 1 660); do
-            RUNS="$(gh run list --commit "$GITHUB_SHA" --limit 30 --json databaseId,workflowName,status,conclusion)"
-            ALL_OK=true
-            DESKTOP_RUN_ID=""
-            for NAME in "CI" "AVD Research Acceptance" "Desktop Build"; do
-              STATE="$(jq -r --arg name "$NAME" '[.[] | select(.workflowName == $name)][0] | if . == null then "missing" else (.status + ":" + (.conclusion // "")) end' <<<"$RUNS")"
-              echo "$NAME=$STATE"
-              if [[ "$STATE" == completed:* && "$STATE" != completed:success ]]; then
-                echo "Gate failed: $NAME=$STATE"
-                exit 1
-              fi
-              if [[ "$STATE" != completed:success ]]; then ALL_OK=false; fi
-            done
-            WHPX_STATE="$(jq -r '[.[] | select(.workflowName == "Windows WHPX Acceptance")][0] | if . == null then "missing" else (.status + ":" + (.conclusion // "")) end' <<<"$RUNS")"
-            echo "Windows WHPX Acceptance=$WHPX_STATE (advisory)"
-            if [[ "$ALL_OK" == true ]]; then
-              DESKTOP_RUN_ID="$(jq -r '[.[] | select(.workflowName == "Desktop Build")][0].databaseId' <<<"$RUNS")"
-              echo "desktop_run_id=$DESKTOP_RUN_ID" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "Timed out waiting for exact-SHA gates"
-          exit 1
+
       - name: Ensure tag is not already published
         if: steps.version.outputs.stable == 'true'
         shell: bash
@@ -96,14 +63,11 @@ jobs:
           fi
       - name: Download tested Windows installer
         if: steps.version.outputs.stable == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p release-assets
-          gh run download "${{ steps.gates.outputs.desktop_run_id }}" -n mobile-research-windows-desktop -D release-assets
-          ls -l release-assets
-          test -f release-assets/MobileResearchSetup.exe
-          test -f release-assets/SHA256SUMS.txt
+        uses: actions/download-artifact@v4
+        with:
+          name: mobile-research-windows-desktop
+          path: release-assets
+
       - name: Verify installer checksum
         if: steps.version.outputs.stable == 'true'
         shell: bash
@@ -124,8 +88,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          RUN_ID="${{ steps.gates.outputs.desktop_run_id }}"
-          ARTIFACT_ID="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" --jq '.artifacts[] | select(.name == "mobile-research-windows-desktop") | .id' | head -n 1)"
+          ARTIFACT_ID="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --jq '.artifacts[] | select(.name == "mobile-research-windows-desktop") | .id' | head -n 1)"
           if [[ -n "$ARTIFACT_ID" ]]; then
             gh api --method DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID"
             echo "Deleted temporary installer artifact $ARTIFACT_ID"
