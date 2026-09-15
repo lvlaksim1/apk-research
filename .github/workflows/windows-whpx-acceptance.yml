@@ -83,7 +83,9 @@ jobs:
           $releaseUri = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$env:RELEASE_TAG"
           $release = Invoke-RestMethod -Headers $headers -Uri $releaseUri
 
-          foreach ($name in @("MobileResearchSetup.exe", "SHA256SUMS.txt")) {
+          $version = $env:RELEASE_TAG.TrimStart("v")
+          $installerName = "MobileResearchSetup_v$version.exe"
+          foreach ($name in @($installerName, "SHA256SUMS.txt")) {
             $asset = $release.assets | Where-Object { $_.name -eq $name } | Select-Object -First 1
             if (-not $asset) { throw "Release asset is missing: $name" }
             $downloadHeaders = @{
@@ -99,7 +101,9 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $artifact = Join-Path $env:RUNNER_TEMP "MobileResearchWHPXInstaller"
-          $installer = Join-Path $artifact "MobileResearchSetup.exe"
+          $installer = Get-ChildItem -Path $artifact -Filter "MobileResearchSetup_v*.exe" | Select-Object -First 1
+          if (-not $installer) { throw "Versioned installer artifact is missing" }
+          $installer = $installer.FullName
           $checksums = Join-Path $artifact "SHA256SUMS.txt"
           if (-not (Test-Path $installer)) { throw "Installer artifact is missing" }
           if (-not (Test-Path $checksums)) { throw "SHA256SUMS.txt is missing" }
@@ -144,7 +148,10 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $installer = Join-Path $env:RUNNER_TEMP "MobileResearchWHPXInstaller\MobileResearchSetup.exe"
+          $artifact = Join-Path $env:RUNNER_TEMP "MobileResearchWHPXInstaller"
+          $installerFile = Get-ChildItem -Path $artifact -Filter "MobileResearchSetup_v*.exe" | Select-Object -First 1
+          if (-not $installerFile) { throw "Versioned installer artifact is missing" }
+          $installer = $installerFile.FullName
           $process = Start-Process -FilePath $installer -ArgumentList @(
             "/VERYSILENT",
             "/SUPPRESSMSGBOXES",
@@ -152,7 +159,7 @@ jobs:
             "/SP-"
           ) -Wait -PassThru
           if ($process.ExitCode -ne 0) {
-            throw "MobileResearchSetup.exe failed: $($process.ExitCode)"
+            throw "Versioned Mobile Research installer failed: $($process.ExitCode)"
           }
 
           $exe = Join-Path $env:LOCALAPPDATA "Programs\MobileResearch\MobileResearch.exe"
