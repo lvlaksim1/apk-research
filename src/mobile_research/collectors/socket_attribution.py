@@ -349,9 +349,10 @@ class SocketAttributionCollector:
         pid_file = shlex.quote(self._remote_pid_file or "")
         interval = f"{self.sample_interval_seconds:.3f}"
         uid = preflight.package_uid
+        package = shlex.quote(preflight.package)
         return (
-            f"APP_UID={uid}; PID_FILE={pid_file}; "
-            'echo $$ > "$PID_FILE"; '
+            f"APP_UID={uid}; APP_PACKAGE={package}; PID_FILE={pid_file}; "
+            'echo $ > "$PID_FILE"; '
             'trap \'rm -f "$PID_FILE"; exit 0\' INT TERM HUP; '
             "while :; do "
             'TS=$(date +%s%N); echo "SNAP|$TS"; '
@@ -361,17 +362,22 @@ class SocketAttributionCollector:
             'done < "/proc/net/$T"; fi; done; '
             "for P in /proc/[0-9]*; do "
             '[ -r "$P/status" ] || continue; '
-            "U=$(sed -n 's/^Uid:[[:space:]]*\\([0-9]*\\).*/\\1/p' "
-            '"$P/status" 2>/dev/null); '
+            'U=""; '
+            'while IFS=" \\t" read -r K V REST; do '
+            'case "$K" in Uid:) U="$V"; break;; esac; '
+            'done < "$P/status"; '
             '[ "$U" = "$APP_UID" ] || continue; '
             'PID=${P##*/}; '
             'N=$(tr "\\000" " " < "$P/cmdline" 2>/dev/null); '
+            'N=${N%% *}; '
             'echo "PROC|$PID|$U|$N"; '
+            'case "$N" in "$APP_PACKAGE"|"$APP_PACKAGE":*) '
             'for F in "$P"/fd/*; do '
             'R=$(readlink "$F" 2>/dev/null) || continue; '
             'case "$R" in socket:\\[*\\]) '
             'I=${R#socket:[}; I=${I%]}; echo "FD|$PID|$I";; esac; '
-            "done; done; "
+            'done;; esac; '
+            "done; "
             'echo "END|$TS"; '
             f"sleep {interval}; "
             "done"
