@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.8.6 — single required runtime path.  
+**Этап:** v0.8.7 — single required runtime path with corrected frame-readiness sequencing.  
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -322,4 +322,7 @@ Release-candidate v0.8.4 прошёл unit tests и AVD acceptance, но Desktop
 
 ### ADR-083 — Recovery не является fallback
 Startup cleanup строго private AVD, удаление stale locks после завершения принадлежащих Mobile Research процессов и один официальный `-wipe-data` при guest boot stall сохраняются. Они не меняют display/input architecture и поэтому считаются восстановлением штатного runtime. Повторный stall после clean boot или отказ обязательного gRPC/MMAP завершают startup с ошибкой.
+
+### ADR-084 — Early framebuffer start and readiness gate are separate lifecycle stages
+Real-PC v0.8.6 testing showed that Emulator gRPC readiness precedes guaranteed production of the first Android framebuffer frame. Starting the framebuffer worker early is useful because it allows boot frames to appear as soon as available, but it must not impose a short blocking deadline before Android boot completes. From v0.8.7 the display callback only starts the gRPC/MMAP worker non-blockingly. The mandatory first-frame gate is evaluated after `AndroidRuntime.ensure_ready()` completes boot, root enablement, orientation normalization and final transport verification. This preserves fail-fast semantics without misclassifying normal Android startup latency as a transport failure.
 

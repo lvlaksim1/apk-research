@@ -2,6 +2,16 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.8.7] - 2026-09-15
+
+### Frame readiness sequencing fix
+
+- Fixes a real-Windows race introduced by v0.8.6: the first-frame gate no longer starts its 15-second deadline immediately after gRPC becomes ready while Android is still booting.
+- The framebuffer worker still starts immediately so boot frames can appear as soon as the Emulator produces them.
+- The required first `grpc-mmap` frame is now gated only after `ensure_ready` has completed Android boot, root enablement, orientation normalization and final gRPC transport verification.
+- This prevents a premature GUI error from aborting the remaining preparation chain (`root → PCAP readiness → APK install`) while the same framebuffer stream later becomes healthy.
+- No fallback transport is restored; the single required gRPC/MMAP + streamInputEvent architecture remains unchanged.
+
 ## [0.8.6] - 2026-09-15
 
 ### Single required runtime architecture

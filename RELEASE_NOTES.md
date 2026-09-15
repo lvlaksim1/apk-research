@@ -1,50 +1,37 @@
-# Mobile Research v0.8.6
+# Mobile Research v0.8.7
 
-v0.8.6 removes the compatibility display/input chain and makes the validated embedded runtime the only supported user path.
+v0.8.7 fixes the startup sequencing regression found during the first real-PC test of the v0.8.6 fail-fast runtime.
 
-## Required Windows runtime
+## Problem reproduced
 
-```text
-Android Emulator -qt-hide-window
-        ↓
-Emulator gRPC
-        ↓
-MMAP streamScreenshot
-        ↓
-AndroidView
-```
+v0.8.6 started the gRPC/MMAP framebuffer worker immediately after the Emulator gRPC endpoint became ready and also synchronously required the first frame within 15 seconds.
 
-Input is required to use the persistent Emulator gRPC `streamInputEvent` path.
+On the real Windows machine, gRPC was ready before Android's graphics/compositor path produced the first frame. Mobile Research therefore reported:
 
-## Removed
+`Обязательный gRPC/MMAP framebuffer не выдал первый кадр за 15 секунд`
 
-- DWM live presenter and standalone source-window management;
-- visible Emulator display fallback;
-- gRPC byte-frame framebuffer fallback;
-- ADB screencap interactive fallback;
-- unary sendTouch/sendKey fallback;
-- ADB tap/swipe/key/text fallback;
-- Windows graphics/display profile ladder.
+The framebuffer worker itself remained alive, and the same gRPC/MMAP stream later produced the Android image. However, the preparation worker had already aborted, so root, PCAP readiness and APK installation were not completed.
 
-A failure in the required display or input transport is now surfaced as an explicit Mobile Research error.
+## Fix
 
-## Preserved recovery
+The two concerns are now separated:
 
-The following are intentionally retained because they restore the same required architecture rather than switching to another mode:
+1. the framebuffer worker starts immediately after gRPC becomes ready so boot frames may appear early;
+2. this early start is non-blocking;
+3. Android continues normal boot and root preparation;
+4. after `ensure_ready` finishes, Mobile Research requires the first real `grpc-mmap` frame;
+5. only a failure at that point is treated as a required-transport error.
 
-- cleanup of stale processes belonging only to the private Mobile Research AVD;
-- stale AVD lock cleanup after those processes are gone;
-- one official `-wipe-data` launch after a guest boot stall;
-- virtualization/hypervisor diagnostics and setup.
+No compatibility or fallback mode has been reintroduced.
 
-If the clean AVD still stalls, or required gRPC/MMAP cannot operate, startup fails.
+## Preserved architecture
 
-## Validation changes
+Windows remains:
 
-- the first gRPC/MMAP frame is now a preparation gate;
-- framebuffer worker failures are no longer silently swallowed;
-- input failures are surfaced instead of falling back;
-- Windows runtime acceptance validates an actual `grpc-mmap` frame;
-- Linux/KVM acceptance remains headless at the window-system level but uses the same required gRPC/MMAP transport.
+`-qt-hide-window → gRPC → MMAP → AndroidView`
 
-The v0.8.2 display orientation and smooth DOWN/MOVE/UP behavior remain unchanged.
+Input remains:
+
+`AndroidView → persistent gRPC streamInputEvent → Android`
+
+Private-AVD cleanup and one-shot `-wipe-data` recovery remain unchanged.

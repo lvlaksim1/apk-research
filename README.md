@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.8.7 — Frame readiness sequencing fix
+
+Исправлена гонка v0.8.6, обнаруженная на реальном Windows-ПК: framebuffer worker запускался сразу после поднятия gRPC и одновременно требовал первый кадр в течение 15 секунд, то есть ещё до завершения Android boot. Теперь worker по-прежнему стартует рано и может показывать boot-кадры, но обязательный first-frame gate выполняется только после завершения Android boot/root preparation. Архитектура single required path не меняется и fallback не возвращается.
+
 ## v0.8.6 — Single required runtime path
 
 Mobile Research больше не имеет пользовательской страховочной display/input-архитектуры. Штатный Windows runtime теперь один: скрытый Android Emulator `-qt-hide-window` → Emulator gRPC → MMAP framebuffer → `AndroidView`; ввод — только через постоянный gRPC `streamInputEvent`. DWM, visible Emulator, gRPC byte-frame fallback, ADB screencap и ADB input fallback удалены. Если обязательный transport не работает, подготовка завершается диагностической ошибкой вместо перехода в другой режим. Startup cleanup и один `-wipe-data` при guest boot stall сохранены как recovery, а не как альтернативный runtime.
