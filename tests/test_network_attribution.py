@@ -101,7 +101,7 @@ def test_unique_package_uid_exact_five_tuple_is_exact() -> None:
     assert owner["pids"] == [4321]
 
 
-def test_shared_uid_downgrades_exact_tuple_to_high() -> None:
+def test_shared_uid_with_target_process_link_can_be_exact() -> None:
     snapshots, summary = _raw_snapshot(
         uid_packages=[PACKAGE, "com.example.shared"]
     )
@@ -109,8 +109,26 @@ def test_shared_uid_downgrades_exact_tuple_to_high() -> None:
 
     owner = index.attribute_packet(_packet())
 
-    assert owner["confidence"] == "HIGH"
-    assert "uid-shared-by-multiple-packages" in owner["ambiguity"]
+    assert owner["confidence"] == "EXACT"
+    assert owner["evidence"] == "target-process+socket-inode+5-tuple"
+
+
+def test_shared_uid_without_target_process_link_is_unknown() -> None:
+    snapshots, summary = _raw_snapshot(
+        uid_packages=[PACKAGE, "com.example.shared"]
+    )
+    for snapshot in snapshots:
+        for socket in snapshot["sockets"]:
+            socket["pids"] = [9999]
+            socket["processes"] = ["com.example.shared"]
+    index = SocketAttributionIndex(summary, snapshots)
+
+    owner = index.attribute_packet(_packet())
+
+    assert owner["confidence"] == "UNKNOWN"
+    assert owner["evidence"] == (
+        "shared-uid-without-target-process-socket-link"
+    )
 
 
 def test_unmatched_packet_stays_unknown() -> None:
