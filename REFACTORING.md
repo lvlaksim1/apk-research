@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.7.9 — v0.7.8 baseline + startup stale-runtime cleanup.  
-**Stable baseline:** v0.7.8 display/runtime architecture + streaming touch + isolated startup cleanup.  
+**Этап:** v0.7.10 — v0.7.9 baseline + bounded self-healing AVD boot.  
+**Stable baseline:** v0.7.8 display/runtime architecture + streaming touch + isolated startup cleanup + boot self-healing.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -271,3 +271,7 @@ DWM thumbnail композитится в top-level HWND и не являетс�
 
 ### ADR-071 — Startup cleanup ограничен только private AVD
 После сбоя пользователь не должен перезагружать Windows ради освобождения AVD. v0.7.9 до создания GUI сканирует Windows процессы, но считает кандидатом только `emulator.exe`/`qemu-system-*.exe`, одновременно содержащий `mobile_research_api35` в command line и относящийся к managed Emulator directory Mobile Research. Сначала выполняется graceful `adb -s emulator-5554 emu kill`, затем surviving matching PID завершается `taskkill /T /F`. Общий adb server и сторонние AVD не затрагиваются. `*.lock` удаляются только если matching processes больше нет; userdata/config/system image не изменяются. При наличии второго живого процесса Mobile Research очистка пропускается, чтобы не уничтожить активный runtime другого окна. Этот механизм не меняет DWM, boot profiles, reset или input path v0.7.8.
+
+
+### ADR-072 — Зависшая загрузка AVD восстанавливается ограниченной двухступенчатой схемой
+Процесс Emulator и DWM surface могут быть живы, когда guest Android не достигает `sys.boot_completed=1`. Это отличается от stale process/lock и не лечится startup cleanup. v0.7.10 классифицирует hardware boot как stalled после 150 s total или 75 s continuous ADB-online без boot_completed. На первый stall выполняется soft restart того же AVD без изменения userdata. Только если повторный boot тоже stalled, один следующий launch получает официальный `-wipe-data`; флаг существует только в памяти до построения этой команды. Clean recovery имеет extended 240 s timeout. На один `ensure_ready` допускается максимум один recovery cycle, после чего сохраняется штатный graphics-profile fallback. DWM/native-window/input код не изменяется.

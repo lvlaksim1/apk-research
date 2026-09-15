@@ -40,6 +40,10 @@ class AndroidRuntimeError(RuntimeError):
     """Raised when the managed Android runtime cannot perform an operation."""
 
 
+class AndroidBootTimeout(AndroidRuntimeError):
+    """Raised when the Emulator process lives but Android never completes boot."""
+
+
 def parse_aapt_package_name(output: str) -> str:
     match = _PACKAGE_BADGING_RE.search(output)
     if not match:
@@ -90,6 +94,7 @@ class AndroidRuntime:
         self._fallback_touch_start: (
             tuple[int, int, float] | None
         ) = None
+        self._wipe_data_next_start = False
 
     @property
     def paths(self):
@@ -450,7 +455,22 @@ class AndroidRuntime:
                 display_ready,
             )
         else:
-            self._wait_for_boot(progress)
+            try:
+                self._wait_for_boot(progress)
+            except AndroidBootTimeout:
+                self._emit(
+                    progress,
+                    "Android найден, но загрузка зависла. "
+                    "Автоматическое восстановление…",
+                    None,
+                    None,
+                )
+                self.stop()
+                self.cleanup_stale_managed_runtime()
+                self._boot_managed_emulator(
+                    progress,
+                    display_ready,
+                )
         self._ensure_root(progress)
         self._normalize_initial_orientation(progress)
         self._ensure_live_transport(progress)
@@ -509,11 +529,12 @@ class AndroidRuntime:
         progress: RuntimeProgress | None,
         display_ready: RuntimeDisplayReady | None = None,
     ) -> None:
-        """Boot with automatic isolation of graphics/window failures."""
+        """Boot with graphics fallback and one bounded AVD self-healing cycle."""
 
         profiles = self._startup_profiles()
         self._startup_attempts = []
         last_error: AndroidRuntimeError | None = None
+        recovery_used = False
 
         for index, (
             gpu_mode,
@@ -529,19 +550,35 @@ class AndroidRuntime:
                 None,
             )
             started = time.monotonic()
+            failure: AndroidRuntimeError | None = None
+            recovery_stage = ""
+
             try:
                 self._start_emulator(progress)
-                if (
-                    display_ready is not None
-                    and self.native_display_supported
-                ):
-                    display_ready(
-                        self.emulator_pid,
-                        AVD_NAME,
-                        self._display_mode,
-                    )
+                self._notify_display_ready(
+                    display_ready
+                )
                 self._wait_for_boot(progress)
+            except AndroidBootTimeout as exc:
+                if not recovery_used:
+                    recovery_used = True
+                    try:
+                        recovery_stage = (
+                            self._recover_stalled_boot(
+                                progress,
+                                display_ready,
+                            )
+                        )
+                    except AndroidRuntimeError as recovery_exc:
+                        failure = recovery_exc
+                    else:
+                        failure = None
+                else:
+                    failure = exc
             except AndroidRuntimeError as exc:
+                failure = exc
+
+            if failure is not None:
                 process = self.process
                 exit_code = (
                     process.returncode
@@ -559,13 +596,13 @@ class AndroidRuntime:
                             3,
                         ),
                         "exit_code": exit_code,
-                        "error": str(exc),
+                        "error": str(failure),
                         "command": list(
                             self._last_emulator_command
                         ),
                     }
                 )
-                last_error = exc
+                last_error = failure
                 self.stop()
                 if index + 1 < len(profiles):
                     self._emit(
@@ -590,6 +627,7 @@ class AndroidRuntime:
                     ),
                     "exit_code": None,
                     "error": "",
+                    "recovery": recovery_stage,
                     "command": list(
                         self._last_emulator_command
                     ),
@@ -606,6 +644,10 @@ class AndroidRuntime:
                         "Android запущен: framebuffer "
                         f"({display_mode}, GPU {gpu_mode})"
                     )
+                if recovery_stage == "wipe-data":
+                    message += " • AVD восстановлен"
+                elif recovery_stage == "soft-restart":
+                    message += " • после автоперезапуска"
                 self._emit(
                     progress,
                     message,
@@ -625,6 +667,81 @@ class AndroidRuntime:
             "Последняя ошибка: "
             + detail
         )
+
+    def _notify_display_ready(
+        self,
+        display_ready: RuntimeDisplayReady | None,
+    ) -> None:
+        if (
+            display_ready is not None
+            and self.native_display_supported
+        ):
+            display_ready(
+                self.emulator_pid,
+                AVD_NAME,
+                self._display_mode,
+            )
+
+    def _recover_stalled_boot(
+        self,
+        progress: RuntimeProgress | None,
+        display_ready: RuntimeDisplayReady | None,
+    ) -> str:
+        """Try one same-data restart, then one official -wipe-data recovery."""
+
+        self._emit(
+            progress,
+            "Android не завершил загрузку. "
+            "Мягкий перезапуск Emulator…",
+            None,
+            None,
+        )
+        self.stop()
+        self.cleanup_stale_managed_runtime()
+
+        self._start_emulator(progress)
+        self._notify_display_ready(
+            display_ready
+        )
+        try:
+            self._wait_for_boot(
+                progress,
+                boot_timeout=120.0,
+                online_stall_timeout=60.0,
+            )
+            return "soft-restart"
+        except AndroidBootTimeout:
+            self._emit(
+                progress,
+                "Повторная загрузка зависла. "
+                "Восстановление чистого AVD через wipe-data…",
+                None,
+                None,
+            )
+            self.stop()
+            self.cleanup_stale_managed_runtime()
+
+        self._wipe_data_next_start = True
+        try:
+            self._start_emulator(progress)
+        finally:
+            # -wipe-data is a one-launch recovery flag, never a persistent mode.
+            self._wipe_data_next_start = False
+
+        self._notify_display_ready(
+            display_ready
+        )
+        try:
+            self._wait_for_boot(
+                progress,
+                boot_timeout=240.0,
+                online_stall_timeout=120.0,
+            )
+        except AndroidRuntimeError:
+            self.stop()
+            self.cleanup_stale_managed_runtime()
+            raise
+        return "wipe-data"
 
     def package_name_from_apk(
         self,
@@ -1165,6 +1282,8 @@ class AndroidRuntime:
             "-crash-report-mode",
             "disabled",
         ]
+        if self._wipe_data_next_start:
+            command.append("-wipe-data")
 
         if (
             self._is_windows()
@@ -1197,16 +1316,33 @@ class AndroidRuntime:
     def _wait_for_boot(
         self,
         progress: RuntimeProgress | None,
+        *,
+        boot_timeout: float | None = None,
+        online_stall_timeout: float | None = None,
     ) -> None:
-        boot_timeout = (
-            900.0
-            if self._software_acceleration
-            else 240.0
-        )
-        deadline = time.monotonic() + boot_timeout
+        if boot_timeout is None:
+            boot_timeout = (
+                900.0
+                if self._software_acceleration
+                else 150.0
+            )
+        if online_stall_timeout is None:
+            online_stall_timeout = (
+                240.0
+                if self._software_acceleration
+                else 75.0
+            )
+
+        started = time.monotonic()
+        deadline = started + boot_timeout
+        online_since: float | None = None
+
         while time.monotonic() < deadline:
             self._ensure_process_alive()
+            now = time.monotonic()
             if self._device_online():
+                if online_since is None:
+                    online_since = now
                 result = self._adb_shell(
                     "getprop",
                     "sys.boot_completed",
@@ -1224,9 +1360,22 @@ class AndroidRuntime:
                         None,
                     )
                     return
+                if (
+                    online_since is not None
+                    and now - online_since
+                    >= online_stall_timeout
+                ):
+                    raise AndroidBootTimeout(
+                        "ADB доступен, но Android не завершил "
+                        "загрузку за "
+                        f"{int(online_stall_timeout)} секунд"
+                    )
+            else:
+                online_since = None
+
             remaining = max(
                 0,
-                int(deadline - time.monotonic()),
+                int(deadline - now),
             )
             self._emit(
                 progress,
@@ -1235,8 +1384,9 @@ class AndroidRuntime:
                 None,
             )
             time.sleep(2.0)
-        raise AndroidRuntimeError(
-            "Android Emulator не загрузился за "
+
+        raise AndroidBootTimeout(
+            "Android Emulator не завершил загрузку за "
             f"{int(boot_timeout)} секунд"
         )
 

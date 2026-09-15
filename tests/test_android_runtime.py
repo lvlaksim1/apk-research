@@ -6,6 +6,7 @@ import subprocess
 import pytest
 
 from mobile_research.desktop.android_runtime import (
+    AndroidBootTimeout,
     AndroidRuntime,
     AndroidRuntimeError,
     acceleration_provider,
@@ -621,3 +622,163 @@ def test_startup_cleanup_does_not_remove_locks_while_process_remains(
 
     assert report["remaining_processes"]
     assert lock_file.is_file()
+
+
+
+def test_emulator_command_adds_wipe_data_only_for_recovery(
+    tmp_path,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+    runtime._grpc_port = 8554
+
+    assert "-wipe-data" not in runtime._emulator_command()
+
+    runtime._wipe_data_next_start = True
+    assert "-wipe-data" in runtime._emulator_command()
+
+
+def test_wait_for_boot_detects_online_stall(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+    clock = [0.0]
+
+    monkeypatch.setattr(
+        time,
+        "monotonic",
+        lambda: clock[0],
+    )
+    monkeypatch.setattr(
+        time,
+        "sleep",
+        lambda seconds: clock.__setitem__(
+            0,
+            clock[0] + seconds,
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_ensure_process_alive",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_device_online",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_adb_shell",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout="",
+            stderr="",
+        ),
+    )
+
+    with pytest.raises(
+        AndroidBootTimeout,
+        match="ADB доступен",
+    ):
+        runtime._wait_for_boot(
+            None,
+            boot_timeout=30.0,
+            online_stall_timeout=5.0,
+        )
+
+
+def test_stalled_boot_recovery_restarts_then_wipes(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+    starts: list[bool] = []
+    waits = [AndroidBootTimeout("stalled"), None]
+
+    monkeypatch.setattr(
+        runtime,
+        "stop",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "cleanup_stale_managed_runtime",
+        lambda: {},
+    )
+
+    def fake_start(progress):
+        starts.append(runtime._wipe_data_next_start)
+
+    def fake_wait(progress, **kwargs):
+        outcome = waits.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+
+    monkeypatch.setattr(
+        runtime,
+        "_start_emulator",
+        fake_start,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_wait_for_boot",
+        fake_wait,
+    )
+
+    stage = runtime._recover_stalled_boot(
+        None,
+        None,
+    )
+
+    assert stage == "wipe-data"
+    assert starts == [False, True]
+    assert runtime._wipe_data_next_start is False
+
+
+def test_stalled_boot_recovery_keeps_userdata_when_restart_works(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    _make_components_ready(manager)
+    runtime = AndroidRuntime(manager)
+    starts: list[bool] = []
+
+    monkeypatch.setattr(
+        runtime,
+        "stop",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "cleanup_stale_managed_runtime",
+        lambda: {},
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_start_emulator",
+        lambda progress: starts.append(
+            runtime._wipe_data_next_start
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_wait_for_boot",
+        lambda progress, **kwargs: None,
+    )
+
+    stage = runtime._recover_stalled_boot(
+        None,
+        None,
+    )
+
+    assert stage == "soft-restart"
+    assert starts == [False]

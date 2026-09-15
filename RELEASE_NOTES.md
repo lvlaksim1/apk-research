@@ -1,33 +1,31 @@
-# Mobile Research v0.7.9
+# Mobile Research v0.7.10
 
-v0.7.9 keeps the v0.7.8 functional baseline and adds one narrowly scoped recovery feature: automatic cleanup of stale Mobile Research Android Emulator processes at application startup.
+v0.7.10 adds automatic self-healing for the specific failure observed on the real PC: the Emulator window and DWM surface exist, but Android inside the AVD never reaches `sys.boot_completed=1`.
 
-## Startup cleanup
+## Recovery sequence
 
-Before the main window is created, Mobile Research checks Windows for processes belonging specifically to its private AVD `mobile_research_api35`.
+Normal boot is unchanged until a real boot stall is detected.
 
-A process is eligible only when all of the following are true:
+For hardware-accelerated Android, a boot is treated as stalled when either:
 
-- it is `emulator.exe` or `qemu-system-*.exe`;
-- its command line contains the private AVD name;
-- its executable/command line points into Mobile Research's managed Android Emulator directory.
+- total boot time reaches 150 seconds; or
+- ADB has been continuously online for 75 seconds while `sys.boot_completed` remains unset.
 
-This prevents the cleanup from touching unrelated Android Emulator instances.
+Then Mobile Research automatically performs a bounded recovery:
 
-If stale private processes are found:
+1. stop the current managed Emulator;
+2. reuse the existing v0.7.9 stale-process/lock cleanup;
+3. restart the same AVD with the same userdata;
+4. if that boot succeeds, continue normally;
+5. if it stalls again, stop it;
+6. launch the same private AVD exactly once with the official Emulator `-wipe-data` flag;
+7. allow the clean boot up to 240 seconds;
+8. continue APK installation and preparation automatically after success.
 
-1. Mobile Research first requests a clean `adb emu kill`;
-2. waits briefly for normal shutdown;
-3. terminates only surviving matching process trees;
-4. waits until no matching private Emulator process remains;
-5. removes stale root-level `*.lock` entries from the private AVD home/profile.
+The wipe flag exists only for that single recovery launch and is immediately cleared in memory.
 
-No userdata, configuration, SDK, system image or APK data is deleted.
+## Safety
 
-Generic `adb.exe` is not killed.
+There is no recovery loop. A single boot sequence can use at most one soft restart and one wipe-data recovery before returning to the existing graphics-profile fallback/error path.
 
-If another Mobile Research executable instance is already running, startup cleanup is skipped so the second launch cannot destroy the active instance's Android environment.
-
-## Unchanged
-
-DWM source-window behavior, Android boot logic, reset behavior and the real-time DOWN/MOVE/UP swipe implementation are unchanged from v0.7.8.
+DWM source-window handling, real-time DOWN/MOVE/UP swipe, reset behavior and research evidence collection are otherwise unchanged.

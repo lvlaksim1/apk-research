@@ -2,6 +2,18 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.7.10] - 2026-09-15
+
+### Self-healing Android boot
+
+- Keeps the v0.7.9 DWM/input/startup-cleanup behavior unchanged and adds bounded recovery only when the Emulator process remains alive but Android never reaches `sys.boot_completed=1`.
+- Hardware boot is now considered stalled after 150 seconds total or 75 seconds continuously online in ADB without completing Android boot.
+- On the first detected stall, Mobile Research performs one soft Emulator restart with the existing userdata.
+- If the soft restart also stalls, Mobile Research performs exactly one official Android Emulator `-wipe-data` launch and gives the clean boot an extended 240-second window.
+- `-wipe-data` is an in-memory one-launch recovery flag; it is never persisted and is never used on a normal successful boot.
+- After either recovery succeeds, APK preparation continues normally in the same user action.
+- A failed clean recovery falls back to the existing graphics compatibility profiles; no infinite restart/wipe loop is possible.
+
 ## [0.7.9] - 2026-09-15
 
 ### Startup recovery for stale private Emulator processes
