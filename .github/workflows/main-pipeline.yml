@@ -1,0 +1,136 @@
+name: Main Pipeline
+run-name: "Pipeline • ${{ github.event.head_commit.message || github.ref_name }}"
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  changes:
+    name: Resolve changed areas
+    runs-on: ubuntu-24.04
+    outputs:
+      desktop: ${{ steps.filter.outputs.desktop }}
+      avd: ${{ steps.filter.outputs.avd }}
+      release: ${{ steps.filter.outputs.release }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Resolve changed files
+        id: filter
+        shell: bash
+        run: |
+          set -euo pipefail
+          BEFORE="${{ github.event.before }}"
+          if [[ "$BEFORE" == "0000000000000000000000000000000000000000" ]] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            FILES="$(git show --pretty='' --name-only "$GITHUB_SHA")"
+          else
+            FILES="$(git diff --name-only "$BEFORE" "$GITHUB_SHA")"
+          fi
+
+          printf '%s\n' "$FILES"
+
+          DESKTOP=false
+          AVD=false
+          RELEASE=false
+
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            case "$file" in
+              src/mobile_research/*|packaging/*|pyproject.toml|tests/*|tools/check_desktop_android_components.py|.github/workflows/*)
+                DESKTOP=true
+                ;;
+            esac
+            case "$file" in
+              src/mobile_research/*|tools/acceptance_avd.py|tools/check_emulator_grpc.py|.github/workflows/*)
+                AVD=true
+                ;;
+            esac
+            case "$file" in
+              pyproject.toml|src/mobile_research/__init__.py)
+                RELEASE=true
+                DESKTOP=true
+                AVD=true
+                ;;
+            esac
+          done <<< "$FILES"
+
+          echo "desktop=$DESKTOP" >> "$GITHUB_OUTPUT"
+          echo "avd=$AVD" >> "$GITHUB_OUTPUT"
+          echo "release=$RELEASE" >> "$GITHUB_OUTPUT"
+
+  ci:
+    name: CI
+    needs: changes
+    uses: ./.github/workflows/ci.yml
+
+  desktop:
+    name: Desktop Build
+    needs:
+      - changes
+      - ci
+    if: needs.changes.outputs.desktop == 'true'
+    uses: ./.github/workflows/desktop-build.yml
+
+  avd:
+    name: AVD Research Acceptance
+    needs:
+      - changes
+      - ci
+    if: needs.changes.outputs.avd == 'true'
+    uses: ./.github/workflows/avd-research-acceptance.yml
+
+  release:
+    name: Publish Release
+    needs:
+      - changes
+      - ci
+      - desktop
+      - avd
+    if: |
+      always() &&
+      needs.changes.outputs.release == 'true' &&
+      needs.ci.result == 'success' &&
+      needs.desktop.result == 'success' &&
+      needs.avd.result == 'success'
+    uses: ./.github/workflows/release.yml
+
+  cleanup-temporary-artifacts:
+    name: Cleanup temporary artifacts
+    needs:
+      - changes
+      - ci
+      - desktop
+      - avd
+      - release
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Delete orphaned installer artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.name == "mobile-research-windows-desktop") | [.id, .workflow_run.id] | @tsv' |
+          while IFS=$'\t' read -r artifact_id run_id; do
+            [[ -z "$artifact_id" ]] && continue
+            if [[ "$run_id" == "$GITHUB_RUN_ID" ]]; then
+              echo "Keep current-run artifact $artifact_id"
+              continue
+            fi
+            echo "Delete orphaned installer artifact $artifact_id from run $run_id"
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id"
+          done
