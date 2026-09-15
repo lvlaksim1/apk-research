@@ -183,6 +183,11 @@ def main() -> int:
             attribution_lines = archive.read(
                 "02_normalized/socket-attribution.jsonl"
             ).decode("utf-8").splitlines()
+            flow_inventory = json.loads(
+                archive.read(
+                    "02_normalized/network-flows.json"
+                )
+            )
         if (
             attribution_summary.get("method")
             != "android-proc-socket-snapshots"
@@ -195,6 +200,13 @@ def main() -> int:
         ) <= 0 or not attribution_lines:
             raise RuntimeError(
                 "Socket attribution evidence is empty"
+            )
+        if (
+            flow_inventory.get("method")
+            != "pcap+android-proc-socket-attribution"
+        ):
+            raise RuntimeError(
+                "Attributed network flow inventory is missing"
             )
 
         archived_actions = (
