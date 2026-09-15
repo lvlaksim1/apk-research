@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.8.8 — final technical cleanup of the validated single-path runtime.
+**Этап:** v0.8.9 — research evidence sequencing and timing hardening on the validated single-path runtime.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -61,8 +61,8 @@ Collector failure во время ACTIVE не переводит state machine �
 ### ADR-012 — Metadata сохраняется одновременно как RAW и normalized
 Device/System Metadata Collector сохраняет оригинальные ответы ADB в `01_raw/device/`. Удобный JSON в `02_normalized/target.json` является производным представлением и не заменяет исходные ответы Android.
 
-### ADR-013 — Необязательные metadata-команды не рушат snapshot
-Обязательные источники (`getprop`, package dump, package paths, clock) должны быть получены полностью. Сбой дополнительной команды (`uname`, SELinux, display metadata и т. п.) фиксируется в raw/normalized данных, но сам collector остаётся успешным.
+### ADR-013 — Необязательные metadata-команды не рушат snapshot (superseded in package-dump scope by ADR-086)
+Обязательные metadata-source должны быть получены полностью. Начиная с v0.8.9 полный verbose Package Manager dump классифицирован ADR-086 как дополнительное raw evidence; lightweight package identity/version evidence остаётся обязательным. Сбой дополнительной команды (`uname`, SELinux, display metadata и т. п.) фиксируется в raw/normalized данных, но сам collector остаётся успешным.
 
 ### ADR-014 — Logcat buffer не очищается
 Logcat Collector не использует `logcat -c`, поскольку очистка уничтожает состояние Android и особенно нежелательна для будущего Physical Device backend. Collector использует минимальный pre-roll `-T 1`; точные временные границы задаются host timestamps, а raw поток сохраняется без необратимой фильтрации.
@@ -195,8 +195,8 @@ GitHub-hosted Windows runner без аппаратной виртуализац�
 GitHub-hosted Windows CI остаётся обязательным для сборки, unit/GUI smoke и чистого provisioning, но не считается доказательством пользовательского Android boot: nested virtualization на hosted runner не является гарантированным контрактом. Отдельный workflow `Windows WHPX Acceptance` на выделенном self-hosted Windows x64 runner с аппаратной виртуализацией и меткой `mobile-research-whpx` сохраняется как дополнительная hardware acceptance. Workflow скачивает `MobileResearchSetup.exe` из `Desktop Build` того же commit SHA, выполняет чистую установку, запускает acceptance через установленный frozen `MobileResearch.exe`, требует именно WHPX по `emulator -accel-check`, загружает private AVD, скачивает зафиксированный Appium ApiDemos v6.0.17 по immutable release URL и проверяет SHA-256 `90cc1041c063a7fb68889143250fefa3139ef0c81e4208f67dbaafe8f15c8be9`, затем именно установленный MobileResearch.exe определяет package через managed aapt2, устанавливает APK через managed ADB и исследует `io.appium.android.apis`. Gate также доказывает root ADB, tcpdump/raw PCAP, framebuffer, logcat, screen recording, complete Research ZIP, checksum verification и semantic audit. Stable publication не блокируется отсутствием или очередью этого self-hosted runner: обязательные exact-SHA gates — CI, Desktop Build и real AVD Research Acceptance. Если WHPX runner доступен, его результат сохраняется как дополнительное evidence и используется для диагностики Windows-specific regressions.
 
 
-### ADR-047 — Package Manager dump failure degrades evidence instead of aborting capture
-A full raw package-manager dump remains required for a `complete` session, but it is not allowed to prevent collection of unrelated high-value evidence. Before the dump, Mobile Research best-effort waits for Package Manager main/background handlers. The primary transport uses bounded `dumpsys -t 30 package <package>`; a bounded `cmd package dump-package` path is the fallback. If neither produces a complete dump, `device_metadata` still writes explicit diagnostic package evidence and normalized metadata, records a non-fatal degradation, and orchestration proceeds to logcat, screen recording and raw PCAP. The final session therefore becomes `partial`, preserving the evidence contract without turning a metadata timeout into a 1–2 KB failed archive.
+### ADR-047 — Package Manager dump failure degrades evidence instead of aborting capture (superseded by ADR-086)
+Историческое решение v0.2.1 оставляло полный package dump обязательным для `complete` и переводило его отказ в `partial`. Реальный v0.8.8 Research ZIP показал, что это ошибочно смешивает полноту диагностического metadata dump с полнотой основного research evidence. Актуальный contract определён ADR-086.
 
 
 ### ADR-048 — Release acceptance и пользовательская hypervisor-совместимость разделены
@@ -209,8 +209,8 @@ WHPX остаётся предпочтительным Microsoft-backed Windows 
 ### ADR-050 — GPU rendering выбирает Emulator
 При аппаратном CPU-ускорении managed Emulator использует GPU mode auto. Принудительный SwiftShader удалён из штатного hardware path и сохраняется только для software-only fallback.
 
-### ADR-051 — Clean launch является отдельным research mode
-Режим clean останавливает текущий экземпляр target package до preflight, затем запускает collectors и только после перехода capture в ACTIVE запускает APK. Режим continue сохраняет уже существующее состояние приложения. Выбранный режим фиксируется в session event log.
+### ADR-051 — Clean launch является отдельным research mode (sequencing superseded by ADR-087)
+Режим clean и continue остаются отдельными пользовательскими режимами, но первоначальная последовательность force-stop-before-preflight больше не является активным contract. Актуальная граница clean launch зафиксирована ADR-087.
 
 
 ### ADR-052 — Framebuffer orientation берётся из Emulator rotation metadata
@@ -328,4 +328,13 @@ Real-PC v0.8.6 testing showed that Emulator gRPC readiness precedes guaranteed p
 
 ### ADR-085 — После v0.8.8 runtime cleanup считается завершённым
 Реальный Windows-тест v0.8.7 подтвердил полную готовность среды: embedded Android загрузился, обязательный gRPC/MMAP framebuffer работал, Root/PCAP/APK readiness завершились успешно. Финальный cleanup v0.8.8 не меняет эту цепочку. Удалены только доказанно мёртвые поля/helpers и исторический package-level monkeypatch repository policy. Добавлен source-level regression contract, который запрещает возврат DWM/native display, ADB screencap/input fallback, graphics profile ladder и manual workflow triggers. Дальнейшие изменения runtime допустимы только для конкретной воспроизводимой проблемы; следующий продуктовый этап — User Actions + Research Timeline.
+
+### ADR-086 — Full Package Manager dump является дополнительным evidence
+Реальный v0.8.8 архив показал две проблемы старого contract: remote `sh -c` redirection была передана через ADB как раздельные host argv, из-за чего Android мог фактически выполнить bare `dumpsys`/bare `cmd`; кроме того, недоступность огромного verbose dump необоснованно переводила полностью пригодные logcat/screen/PCAP evidence в `partial`. Начиная с v0.8.9 remote command передаётся как единый quoted `sh -c '<command > session-file>'`. Primary full dump — bounded `cmd package dump <package>`, fallback — короткий `dumpsys -t 5 package <package>`. Lightweight `cmd package list packages --show-versioncode` сохраняется отдельно. Full dump остаётся raw evidence, но `required_for_complete_session=false`; его отсутствие сохраняется явно и не деградирует session само по себе.
+
+### ADR-087 — Clean launch boundary находится после arm collectors
+Clean launch должен быть доказуемым состоянием в момент старта исследования, а не состоянием десятки секунд до него. Поэтому v0.8.9 сначала завершает preflight, запускает logcat/screen/PCAP и переводит session в ACTIVE, затем выполняет `am force-stop <package>`, подтверждает исчезновение package process, фиксирует event и только после этого выполняет launch. Если process не исчез либо `am start -W` сообщает reuse уже работающего activity instance, clean-launch invariant считается нарушенным и ошибка выходит наружу.
+
+### ADR-088 — Recorder coverage и frame presentation timeline различаются
+Android `screenrecord` может оставаться активным, когда display не генерирует новые кадры; поэтому MP4/Winscope frame span может быть короче wall-clock времени collector process без потери самого capture. Raw MP4 никогда не дополняется синтетическими кадрами. `screen.json` хранит два независимых слоя: (1) host/target start/finish recorder process и `capture_span_seconds`, описывающие coverage; (2) Winscope v2 elapsed frame timestamps + realtime offset, описывающие фактически представленные кадры. Semantic audit требует process coverage через package launch и STOP и отдельно проверяет frame timeline.
 

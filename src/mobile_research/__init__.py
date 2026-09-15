@@ -1,6 +1,6 @@
 """Mobile Research core package."""
 
-__version__ = "0.8.8"
+__version__ = "0.8.9"
 
-# v0.8.8 closes the validated runtime cleanup and commit-only workflow cleanup.
+# v0.8.9 hardens research evidence sequencing and timing.
 __all__ = ["__version__"]

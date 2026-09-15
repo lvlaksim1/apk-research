@@ -1,31 +1,40 @@
-# Mobile Research v0.8.8
+# Mobile Research v0.8.9
 
-v0.8.8 завершает technical cleanup runtime-слоя после успешного реального теста v0.8.7.
+v0.8.9 исправляет три системные проблемы, обнаруженные при анализе реального Research ZIP, созданного v0.8.8.
 
-## Что подтверждено реальным тестом
+## 1. Package metadata без 40-секундного зависания
 
-- Android Emulator загружается внутри Mobile Research;
-- отдельное окно Emulator не используется;
-- gRPC/MMAP framebuffer работает штатно;
-- Root, PCAP и APK readiness завершаются успешно;
-- текущая display/input architecture не требует compatibility fallback.
+Исправлена remote-shell quoting для session-scoped package dump. Вместо ошибочного `cmd package dump-package` используется валидный `cmd package dump <package>` с жёстко ограниченным по времени `dumpsys -t 5 package <package>` fallback.
 
-## Cleanup
+Дополнительно сохраняется lightweight `cmd package list packages --show-versioncode`. Полный verbose dump остаётся полезным raw evidence, но его отсутствие больше не делает качественную сессию `partial`: diagnostic сохраняется, versionCode берётся из lightweight source, остальные collectors продолжают работу.
 
-- удалено неиспользуемое pointer-state поле из `AndroidView`;
-- удалены мёртвые `DesktopController.session_root` и `_thread_quiet`;
-- удалены неиспользуемые `AndroidRuntime.emulator_pid` и GUI `_last_gpu_mode`;
-- убран package-level monkeypatch Android repository selector;
-- `components.py` теперь напрямую делегирует выбор архива единой stable repository policy;
-- удалён дублирующий старый XML parser;
-- добавлен regression contract, запрещающий возврат DWM/native/ADB-display fallback и `workflow_dispatch`.
+## 2. Настоящий clean launch
 
-## Runtime contract не изменён
+В режиме `clean` package больше не force-stop'ится до долгого preflight. Теперь порядок жёсткий:
 
-Windows: `-qt-hide-window → Emulator gRPC → MMAP → AndroidView`.
+`preflight → arm logcat/screen/PCAP → ACTIVE → force-stop → verify process gone → launch`
 
-Input: `AndroidView → persistent gRPC streamInputEvent → Android`.
+Если package не исчез после force-stop либо Android сообщает `Activity not started ... currently running`, clean launch считается нарушенным и сессия завершается с явной ошибкой.
 
-Private-AVD stale-process cleanup и один `-wipe-data` при guest boot stall остаются recovery того же runtime, а не альтернативными режимами.
+## 3. Точная screen timing model
 
-После этого релиза runtime technical cleanup считается завершённым. Следующий этап разработки — User Actions + Research Timeline.
+Raw MP4 остаётся неизменным evidence. В `screen.json` отдельно фиксируются:
+
+- host/target границы жизни процесса `screenrecord`;
+- `capture_span_seconds` — wall-clock coverage collector;
+- Winscope elapsed frame timestamps;
+- realtime-to-elapsed offset;
+- UTC первого/последнего фактического кадра;
+- presentation/frame span.
+
+Статичный экран может не генерировать новые frames, поэтому MP4 presentation span не обязан совпадать с wall-clock временем recorder process. Semantic audit теперь проверяет оба слоя отдельно и требует, чтобы recorder process покрывал launch и STOP.
+
+## Runtime
+
+Windows display/input architecture не изменена:
+
+`-qt-hide-window → Emulator gRPC → MMAP → AndroidView`
+
+Input: persistent gRPC `streamInputEvent`.
+
+Никакие display/input fallback-механизмы не возвращены.

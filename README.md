@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.8.9 — Evidence sequencing and timing hardening
+
+Релиз исправляет три проблемы, обнаруженные при разборе реального Research ZIP v0.8.8. Package metadata больше не может превращать качественную сессию в `partial` только из-за необязательного полного Package Manager dump: исправлена remote `sh -c` quoting, используется валидный bounded `cmd package dump` с коротким `dumpsys` fallback, а versionCode дополнительно фиксируется лёгким package summary. Режим clean теперь выполняет проверенный `force-stop` только после запуска collectors и непосредственно перед launch, поэтому preflight больше не может разрушить clean-launch invariant. Screen evidence теперь явно разделяет wall-clock capture interval процесса `screenrecord` и Winscope frame/presentation span; raw MP4 не переписывается.
+
 ## v0.8.8 — Final technical cleanup
 
 Финальный cleanup стабильного v0.8.7 runtime без изменения пользовательского поведения. Удалены подтверждённо мёртвые desktop state/helpers, package-level monkeypatch выбора Android repository archive заменён прямым стабильным policy-вызовом, а regression contract теперь запрещает возврат удалённых DWM/native/fallback путей и ручных workflow triggers. Рабочая цепочка hidden Emulator → gRPC/MMAP → AndroidView и persistent streamInputEvent не изменена.
@@ -135,7 +139,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.8.6 — Desktop Application** — один обязательный Windows runtime: hidden Emulator + gRPC/MMAP framebuffer + streaming gRPC input. Альтернативные display/input fallbacks удалены; transport failure теперь является явной ошибкой. Recovery private AVD сохранён.
+**v0.8.9 — Desktop Application** — single-path runtime v0.8.8 сохранён; research evidence hardening исправляет package metadata, гарантирует настоящий clean launch после arm collectors и фиксирует точную двухуровневую screen timing model.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 
@@ -196,16 +200,17 @@ v0.1.0 доказывает полный вертикальный цикл: ре
 
 ## Device/System Metadata Collector
 
-Первый реальный evidence collector сохраняет:
+Device/System Metadata Collector сохраняет:
 
 - полный raw `getprop`;
-- raw `dumpsys package <package>`; для больших package dumps Android сначала пишет полный вывод во временный session-файл на target, после чего Mobile Research переносит его через `adb pull`;
+- lightweight package summary через `cmd package list packages --show-versioncode`;
+- best-effort полный Package Manager dump: сначала bounded `cmd package dump <package>`, затем короткий `dumpsys -t 5 package <package>`; вывод переносится через session-scoped remote file + `adb pull`;
 - raw пути APK из `pm path`;
 - системный snapshot: `id`, `uname -a`, SELinux, размер и плотность экрана;
 - target/host clock markers вокруг snapshot;
 - производный `02_normalized/target.json` с базовыми характеристиками target и package.
 
-Обязательные команды приводят collector к `failed`, а сбой дополнительной системной команды фиксируется внутри snapshot и не уничтожает остальные данные.
+Полный verbose package dump является дополнительным raw evidence и сам по себе больше не переводит корректную сессию в `partial`. Если он недоступен, collector сохраняет явный diagnostic artifact и продолжает; versionCode при этом извлекается из lightweight summary. Отказ действительно обязательного metadata-source по-прежнему приводит collector к `failed`.
 
 ## Logcat Collector
 
@@ -235,8 +240,9 @@ v0.1.0 доказывает полный вертикальный цикл: ре
 - STOP пытается послать адресный SIGINT PID нашего `screenrecord`;
 - затем используется terminate → grace period → kill как fallback;
 - пустой, неперенесённый или аварийно завершившийся chunk делает collector `failed`, сохраняя предыдущие chunks;
-- `02_normalized/screen.json` содержит хронологию chunks, команды, return codes, remote PID, timestamps и размеры;
-- если Android `screenrecord` содержит Winscope-v2 metadata track, collector извлекает frame count и абсолютные UTC timestamps первого/последнего кадра без изменения raw MP4.
+- `02_normalized/screen.json` содержит хронологию chunks, команды, return codes, remote PID, host/target timestamps, wall-clock `capture_span_seconds` и размеры;
+- если Android `screenrecord` содержит Winscope-v2 metadata track, collector извлекает frame count, elapsed timestamps, realtime offset и абсолютные UTC timestamps первого/последнего кадра без изменения raw MP4;
+- MP4 presentation/frame span и recorder capture interval считаются разными величинами: при статичном экране Android может не выдавать новые frames, поэтому authoritative coverage определяется жизнью recorder process, а frame timing — фактическими кадрами.
 
 ## Raw Network Collector
 

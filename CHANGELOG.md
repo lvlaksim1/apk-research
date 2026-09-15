@@ -2,6 +2,20 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.8.9] - 2026-09-15
+
+### Research evidence hardening
+
+- Fixes the remote shell quoting used for large package dumps: the entire `sh -c` expression is now passed as one Android-shell argument instead of being split into an invalid remote command.
+- Replaces invalid `cmd package dump-package` fallback with bounded `cmd package dump <package>` and a short `dumpsys -t 5 package <package>` fallback.
+- Adds lightweight `cmd package list packages --show-versioncode` evidence; an unavailable verbose package dump is now diagnostic/optional and no longer degrades an otherwise complete research session.
+- Moves clean-mode `force-stop` to the exact capture boundary after logcat/screen/PCAP collectors are armed, verifies the package process is gone, then launches it.
+- Rejects a clean launch if Android reports that the intent was delivered to an already-running activity instance.
+- Extends `screen.json` with host/target recorder boundaries, wall-clock capture span and explicit Winscope clock-domain fields.
+- Treats recorder process lifetime as capture coverage while preserving Winscope frame timestamps as the actual presentation timeline; raw MP4 is never padded or rewritten.
+- Extends semantic Research ZIP audit to verify screen recorder coverage through launch and STOP independently of idle frame gaps.
+- Preserves the single required gRPC/MMAP display/input runtime from v0.8.8 unchanged.
+
 ## [0.8.8] - 2026-09-15
 
 ### Final technical cleanup
