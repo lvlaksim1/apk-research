@@ -1,14 +1,8 @@
 name: AVD Research Acceptance
+run-name: "AVD Acceptance • ${{ github.event.head_commit.message || github.ref_name }}"
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "src/mobile_research/**"
-      - "tools/acceptance_avd.py"
-      - "tools/check_emulator_grpc.py"
-      - ".github/workflows/avd-research-acceptance.yml"
+  workflow_call:
 
 permissions:
   contents: read
