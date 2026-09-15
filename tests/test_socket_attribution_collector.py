@@ -155,7 +155,7 @@ def test_socket_attribution_collector_normalizes_snapshots(
     collector.start()
     assert collector.running is True
     assert "APP_UID=10234" in factory.command[-1]
-    assert 'echo $ > "$PID_FILE"' in factory.command[-1]
+    assert 'echo $$ > "$PID_FILE"' in factory.command[-1]
     assert 'echo $ > "$PID_FILE"' not in factory.command[-1]
     assert "/proc/net/$T" in factory.command[-1]
 
