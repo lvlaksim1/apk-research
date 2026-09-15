@@ -461,13 +461,18 @@ class AndroidRuntime:
                 self._emit(
                     progress,
                     "Android найден, но загрузка зависла. "
-                    "Автоматическое восстановление…",
+                    "Восстановление чистого AVD…",
                     None,
                     None,
                 )
                 self.stop()
                 self.cleanup_stale_managed_runtime()
-                self._boot_managed_emulator(
+                (
+                    self._gpu_mode,
+                    self._display_mode,
+                    _label,
+                ) = self._startup_profiles()[0]
+                self._recover_stalled_boot(
                     progress,
                     display_ready,
                 )
@@ -529,12 +534,11 @@ class AndroidRuntime:
         progress: RuntimeProgress | None,
         display_ready: RuntimeDisplayReady | None = None,
     ) -> None:
-        """Boot with graphics fallback and one bounded AVD self-healing cycle."""
+        """Boot with graphics fallback and one bounded clean-AVD recovery."""
 
         profiles = self._startup_profiles()
         self._startup_attempts = []
         last_error: AndroidRuntimeError | None = None
-        recovery_used = False
 
         for index, (
             gpu_mode,
@@ -552,6 +556,7 @@ class AndroidRuntime:
             started = time.monotonic()
             failure: AndroidRuntimeError | None = None
             recovery_stage = ""
+            abort_after_failure = False
 
             try:
                 self._start_profile_display(
@@ -559,22 +564,17 @@ class AndroidRuntime:
                     display_ready,
                 )
                 self._wait_for_boot(progress)
-            except AndroidBootTimeout as exc:
-                if not recovery_used:
-                    recovery_used = True
-                    try:
-                        recovery_stage = (
-                            self._recover_stalled_boot(
-                                progress,
-                                display_ready,
-                            )
+            except AndroidBootTimeout:
+                try:
+                    recovery_stage = (
+                        self._recover_stalled_boot(
+                            progress,
+                            display_ready,
                         )
-                    except AndroidRuntimeError as recovery_exc:
-                        failure = recovery_exc
-                    else:
-                        failure = None
-                else:
-                    failure = exc
+                    )
+                except AndroidRuntimeError as recovery_exc:
+                    failure = recovery_exc
+                    abort_after_failure = True
             except AndroidRuntimeError as exc:
                 failure = exc
 
@@ -604,6 +604,8 @@ class AndroidRuntime:
                 )
                 last_error = failure
                 self.stop()
+                if abort_after_failure:
+                    raise failure
                 if index + 1 < len(profiles):
                     self._emit(
                         progress,
@@ -646,8 +648,6 @@ class AndroidRuntime:
                     )
                 if recovery_stage == "wipe-data":
                     message += " • AVD восстановлен"
-                elif recovery_stage == "soft-restart":
-                    message += " • после автоперезапуска"
                 self._emit(
                     progress,
                     message,
@@ -701,50 +701,28 @@ class AndroidRuntime:
         progress: RuntimeProgress | None,
         display_ready: RuntimeDisplayReady | None,
     ) -> str:
-        """Try one same-data restart, then one official -wipe-data recovery."""
+        """Perform exactly one official -wipe-data recovery launch."""
 
         self._emit(
             progress,
             "Android не завершил загрузку. "
-            "Мягкий перезапуск Emulator…",
+            "Восстановление чистого AVD через wipe-data…",
             None,
             None,
         )
         self.stop()
         self.cleanup_stale_managed_runtime()
 
-        self._start_profile_display(
-            progress,
-            display_ready,
-        )
-        try:
-            self._wait_for_boot(
-                progress,
-                boot_timeout=120.0,
-                online_stall_timeout=60.0,
-            )
-            return "soft-restart"
-        except AndroidBootTimeout:
-            self._emit(
-                progress,
-                "Повторная загрузка зависла. "
-                "Восстановление чистого AVD через wipe-data…",
-                None,
-                None,
-            )
-            self.stop()
-            self.cleanup_stale_managed_runtime()
-
         self._wipe_data_next_start = True
         try:
-            self._start_emulator(progress)
+            self._start_profile_display(
+                progress,
+                display_ready,
+            )
         finally:
             # -wipe-data is a one-launch recovery flag, never a persistent mode.
             self._wipe_data_next_start = False
 
-        self._notify_display_ready(
-            display_ready
-        )
         try:
             self._wait_for_boot(
                 progress,

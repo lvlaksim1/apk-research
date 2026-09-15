@@ -4,11 +4,22 @@
 
 ## Текущее состояние
 
-**Этап:** v0.8.2 — corrected gRPC/MMAP framebuffer row-order contract.  
-**Stable baseline:** hidden Emulator + top-down gRPC/MMAP display + streaming gRPC input; DWM compatibility fallback only.  
+**Этап:** v0.8.3 — technical cleanup after validated v0.8.2 runtime.  
+**Stable baseline:** hidden Emulator + top-down gRPC/MMAP display + streaming gRPC input; DWM compatibility fallback only. Boot stall recovery: one `-wipe-data`, no soft restart, no graphics-profile cycling after guest stall.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
+
+### Активный runtime contract
+
+- штатный Windows display: `-qt-hide-window → gRPC streamScreenshot → MMAP → AndroidView`;
+- input: persistent gRPC `streamInputEvent`, pointer drag = DOWN → MOVE → UP;
+- framebuffer `top-down`; display и input geometry совпадают;
+- DWM остаётся только последним compatibility fallback;
+- graphics-profile fallback используется только для process/graphics startup failures;
+- guest/AVD boot stall получает ровно один `-wipe-data`; повторный stall завершает startup;
+- старые ADR ниже сохраняются как история экспериментов. Если старое решение противоречит этому разделу или более новому superseding ADR, активным считается более новое решение.
+
 
 ## Зафиксированные решения
 
@@ -273,7 +284,7 @@ DWM thumbnail композитится в top-level HWND и не являетс�
 После сбоя пользователь не должен перезагружать Windows ради освобождения AVD. v0.7.9 до создания GUI сканирует Windows процессы, но считает кандидатом только `emulator.exe`/`qemu-system-*.exe`, одновременно содержащий `mobile_research_api35` в command line и относящийся к managed Emulator directory Mobile Research. Сначала выполняется graceful `adb -s emulator-5554 emu kill`, затем surviving matching PID завершается `taskkill /T /F`. Общий adb server и сторонние AVD не затрагиваются. `*.lock` удаляются только если matching processes больше нет; userdata/config/system image не изменяются. При наличии второго живого процесса Mobile Research очистка пропускается, чтобы не уничтожить активный runtime другого окна. Этот механизм не меняет DWM, boot profiles, reset или input path v0.7.8.
 
 
-### ADR-072 — Зависшая загрузка AVD восстанавливается ограниченной двухступенчатой схемой
+### ADR-072 — Зависшая загрузка AVD восстанавливается ограниченной двухступенчатой схемой (superseded by ADR-077)
 Процесс Emulator и DWM surface могут быть живы, когда guest Android не достигает `sys.boot_completed=1`. Это отличается от stale process/lock и не лечится startup cleanup. v0.7.10 классифицирует hardware boot как stalled после 150 s total или 75 s continuous ADB-online без boot_completed. На первый stall выполняется soft restart того же AVD без изменения userdata. Только если повторный boot тоже stalled, один следующий launch получает официальный `-wipe-data`; флаг существует только в памяти до построения этой команды. Clean recovery имеет extended 240 s timeout. На один `ensure_ready` допускается максимум один recovery cycle, после чего сохраняется штатный graphics-profile fallback. DWM/native-window/input код не изменяется.
 
 
@@ -288,4 +299,10 @@ Display lifecycle отделён от guest boot lifecycle. После process s
 
 ### ADR-076 — Ориентация framebuffer является свойством транспорта, а не предположением UI
 Реальный тест v0.8.1 подтвердил, что Emulator `streamScreenshot` через gRPC/MMAP уже отдаёт логически ориентированный top-down raw frame. Старый `AndroidView` безусловно помечал любой RGBA/RGB raw frame как bottom-up и выполнял дополнительный vertical flip, из-за чего изображение оказывалось перевёрнуто относительно корректной Android input geometry. Начиная с v0.8.2 `LiveFrame` несёт явный `row_order`. gRPC/MMAP и gRPC bytes выставляют `top-down`; UI выполняет flip только при явном `bottom-up`. Input mapping, DOWN/MOVE/UP stream и rotation metadata этим изменением не модифицируются.
+
+### ADR-077 — Guest boot stall не является graphics failure
+Реальные тесты v0.7.x показали, что soft restart не восстанавливает affected AVD и только увеличивает время ожидания. Технический cleanup v0.8.3 окончательно закрепляет более строгую классификацию: если Emulator process уже жив, но Android не достигает `sys.boot_completed=1`, это guest/AVD state failure, а не повод перебирать display/GPU profiles. Mobile Research останавливает private AVD, очищает только принадлежащие ему stale processes/locks и выполняет ровно один официальный launch того же выбранного profile с `-wipe-data`. Для clean boot действует extended timeout. Если clean AVD также stalls, ошибка выходит наружу и startup завершается. Soft restart удалён. Host/auto/headless/DWM fallback сохраняется только для настоящих process/graphics startup failures до классификации guest boot stall.
+
+### ADR-078 — v0.8.2 display/input является замороженным baseline
+Реальный пользовательский тест v0.8.2 подтвердил одновременно четыре свойства: отдельное окно Emulator не вспыхивает, framebuffer ориентирован правильно, touch geometry совпадает с изображением, потоковый swipe плавный и отзывчивый. Поэтому technical cleanup v0.8.3 не меняет `AndroidView`, gRPC/MMAP row-order contract, input mapping или DOWN/MOVE/UP cadence. Дальнейшие изменения этого слоя допускаются только для конкретной воспроизводимой регрессии.
 

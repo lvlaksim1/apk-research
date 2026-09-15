@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.8.3 — Technical cleanup
+
+Технический cleanup после подтверждённого реального теста v0.8.2. Display/input baseline не меняется. Удалён бесполезный soft-restart из boot recovery: guest boot stall теперь получает ровно один официальный `-wipe-data`, а при повторном stall запуск останавливается без перехода к новым 150-секундным graphics cycles. Desktop contract и release-gate документация приведены в соответствие с фактической архитектурой.
+
 ## v0.8.2 — Correct gRPC/MMAP display orientation
 
 Исправлена единственная проблема, обнаруженная реальным тестом v0.8.1: raw-кадр `streamScreenshot` больше не переворачивается повторно по вертикали. Для кадров введён явный `row_order`; gRPC/MMAP помечается как `top-down`, поэтому изображение совпадает с реальными координатами Android. Потоковый touch DOWN/MOVE/UP не изменён. Безоконный `-qt-hide-window` startup и отсутствие вспышек сохранены.
@@ -111,7 +115,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.8.2 — Desktop Application** — primary Windows architecture остаётся `-qt-hide-window + gRPC/MMAP`; исправлена display-only инверсия raw framebuffer через явный top-down row-order contract. Потоковый touch и evidence pipeline не изменены.
+**v0.8.3 — Desktop Application** — stable v0.8.2 display/input baseline сохранён; boot recovery упрощён до одного `-wipe-data` без soft restart и без graphics-profile cycling после guest boot stall. Документация синхронизирована с фактическим runtime.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 
@@ -371,9 +375,8 @@ Research ZIP
 ## Среда разработки
 
 - Windows — целевая host-платформа.
-- Python >= 3.11.
-- Android Debug Bridge (ADB) — внешняя runtime-зависимость.
-- На первом этапе интерфейс — CLI.
+- Для пользователя поставляется self-contained `MobileResearchSetup.exe`; Python, Android Studio и отдельный ADB не требуются.
+- Python >= 3.11 и CLI используются только как development/test interfaces внутри репозитория.
 
 ```powershell
 python -m pip install -e ".[dev]"
@@ -382,13 +385,13 @@ python -m pytest -q
 
 ## Следующий этап
 
-После v0.1.0 развитие идёт как **v0.2**. Приоритеты: AVD lifecycle/snapshots, normalized timeline, расширение target abstraction для AVD-PLAY/Physical Device и только затем дополнительные decoder/instrumentation слои. Raw evidence contract v0.1.0 остаётся совместимой базой.
+После стабилизации desktop/runtime baseline v0.8.x следующий продуктовый этап — расширение research semantics: user-action timeline, network flow analysis и app attribution. AVD-PLAY/Physical Device, decoders и instrumentation добавляются поверх неизменного RAW-first evidence contract.
 
 ## CI и release gate
 
 - `CI` автоматически запускается на push/pull request на Windows;
-- `AVD Research Acceptance` автоматически запускает настоящий Android Emulator на Ubuntu/KVM;
-- `Release` запускается по release-prep commit, ждёт успешные CI + AVD acceptance **того же commit SHA**, затем собирает wheel/sdist, создаёт `SHA256SUMS.txt` и публикует tag/GitHub Release;
+- `AVD Research Acceptance` проверяет Research Session Core на настоящем Android Emulator под Linux/KVM;
+- `Desktop Build` собирает и smoke-тестирует standalone Windows application/installer и clean provisioning;
+- `Release` для stable version ждёт успешные CI + AVD Research Acceptance + Desktop Build того же commit SHA и публикует проверенный `MobileResearchSetup.exe`;
+- `Windows WHPX Acceptance` является дополнительной hardware-проверкой и сейчас advisory, а не блокирующим gate;
 - ручной `workflow_dispatch` не используется.
-
-Release `v0.1.0` не считается готовым, пока exact release commit не пройдёт оба обязательных gate.

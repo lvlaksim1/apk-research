@@ -2,6 +2,19 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.8.3] - 2026-09-15
+
+### Technical cleanup
+
+- Freezes the real-PC validated v0.8.2 display/input path: hidden `-qt-hide-window` Emulator, top-down gRPC/MMAP framebuffer and persistent DOWN/MOVE/UP input are unchanged.
+- Removes the ineffective soft Emulator restart from guest boot recovery.
+- A guest/AVD boot stall now performs exactly one official `-wipe-data` recovery on the same selected startup profile.
+- If the clean AVD also stalls, startup stops immediately; it no longer falls through into additional long graphics/display profile cycles.
+- Graphics compatibility fallback remains available for genuine process/graphics startup failures.
+- Synchronizes the desktop contract, README and architecture log with the actual embedded display and release-gate behavior.
+- Marks Windows WHPX Acceptance as advisory in documentation, matching the current release workflow.
+- Retires the obsolete v0.2.0rc1 pull request from active project state.
+
 ## [0.8.2] - 2026-09-15
 
 ### gRPC/MMAP display orientation correction
