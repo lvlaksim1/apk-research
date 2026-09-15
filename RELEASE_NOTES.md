@@ -1,6 +1,6 @@
-# Mobile Research v0.7.10
+# Mobile Research v0.7.11
 
-v0.7.10 adds automatic self-healing for the specific failure observed on the real PC: the Emulator window and DWM surface exist, but Android inside the AVD never reaches `sys.boot_completed=1`.
+v0.7.11 is the release-ready self-healing build for the specific failure observed on the real PC: the Emulator window and DWM surface exist, but Android inside the AVD never reaches `sys.boot_completed=1`. Runtime behavior is the same as the v0.7.10 implementation; this commit includes the corrected test gate.
 
 ## Recovery sequence
 

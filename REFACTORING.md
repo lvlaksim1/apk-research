@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.7.10 — v0.7.9 baseline + bounded self-healing AVD boot.  
+**Этап:** v0.7.11 — release-ready bounded self-healing AVD boot.  
 **Stable baseline:** v0.7.8 display/runtime architecture + streaming touch + isolated startup cleanup + boot self-healing.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  

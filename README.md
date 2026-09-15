@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.7.11 — Self-healing Android boot
+
+Release-ready сборка механизма v0.7.10. Runtime не изменён: один soft restart зависшего AVD, затем при повторном stall один штатный `-wipe-data`. Исправлен только release test gate.
+
 ## v0.7.10 — Self-healing Android boot
 
 Поверх v0.7.9 добавлено только восстановление зависшей загрузки Android. Если Emulator жив, но Android не достигает `sys.boot_completed=1`, Mobile Research один раз мягко перезапускает тот же AVD с сохранением userdata. Если повторная загрузка тоже зависает — один раз выполняется штатный Emulator `-wipe-data` и чистая загрузка. После успеха подготовка APK продолжается автоматически. DWM и real-time swipe не изменены.
@@ -95,7 +99,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.7.10 — Desktop Application** — baseline v0.7.9 плюс bounded self-healing private AVD boot: один soft restart, затем при повторном stall один штатный `-wipe-data` launch. DWM, input и evidence path не меняются.
+**v0.7.11 — Desktop Application** — release-ready baseline v0.7.9 плюс bounded self-healing private AVD boot: один soft restart, затем при повторном stall один штатный `-wipe-data` launch. DWM, input и evidence path не меняются.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

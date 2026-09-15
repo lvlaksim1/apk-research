@@ -2,6 +2,13 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.7.11] - 2026-09-15
+
+### Release correction
+
+- Runtime behavior is identical to v0.7.10 self-healing boot logic.
+- Adds the missing test-module `time` import so the exact release commit passes the full Windows test gate and can be published from the same SHA.
+
 ## [0.7.10] - 2026-09-15
 
 ### Self-healing Android boot
