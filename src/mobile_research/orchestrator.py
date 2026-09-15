@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import statistics
 import time
 import threading
 from dataclasses import dataclass
@@ -198,6 +199,9 @@ class ResearchOrchestrator:
 
     EVENTS_ARTIFACT = "02_normalized/session-events.jsonl"
     USER_ACTIONS_ARTIFACT = USER_ACTIONS_ARTIFACT
+    CLOCK_CALIBRATION_ARTIFACT = (
+        "02_normalized/clock-calibration.json"
+    )
     LAUNCH_ARTIFACT = "01_raw/device/package-launch.txt"
 
     def __init__(
@@ -251,6 +255,8 @@ class ResearchOrchestrator:
         self._launch_registered = False
         self._user_action_lock = threading.Lock()
         self._user_action_sequence = 0
+        self._user_actions_enabled = False
+        self._clock_calibration_registered = False
 
     def start(self) -> StartResult:
         if self.session is not None:
@@ -329,6 +335,7 @@ class ResearchOrchestrator:
                 "capture_active",
                 target_utc=self._target_time_best_effort(),
             )
+            self._calibrate_clock()
 
             if self.launch_mode == "clean":
                 self._event(
@@ -377,6 +384,11 @@ class ResearchOrchestrator:
                 "package_launched",
                 target_utc=self._target_time_best_effort(),
             )
+            self._user_actions_enabled = True
+            self._event(
+                "user_action_capture_enabled",
+                target_utc=self._target_time_best_effort(),
+            )
 
             return StartResult(
                 session_id=self.session.session_id,
@@ -417,6 +429,7 @@ class ResearchOrchestrator:
         if (
             session is None
             or session.status != SessionStatus.ACTIVE
+            or not self._user_actions_enabled
         ):
             return False
 
@@ -473,6 +486,175 @@ class ResearchOrchestrator:
                 handle.flush()
                 os.fsync(handle.fileno())
         return True
+
+    def _calibrate_clock(self) -> None:
+        session = self._require_session()
+        sampler = getattr(
+            self.adb,
+            "get_unix_time_ns",
+            None,
+        )
+        if sampler is None:
+            self._event(
+                "clock_calibration_unavailable",
+                details={
+                    "reason": (
+                        "ADB client has no nanosecond clock sampler"
+                    )
+                },
+            )
+            return
+
+        samples: list[dict[str, object]] = []
+        for index in range(9):
+            before_utc_ns = time.time_ns()
+            before_mono_ns = time.monotonic_ns()
+            try:
+                target_ns = int(
+                    sampler(self.serial)
+                )
+            except Exception as exc:
+                samples.append(
+                    {
+                        "index": index,
+                        "error": (
+                            str(exc)
+                            or exc.__class__.__name__
+                        ),
+                    }
+                )
+                continue
+            after_mono_ns = time.monotonic_ns()
+            rtt_ns = max(
+                0,
+                after_mono_ns - before_mono_ns,
+            )
+            host_midpoint_ns = (
+                before_utc_ns
+                + rtt_ns // 2
+            )
+            offset_ns = (
+                target_ns - host_midpoint_ns
+            )
+            samples.append(
+                {
+                    "index": index,
+                    "target_unix_ns": target_ns,
+                    "host_midpoint_unix_ns": (
+                        host_midpoint_ns
+                    ),
+                    "round_trip_ns": rtt_ns,
+                    "offset_ns": offset_ns,
+                }
+            )
+
+        valid = [
+            sample
+            for sample in samples
+            if "offset_ns" in sample
+        ]
+        if not valid:
+            self._event(
+                "clock_calibration_failed",
+                details={
+                    "samples": len(samples),
+                },
+            )
+            return
+
+        selected = sorted(
+            valid,
+            key=lambda item: int(
+                item["round_trip_ns"]
+            ),
+        )[: min(5, len(valid))]
+        offset_ns = int(
+            statistics.median(
+                int(item["offset_ns"])
+                for item in selected
+            )
+        )
+        median_rtt_ns = int(
+            statistics.median(
+                int(item["round_trip_ns"])
+                for item in selected
+            )
+        )
+        calibration = {
+            "schema_version": "0.1",
+            "method": "adb-ntp-midpoint",
+            "sample_count": len(valid),
+            "selected_count": len(selected),
+            "target_minus_host_ns": offset_ns,
+            "target_minus_host_seconds": (
+                offset_ns / 1_000_000_000
+            ),
+            "median_selected_rtt_ns": (
+                median_rtt_ns
+            ),
+            "estimated_uncertainty_ns": (
+                median_rtt_ns // 2
+            ),
+            "samples": samples,
+            "selected_indices": [
+                int(item["index"])
+                for item in selected
+            ],
+        }
+
+        path = (
+            session.paths.root
+            / self.CLOCK_CALIBRATION_ARTIFACT
+        )
+        temporary = path.with_suffix(
+            path.suffix + ".tmp"
+        )
+        with temporary.open(
+            "w",
+            encoding="utf-8",
+            newline="\n",
+        ) as handle:
+            json.dump(
+                calibration,
+                handle,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+
+        if not self._clock_calibration_registered:
+            session.register_artifact(
+                kind="clock_calibration",
+                relative_path=(
+                    self.CLOCK_CALIBRATION_ARTIFACT
+                ),
+                source="orchestrator",
+                raw=False,
+            )
+            self._clock_calibration_registered = True
+
+        self._event(
+            "clock_calibrated",
+            details={
+                "method": calibration["method"],
+                "sample_count": len(valid),
+                "selected_count": len(selected),
+                "target_minus_host_seconds": (
+                    calibration[
+                        "target_minus_host_seconds"
+                    ]
+                ),
+                "estimated_uncertainty_ns": (
+                    calibration[
+                        "estimated_uncertainty_ns"
+                    ]
+                ),
+            },
+        )
 
     def health_check(self) -> HealthResult:
         session = self._require_session()
