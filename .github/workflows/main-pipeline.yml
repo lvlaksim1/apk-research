@@ -10,6 +10,10 @@ permissions:
   contents: write
   actions: write
 
+concurrency:
+  group: main-pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   changes:
     name: Resolve changed areas
