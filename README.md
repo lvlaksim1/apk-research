@@ -1,5 +1,11 @@
 # Mobile Research
 
+## v0.9.0 — User Actions + Research Timeline
+
+Mobile Research теперь фиксирует действия пользователя во время активного исследования и строит производный `02_normalized/research-timeline.json`, объединяющий lifecycle, пользовательские действия и сетевые маркеры. Pointer gesture сохраняется как один `tap` или `swipe`, wheel — как swipe, клавиши и текстовый ввод — как user actions; последовательные символы группируются в timeline. Для каждого action рассчитывается временное окно и привязываются packet/flow statistics, новые network flows, DNS queries, best-effort TLS SNI и релевантный logcat sample. Host action clock переводится в target clock по сохранённым clock markers, поэтому correlation не предполагает, что Windows и Android имеют нулевой clock skew. В GUI вкладки «Результаты» добавлена кнопка **Research Timeline**.
+
+> Важно: введённый через встроенный Android текст сохраняется в локальном Research ZIP как research evidence. Архив следует считать потенциально чувствительным.
+
 ## v0.8.9 — Evidence sequencing and timing hardening
 
 Релиз исправляет три проблемы, обнаруженные при разборе реального Research ZIP v0.8.8. Package metadata больше не может превращать качественную сессию в `partial` только из-за необязательного полного Package Manager dump: исправлена remote `sh -c` quoting, используется валидный bounded `cmd package dump` с коротким `dumpsys` fallback, а versionCode дополнительно фиксируется лёгким package summary. Режим clean теперь выполняет проверенный `force-stop` только после запуска collectors и непосредственно перед launch, поэтому preflight больше не может разрушить clean-launch invariant. Screen evidence теперь явно разделяет wall-clock capture interval процесса `screenrecord` и Winscope frame/presentation span; raw MP4 не переписывается.
@@ -139,7 +145,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.8.9 — Desktop Application** — single-path runtime v0.8.8 сохранён; research evidence hardening исправляет package metadata, гарантирует настоящий clean launch после arm collectors и фиксирует точную двухуровневую screen timing model.
+**v0.9.0 — Desktop Application** — validated single-path runtime сохранён; добавлены User Actions и unified Research Timeline с clock-aligned correlation к PCAP/network flows и logcat.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 
