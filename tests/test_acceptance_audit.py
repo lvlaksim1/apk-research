@@ -40,6 +40,25 @@ def _epoch(value: str) -> float:
     ).timestamp()
 
 
+def stamp_for_test(seconds: float) -> str:
+    base = datetime(
+        2026,
+        9,
+        13,
+        12,
+        0,
+        tzinfo=timezone.utc,
+    )
+    return (
+        datetime.fromtimestamp(
+            base.timestamp() + seconds,
+            tz=timezone.utc,
+        )
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
 def _pcap(*timestamps: str) -> bytes:
     data = bytearray(
         b"\xd4\xc3\xb2\xa1"
@@ -157,13 +176,16 @@ def _build_zip(
             {
                 "status": "completed",
                 "bytes": 100,
+                "host_started_utc": stamp(1.9),
+                "host_finished_utc": stamp(8.2),
+                "capture_span_seconds": 6.3,
                 "frame_timing": {
                     "source": "winscope-v2",
                     "version": 2,
                     "frame_count": 12,
                     "first_frame_utc": stamp(2.1),
-                    "last_frame_utc": stamp(7.7),
-                    "frame_span_seconds": 5.6,
+                    "last_frame_utc": stamp(5.0),
+                    "frame_span_seconds": 2.9,
                 },
             }
         ]
@@ -228,7 +250,10 @@ def test_complete_research_zip_semantic_audit(
     assert result.logcat_entries == 3
     assert result.screen_frames == 12
     assert result.max_clock_skew_seconds <= 1.0
-    assert result.screen_last_frame_gap_seconds < 1.0
+    assert result.screen_last_frame_gap_seconds >= 3.0
+    assert result.screen_capture_span_seconds == pytest.approx(6.3)
+    assert result.screen_capture_started_utc == stamp_for_test(1.9)
+    assert result.screen_capture_stopped_utc == stamp_for_test(8.2)
 
 
 def test_semantic_audit_rejects_degraded_complete_session(

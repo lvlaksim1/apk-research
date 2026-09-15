@@ -145,15 +145,21 @@ def inspect_screenrecord_timing(
         realtime_to_elapsed_ns + last_elapsed_ns
     )
 
+    frame_span_seconds = (
+        last_elapsed_ns - first_elapsed_ns
+    ) / 1_000_000_000
     return {
         "source": "winscope-v2",
         "version": version,
+        "clock_domain": "device-realtime-derived-from-elapsed",
         "frame_count": frame_count,
+        "realtime_to_elapsed_offset_ns": realtime_to_elapsed_ns,
+        "first_frame_elapsed_ns": first_elapsed_ns,
+        "last_frame_elapsed_ns": last_elapsed_ns,
         "first_frame_utc": _iso_unix_ns(first_realtime_ns),
         "last_frame_utc": _iso_unix_ns(last_realtime_ns),
-        "frame_span_seconds": (
-            last_elapsed_ns - first_elapsed_ns
-        ) / 1_000_000_000,
+        "frame_span_seconds": frame_span_seconds,
+        "presentation_span_seconds": frame_span_seconds,
     }
 
 
@@ -482,6 +488,7 @@ class ScreenRecordingCollector:
             remote_video,
         ]
 
+        target_started_utc = self._target_time_best_effort()
         started_utc = _iso_utc(self.clock())
         try:
             process = self.process_factory(
@@ -523,6 +530,9 @@ class ScreenRecordingCollector:
             "command": command,
             "host_started_utc": started_utc,
             "host_finished_utc": None,
+            "target_started_utc": target_started_utc,
+            "target_finished_utc": None,
+            "capture_span_seconds": None,
             "returncode": None,
             "remote_pid": self._remote_pid,
             "bytes": 0,
@@ -547,7 +557,21 @@ class ScreenRecordingCollector:
         self._close_diagnostic()
         chunk = self._current_chunk
         chunk["host_finished_utc"] = _iso_utc(self.clock())
+        chunk["target_finished_utc"] = self._target_time_best_effort()
         chunk["returncode"] = returncode
+        try:
+            host_started = datetime.fromisoformat(
+                str(chunk["host_started_utc"]).replace("Z", "+00:00")
+            )
+            host_finished = datetime.fromisoformat(
+                str(chunk["host_finished_utc"]).replace("Z", "+00:00")
+            )
+            chunk["capture_span_seconds"] = max(
+                0.0,
+                (host_finished - host_started).total_seconds(),
+            )
+        except (TypeError, ValueError):
+            chunk["capture_span_seconds"] = None
 
         local_relative = str(chunk["local_video"])
         local_path = self.session.paths.root / local_relative
@@ -630,6 +654,14 @@ class ScreenRecordingCollector:
 
         return True
 
+    def _target_time_best_effort(self) -> str | None:
+        if self._serial is None:
+            return None
+        try:
+            return self.adb.get_utc_time(self._serial)
+        except AdbError:
+            return None
+
     def _request_graceful_stop(self) -> None:
         if (
             self._serial is None
@@ -682,6 +714,22 @@ class ScreenRecordingCollector:
             "schema_version": "0.1",
             "collector": self.NAME,
             "backend": self.BACKEND,
+            "timing_model": {
+                "capture_interval": (
+                    "host wall-clock interval while screenrecord process "
+                    "was alive"
+                ),
+                "frame_timestamps": (
+                    "Winscope v2 device elapsed timestamps converted to "
+                    "device realtime"
+                ),
+                "media_duration_note": (
+                    "MP4 presentation duration may be shorter than the "
+                    "capture interval when Android emits no new display "
+                    "frames; the capture interval remains authoritative "
+                    "for collector coverage"
+                ),
+            },
             "status": status,
             "chunk_seconds": self.chunk_seconds,
             "started_utc": self._started_utc,

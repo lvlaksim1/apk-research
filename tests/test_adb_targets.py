@@ -598,12 +598,10 @@ def test_capture_shell_output_to_remote_file() -> None:
             "-s",
             "emulator-5554",
             "shell",
-            "sh",
-            "-c",
             (
-                "dumpsys package com.example.app "
+                "sh -c 'dumpsys package com.example.app "
                 ">/data/local/tmp/mobile-research/"
-                "session-1/package-dump.txt"
+                "session-1/package-dump.txt'"
             ),
         ): _completed(),
     }
@@ -641,3 +639,41 @@ def test_capture_shell_output_rejects_remote_escape() -> None:
             "package",
             "com.example.app",
         )
+
+def test_wait_for_package_stopped_polls_until_process_is_gone() -> None:
+    pid_checks = 0
+
+    def runner(
+        arguments: Sequence[str],
+        timeout: float,
+    ) -> subprocess.CompletedProcess[str]:
+        nonlocal pid_checks
+        key = tuple(arguments)
+        if key == ("devices", "-l"):
+            return _completed(
+                "List of devices attached\n"
+                "emulator-5554 device model:sdk_gphone transport_id:1\n"
+            )
+        if key == (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "pidof",
+            "com.example.app",
+        ):
+            pid_checks += 1
+            if pid_checks < 3:
+                return _completed("4321\n")
+            return _completed(returncode=1)
+        raise AssertionError(key)
+
+    client = AdbClient(Path("adb"), runner=runner)
+
+    assert client.wait_for_package_stopped(
+        "emulator-5554",
+        "com.example.app",
+        timeout=1.0,
+        poll_interval=0.001,
+    ) is True
+    assert pid_checks == 3
+

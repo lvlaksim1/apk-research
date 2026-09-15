@@ -131,6 +131,17 @@ def _iso_utc(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _launch_reused_existing_instance(output: str) -> bool:
+    normalized = output.lower()
+    return (
+        "activity not started" in normalized
+        or (
+            "intent has been delivered" in normalized
+            and "running" in normalized
+        )
+    )
+
+
 def _metadata_factory(
     adb: AdbClient,
     session: SessionManager,
@@ -248,18 +259,6 @@ class ResearchOrchestrator:
                 },
             )
 
-            if self.launch_mode == "clean":
-                self.adb.force_stop_package(
-                    self.serial,
-                    self.package_name,
-                )
-                self._event(
-                    "package_force_stopped",
-                    target_utc=(
-                        self._target_time_best_effort()
-                    ),
-                )
-
             self.session.begin_preflight()
             self._event("preflight_started")
 
@@ -308,11 +307,49 @@ class ResearchOrchestrator:
                 target_utc=self._target_time_best_effort(),
             )
 
+            if self.launch_mode == "clean":
+                self._event(
+                    "package_force_stop_requested",
+                    target_utc=self._target_time_best_effort(),
+                )
+                self.adb.force_stop_package(
+                    self.serial,
+                    self.package_name,
+                )
+                if not self.adb.wait_for_package_stopped(
+                    self.serial,
+                    self.package_name,
+                    timeout=3.0,
+                ):
+                    raise OrchestratorError(
+                        "Clean launch invariant failed: target package "
+                        "is still running after force-stop"
+                    )
+                self._event(
+                    "package_force_stopped",
+                    target_utc=self._target_time_best_effort(),
+                    details={"verified": True},
+                )
+
+            self._event(
+                "package_launch_requested",
+                target_utc=self._target_time_best_effort(),
+            )
             launch_output = self.adb.launch_package(
                 self.serial,
                 self.package_name,
             )
             self._write_launch_output(launch_output)
+            if (
+                self.launch_mode == "clean"
+                and _launch_reused_existing_instance(
+                    launch_output
+                )
+            ):
+                raise OrchestratorError(
+                    "Clean launch invariant failed: Android reused "
+                    "an already-running activity instance"
+                )
             self._event(
                 "package_launched",
                 target_utc=self._target_time_best_effort(),

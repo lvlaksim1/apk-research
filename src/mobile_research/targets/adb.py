@@ -5,6 +5,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable, Sequence
@@ -480,6 +481,32 @@ class AdbClient:
             timeout=15.0,
         )
 
+    def wait_for_package_stopped(
+        self,
+        serial: str,
+        package_name: str,
+        *,
+        timeout: float = 3.0,
+        poll_interval: float = 0.1,
+    ) -> bool:
+        """Verify that the package main process is gone after force-stop."""
+
+        package_name = validate_package_name(package_name)
+        if timeout < 0:
+            raise ValueError("timeout must be non-negative")
+        if poll_interval <= 0:
+            raise ValueError("poll_interval must be positive")
+
+        deadline = time.monotonic() + timeout
+        while True:
+            if not self.get_process_ids(serial, package_name):
+                return True
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            time.sleep(min(poll_interval, remaining))
+
     def launch_package(
         self,
         serial: str,
@@ -596,14 +623,20 @@ class AdbClient:
             + " >"
             + shlex.quote(remote_path)
         )
+        # adb shell joins host argv into one remote command string. Passing
+        # "sh", "-c", <script> as separate host arguments lets the remote
+        # shell treat only the first token of <script> as the -c program.
+        # Keep the complete sh -c expression in one adb shell argument.
+        remote_command = (
+            "sh -c "
+            + shlex.quote(shell_command)
+        )
         self._run_checked(
             [
                 "-s",
                 serial,
                 "shell",
-                "sh",
-                "-c",
-                shell_command,
+                remote_command,
             ],
             timeout=timeout,
         )

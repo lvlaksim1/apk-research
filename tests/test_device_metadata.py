@@ -117,6 +117,14 @@ class FakeAdb:
             from mobile_research.targets import AdbError
 
             raise AdbError(f"optional failure: {label}")
+        if arguments[:5] == (
+            "cmd",
+            "package",
+            "list",
+            "packages",
+            "--show-versioncode",
+        ):
+            return "package:com.example.app versionCode:123\n"
         return f"{label} output\n"
 
 
@@ -146,7 +154,7 @@ def test_metadata_collector_writes_raw_and_normalized_files(
     result = collector.collect()
 
     assert result.status == "completed"
-    assert len(result.raw_artifacts) == 5
+    assert len(result.raw_artifacts) == 6
 
     for relative_path in result.raw_artifacts:
         assert (session.paths.root / relative_path).is_file()
@@ -162,10 +170,9 @@ def test_metadata_collector_writes_raw_and_normalized_files(
         "/data/app/example/base.apk"
     ]
     assert (
-        "dumpsys",
-        "-t",
-        "30",
+        "cmd",
         "package",
+        "dump",
         "com.example.app",
     ) in collector.adb.captured_commands
     assert collector.adb.remote_dirs == [
@@ -177,8 +184,8 @@ def test_metadata_collector_writes_raw_and_normalized_files(
     assert state["status"] == "completed"
     assert state["required"] is True
     assert state["backend"] == "adb"
-    assert len(state["artifact_paths"]) == 6
-    assert len(manifest["artifacts"]) == 6
+    assert len(state["artifact_paths"]) == 7
+    assert len(manifest["artifacts"]) == 7
     assert session.degraded is False
 
 
@@ -276,10 +283,9 @@ def test_large_package_dump_uses_remote_file_transport(
     assert package_file.stat().st_size > 250_000
     assert adb.captured_commands == [
         (
-            "dumpsys",
-            "-t",
-            "30",
+            "cmd",
             "package",
+            "dump",
             "com.example.app",
         )
     ]
@@ -292,16 +298,16 @@ def test_package_dump_timeout_uses_bounded_fallback(
     session = create_session(tmp_path)
     adb = FakeAdb()
     primary = (
-        "dumpsys",
-        "-t",
-        "30",
+        "cmd",
         "package",
+        "dump",
         "com.example.app",
     )
     fallback = (
-        "cmd",
+        "dumpsys",
+        "-t",
+        "5",
         "package",
-        "dump-package",
         "com.example.app",
     )
     adb.capture_failures.add(primary)
@@ -328,7 +334,7 @@ def test_package_dump_timeout_uses_bounded_fallback(
     assert normalized["package_dump"]["complete"] is True
     assert (
         normalized["package_dump"]["method"]
-        == "cmd-package-dump-package"
+        == "dumpsys-package"
     )
 
 
@@ -338,16 +344,16 @@ def test_package_dump_failure_degrades_but_does_not_abort_metadata(
     session = create_session(tmp_path)
     adb = FakeAdb()
     primary = (
-        "dumpsys",
-        "-t",
-        "30",
+        "cmd",
         "package",
+        "dump",
         "com.example.app",
     )
     fallback = (
-        "cmd",
+        "dumpsys",
+        "-t",
+        "5",
         "package",
-        "dump-package",
         "com.example.app",
     )
     adb.capture_failures.update(
@@ -364,14 +370,10 @@ def test_package_dump_failure_degrades_but_does_not_abort_metadata(
     ).collect()
 
     assert result.status == "completed"
-    assert session.degraded is True
+    assert session.degraded is False
     state = session.manifest["collectors"]["device_metadata"]
     assert state["status"] == "completed"
-    assert any(
-        error["source"]
-        == "collector:device_metadata:package_dump"
-        for error in session.manifest["errors"]
-    )
+    assert session.manifest["errors"] == []
 
     package_text = (
         session.paths.raw_device
@@ -389,3 +391,10 @@ def test_package_dump_failure_degrades_but_does_not_abort_metadata(
     )
     assert normalized["package_dump"]["complete"] is False
     assert normalized["package_dump"]["method"] == "unavailable"
+    assert normalized["package_dump"]["required_for_complete_session"] is False
+    assert normalized["package"]["version_code"] == "123"
+    assert (
+        session.paths.raw_device / "package-summary.txt"
+    ).read_text(encoding="utf-8").startswith(
+        "package:com.example.app versionCode:123"
+    )

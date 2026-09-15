@@ -69,6 +69,10 @@ class FakeAdb:
         self.removed: list[str] = []
         self.remote_dirs: list[str] = []
 
+    def get_utc_time(self, serial: str) -> str:
+        assert serial == "emulator-5554"
+        return "2026-09-13T18:00:00Z"
+
     def ensure_ready(self, serial: str) -> None:
         assert serial == "emulator-5554"
 
@@ -197,6 +201,18 @@ def test_screen_recording_graceful_stop_preserves_video(
 
     video = session.paths.root / result.chunks[0]
     assert video.read_bytes() == adb.pull_bytes
+
+    metadata = __import__("json").loads(
+        (
+            session.paths.root
+            / ScreenRecordingCollector.METADATA_ARTIFACT
+        ).read_text(encoding="utf-8")
+    )
+    chunk = metadata["completed_chunks"][0]
+    assert chunk["target_started_utc"] == "2026-09-13T18:00:00Z"
+    assert chunk["target_finished_utc"] == "2026-09-13T18:00:00Z"
+    assert chunk["capture_span_seconds"] >= 0
+    assert "media_duration_note" in metadata["timing_model"]
 
 
 def test_natural_chunk_completion_rotates_to_next_chunk(
@@ -423,6 +439,13 @@ def test_winscope_v2_timing_is_extracted(tmp_path: Path) -> None:
     assert timing["version"] == 2
     assert timing["frame_count"] == 3
     assert timing["frame_span_seconds"] == 2.0
+    assert timing["presentation_span_seconds"] == 2.0
+    assert timing["clock_domain"] == (
+        "device-realtime-derived-from-elapsed"
+    )
+    assert timing["realtime_to_elapsed_offset_ns"] == (
+        1_700_000_000_000_000_000
+    )
     assert timing["first_frame_utc"].endswith("Z")
     assert timing["last_frame_utc"].endswith("Z")
 

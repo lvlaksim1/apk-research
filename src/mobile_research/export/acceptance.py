@@ -52,6 +52,9 @@ class CompleteResearchAudit:
     screen_first_frame_utc: str
     screen_last_frame_utc: str
     screen_last_frame_gap_seconds: float
+    screen_capture_started_utc: str
+    screen_capture_stopped_utc: str
+    screen_capture_span_seconds: float
     max_clock_skew_seconds: float
 
     def to_dict(self) -> dict[str, object]:
@@ -417,11 +420,22 @@ def audit_complete_research_zip(
         frame_count = 0
         first_frames: list[datetime] = []
         last_frames: list[datetime] = []
+        capture_starts: list[datetime] = []
+        capture_stops: list[datetime] = []
         for chunk in chunks:
             if not isinstance(chunk, dict):
                 continue
             if chunk.get("status") != "completed":
                 continue
+            host_started = chunk.get("host_started_utc")
+            host_finished = chunk.get("host_finished_utc")
+            if host_started and host_finished:
+                capture_starts.append(
+                    _parse_utc(str(host_started))
+                )
+                capture_stops.append(
+                    _parse_utc(str(host_finished))
+                )
             timing = chunk.get("frame_timing")
             if not isinstance(timing, dict):
                 continue
@@ -439,6 +453,21 @@ def audit_complete_research_zip(
         if frame_count <= 0 or not first_frames or not last_frames:
             raise ExportError(
                 "Screen video has no Winscope v2 frame timing"
+            )
+        if not capture_starts or not capture_stops:
+            raise ExportError(
+                "Screen metadata has no recorder capture interval"
+            )
+
+        capture_started = min(capture_starts)
+        capture_stopped = max(capture_stops)
+        if capture_started > launch_time:
+            raise ExportError(
+                "Screen recorder process started after package launch"
+            )
+        if capture_stopped < stop_time:
+            raise ExportError(
+                "Screen recorder process stopped before stop request"
             )
 
         first_frame = min(first_frames)
@@ -482,5 +511,14 @@ def audit_complete_research_zip(
             last_frame.isoformat().replace("+00:00", "Z")
         ),
         screen_last_frame_gap_seconds=screen_gap,
+        screen_capture_started_utc=(
+            capture_started.isoformat().replace("+00:00", "Z")
+        ),
+        screen_capture_stopped_utc=(
+            capture_stopped.isoformat().replace("+00:00", "Z")
+        ),
+        screen_capture_span_seconds=(
+            capture_stopped - capture_started
+        ).total_seconds(),
         max_clock_skew_seconds=observed_clock_skew,
     )

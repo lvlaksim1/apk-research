@@ -35,6 +35,11 @@ class FakeAdb:
     def __init__(self) -> None:
         self.launched: list[tuple[str, str]] = []
         self.force_stopped: list[tuple[str, str]] = []
+        self.waited_for_stop: list[tuple[str, str]] = []
+        self.order: list[str] = []
+        self.launch_output = (
+            "Status: ok\nActivity: com.example/.MainActivity\n"
+        )
 
     def get_target_details(self, serial: str) -> FakeDetails:
         assert serial == "emulator-5554"
@@ -58,6 +63,20 @@ class FakeAdb:
         self.force_stopped.append(
             (serial, package_name)
         )
+        self.order.append("force-stop")
+
+    def wait_for_package_stopped(
+        self,
+        serial: str,
+        package_name: str,
+        *,
+        timeout: float = 3.0,
+    ) -> bool:
+        self.waited_for_stop.append(
+            (serial, package_name)
+        )
+        self.order.append("wait-stopped")
+        return True
 
     def launch_package(
         self,
@@ -65,7 +84,8 @@ class FakeAdb:
         package_name: str,
     ) -> str:
         self.launched.append((serial, package_name))
-        return "Status: ok\nActivity: com.example/.MainActivity\n"
+        self.order.append("launch")
+        return self.launch_output
 
 
 class FakeMetadata:
@@ -121,14 +141,18 @@ class FakeContinuous:
         session: SessionManager,
         *,
         fail_health: bool = False,
+        order: list[str] | None = None,
     ) -> None:
         self.name = name
         self.session = session
         self.fail_health = fail_health
+        self.order = order
         self.started = False
         self.stopped = False
 
     def start(self) -> None:
+        if self.order is not None:
+            self.order.append(f"start:{self.name}")
         self.session.register_collector(
             self.name,
             required=True,
@@ -211,6 +235,7 @@ def make_orchestrator(
             "logcat",
             session,
             fail_health=fail_logcat_health,
+            order=adb.order,
         )
 
     def screen_factory(
@@ -222,6 +247,7 @@ def make_orchestrator(
         return FakeContinuous(
             "screen_recording",
             session,
+            order=adb.order,
         )
 
     def network_factory(
@@ -231,6 +257,7 @@ def make_orchestrator(
         return FakeNetwork(
             "raw_network",
             session,
+            order=adb.order,
         )
 
     orchestrator = ResearchOrchestrator(
@@ -336,15 +363,13 @@ def test_start_failure_creates_failed_research_zip(
 
 
 
-def test_clean_launch_force_stops_before_launch(
+def test_clean_launch_force_stops_after_collectors_before_launch(
     tmp_path: Path,
 ) -> None:
     adb = FakeAdb()
 
     def metadata_factory(a, s):
-        assert adb.force_stopped == [
-            ("emulator-5554", "com.example.app")
-        ]
+        assert adb.force_stopped == []
         return FakeMetadata(a, s)
 
     orchestrator = ResearchOrchestrator(
@@ -355,6 +380,74 @@ def test_clean_launch_force_stops_before_launch(
         output_path=tmp_path / "clean.research.zip",
         launch_mode="clean",
         metadata_factory=metadata_factory,
+        logcat_factory=lambda a, s: FakeContinuous(
+            "logcat",
+            s,
+            order=adb.order,
+        ),
+        screen_factory=lambda a, s, c: FakeContinuous(
+            "screen_recording",
+            s,
+            order=adb.order,
+        ),
+        network_factory=lambda a, s: FakeNetwork(
+            "raw_network",
+            s,
+            order=adb.order,
+        ),
+    )
+
+    orchestrator.start()
+
+    assert adb.force_stopped == [
+        ("emulator-5554", "com.example.app")
+    ]
+    assert adb.waited_for_stop == [
+        ("emulator-5554", "com.example.app")
+    ]
+    assert adb.launched == [
+        ("emulator-5554", "com.example.app")
+    ]
+    assert adb.order.index("start:raw_network") < adb.order.index(
+        "force-stop"
+    )
+    assert adb.order.index("force-stop") < adb.order.index(
+        "wait-stopped"
+    )
+    assert adb.order.index("wait-stopped") < adb.order.index("launch")
+
+    events = (
+        orchestrator.session.paths.root
+        / ResearchOrchestrator.EVENTS_ARTIFACT
+    ).read_text(encoding="utf-8")
+    assert events.index("capture_active") < events.index(
+        "package_force_stopped"
+    )
+    assert events.index("package_force_stopped") < events.index(
+        "package_launch_requested"
+    )
+    assert events.index("package_launch_requested") < events.index(
+        "package_launched"
+    )
+
+
+def test_clean_launch_rejects_reused_activity_instance(
+    tmp_path: Path,
+) -> None:
+    adb = FakeAdb()
+    adb.launch_output = (
+        "Status: ok\n"
+        "Warning: Activity not started, intent has been delivered "
+        "to currently running top-most instance.\n"
+    )
+    orchestrator = ResearchOrchestrator(
+        adb,  # type: ignore[arg-type]
+        "emulator-5554",
+        "com.example.app",
+        runtime_root=tmp_path / "sessions-reused",
+        output_path=tmp_path / "reused.research.zip",
+        launch_mode="clean",
+        metadata_factory=lambda a, s: FakeMetadata(a, s),
         logcat_factory=lambda a, s: FakeContinuous(
             "logcat",
             s,
@@ -369,11 +462,8 @@ def test_clean_launch_force_stops_before_launch(
         ),
     )
 
-    orchestrator.start()
-
-    assert adb.force_stopped == [
-        ("emulator-5554", "com.example.app")
-    ]
-    assert adb.launched == [
-        ("emulator-5554", "com.example.app")
-    ]
+    with pytest.raises(
+        OrchestratorError,
+        match="already-running activity instance",
+    ):
+        orchestrator.start()

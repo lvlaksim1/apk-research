@@ -18,6 +18,7 @@ _VERSION_CODE_RE = re.compile(r"\bversionCode=(\d+)")
 _VERSION_NAME_RE = re.compile(r"\bversionName=([^\r\n]+)")
 _FIRST_INSTALL_RE = re.compile(r"^\s*firstInstallTime=(.+)$", re.MULTILINE)
 _LAST_UPDATE_RE = re.compile(r"^\s*lastUpdateTime=(.+)$", re.MULTILINE)
+_SUMMARY_VERSION_CODE_RE = re.compile(r"\bversionCode:(\d+)")
 
 
 class MetadataCollectorError(RuntimeError):
@@ -140,13 +141,13 @@ class DeviceMetadataCollector:
                 serial,
                 package_name,
             )
-            if not package_dump_complete:
-                self.session.record_error(
-                    "collector:device_metadata:package_dump",
-                    "Full package dump unavailable; research continues "
-                    "with degraded package metadata. "
-                    + "; ".join(package_dump_errors),
-                )
+            (
+                package_summary,
+                package_summary_error,
+            ) = self._capture_package_summary(
+                serial,
+                package_name,
+            )
             package_paths = self.adb.get_package_paths(serial, package_name)
 
             system_text, optional_errors = self._capture_optional_system(serial)
@@ -156,6 +157,7 @@ class DeviceMetadataCollector:
             files = {
                 "01_raw/device/getprop.txt": getprop,
                 "01_raw/device/package.txt": package_dump,
+                "01_raw/device/package-summary.txt": package_summary,
                 "01_raw/device/package-paths.txt": package_paths,
                 "01_raw/device/system.txt": system_text,
                 "01_raw/device/clock.txt": (
@@ -187,6 +189,7 @@ class DeviceMetadataCollector:
                 package_name=package_name,
                 getprop=getprop,
                 package_dump=package_dump,
+                package_summary=package_summary,
                 package_paths=package_paths,
                 host_started=host_started,
                 host_finished=host_finished,
@@ -196,6 +199,7 @@ class DeviceMetadataCollector:
                 package_dump_complete=package_dump_complete,
                 package_dump_method=package_dump_method,
                 package_dump_errors=package_dump_errors,
+                package_summary_error=package_summary_error,
             )
             normalized_path = "02_normalized/target.json"
             _write_text_atomic(
@@ -248,45 +252,30 @@ class DeviceMetadataCollector:
                 f"Device metadata capture failed: {message}"
             ) from exc
 
-    def _wait_for_package_manager_idle(
+    def _capture_package_summary(
         self,
         serial: str,
-    ) -> list[str]:
-        errors: list[str] = []
-        commands = (
-            (
-                "package-handler",
-                (
-                    "cmd",
-                    "package",
-                    "wait-for-handler",
-                    "--timeout",
-                    "10000",
-                ),
-            ),
-            (
-                "package-background-handler",
-                (
-                    "cmd",
-                    "package",
-                    "wait-for-background-handler",
-                    "--timeout",
-                    "10000",
-                ),
-            ),
-        )
-        for label, arguments in commands:
-            try:
-                self.adb.shell_output(
-                    serial,
-                    *arguments,
-                    timeout=15.0,
-                )
-            except AdbError as exc:
-                errors.append(
-                    f"{label}: {str(exc) or exc.__class__.__name__}"
-                )
-        return errors
+        package_name: str,
+    ) -> tuple[str, str | None]:
+        try:
+            text = self.adb.shell_output(
+                serial,
+                "cmd",
+                "package",
+                "list",
+                "packages",
+                "--show-versioncode",
+                package_name,
+                timeout=5.0,
+            )
+            return text, None
+        except AdbError as exc:
+            message = str(exc) or exc.__class__.__name__
+            return (
+                "PACKAGE SUMMARY UNAVAILABLE\n"
+                f"- {message}\n",
+                message,
+            )
 
     def _capture_package_dump(
         self,
@@ -300,28 +289,28 @@ class DeviceMetadataCollector:
         temporary = (
             self.session.paths.raw_device / "package.remote.tmp"
         )
-        errors = self._wait_for_package_manager_idle(serial)
+        errors: list[str] = []
         attempts = (
+            (
+                "cmd-package-dump",
+                (
+                    "cmd",
+                    "package",
+                    "dump",
+                    package_name,
+                ),
+                8.0,
+            ),
             (
                 "dumpsys-package",
                 (
                     "dumpsys",
                     "-t",
-                    "30",
+                    "5",
                     "package",
                     package_name,
                 ),
-                40.0,
-            ),
-            (
-                "cmd-package-dump-package",
-                (
-                    "cmd",
-                    "package",
-                    "dump-package",
-                    package_name,
-                ),
-                40.0,
+                8.0,
             ),
         )
 
@@ -352,7 +341,7 @@ class DeviceMetadataCollector:
                         serial,
                         remote_path,
                         temporary,
-                        timeout=60.0,
+                        timeout=20.0,
                     )
                 except AdbError as exc:
                     errors.append(
@@ -379,6 +368,7 @@ class DeviceMetadataCollector:
                 if (
                     "DUMP TIMEOUT" in upper
                     or "FAILURE DUMPING SERVICE" in upper
+                    or "NO SERVICE SPECIFIED" in upper
                 ):
                     errors.append(
                         f"{method}: Android reported an incomplete dump"
@@ -394,9 +384,10 @@ class DeviceMetadataCollector:
 
             diagnostic = (
                 "PACKAGE DUMP UNAVAILABLE\n"
-                "The full Package Manager dump could not be captured.\n"
-                "Other device metadata and research collectors were allowed "
-                "to continue.\n"
+                "The optional full Package Manager dump could not be "
+                "captured within the bounded timeout.\n"
+                "Lightweight package metadata remains available and this "
+                "does not degrade the research session.\n"
                 + "\n".join(f"- {item}" for item in errors)
                 + "\n"
             )
@@ -451,6 +442,7 @@ class DeviceMetadataCollector:
         package_name: str,
         getprop: str,
         package_dump: str,
+        package_summary: str,
         package_paths: str,
         host_started: str,
         host_finished: str,
@@ -460,9 +452,16 @@ class DeviceMetadataCollector:
         package_dump_complete: bool,
         package_dump_method: str,
         package_dump_errors: list[str],
+        package_summary_error: str | None,
     ) -> dict[str, object]:
         properties = _parse_getprop(getprop)
-        version_code = _search_group(_VERSION_CODE_RE, package_dump)
+        version_code = (
+            _search_group(_VERSION_CODE_RE, package_dump)
+            or _search_group(
+                _SUMMARY_VERSION_CODE_RE,
+                package_summary,
+            )
+        )
         version_name = _search_group(_VERSION_NAME_RE, package_dump)
 
         return {
@@ -507,6 +506,11 @@ class DeviceMetadataCollector:
                 "complete": package_dump_complete,
                 "method": package_dump_method,
                 "attempt_errors": list(package_dump_errors),
+                "required_for_complete_session": False,
+            },
+            "package_summary": {
+                "method": "cmd-package-list-packages",
+                "error": package_summary_error,
             },
             "optional_command_errors": optional_errors,
         }
