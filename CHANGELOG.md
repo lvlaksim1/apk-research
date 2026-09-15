@@ -8,13 +8,14 @@ All notable Mobile Research changes are recorded here.
 
 - Adds continuous Android socket ownership snapshots for the target package UID while research is active.
 - Resolves package UID, same-UID processes, socket file descriptors/inodes and TCP/UDP 5-tuples without changing the validated Emulator runtime.
-- Adds evidence-graded flow ownership: `EXACT`, `HIGH`, `MEDIUM`, `UNKNOWN`; shared UID, wildcard endpoints and sampler-margin matches are explicitly downgraded.
+- Adds evidence-graded flow ownership: `EXACT`, `HIGH`, `MEDIUM`, `UNKNOWN`; shared UID can reach `EXACT` only with a direct target-package PID/process → FD → inode link, while shared UID without that link remains `UNKNOWN`. Wildcard endpoints and sampler-margin matches are explicitly downgraded.
 - Adds `02_normalized/socket-attribution.jsonl` and `02_normalized/socket-attribution.json` to the Research ZIP.
 - Adds whole-session `02_normalized/network-flows.json` so background app traffic is visible outside user-action windows.
 - Research Timeline schema becomes 0.3 and annotates flows/new flows with package owner evidence plus per-action attributed packet counts.
 - Keeps user-action causality independent: `causal_claim=false` and `attribution=temporal-only` remain in force.
 - Extends the Timeline GUI with package-attributed packet counts and confidence breakdown.
 - Extends synthetic/unit and real AVD release acceptance to validate attribution evidence and exported flow inventory.
+- Fixes remote sampler PID tracking so graceful stop signals the actual Android shell sampler and cleans up its PID file reliably.
 - Windows installer naming remains `MobileResearchSetup_v<version>.exe`.
 
 ## [0.9.2] - 2026-09-16
