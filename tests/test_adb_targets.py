@@ -677,3 +677,69 @@ def test_wait_for_package_stopped_polls_until_process_is_gone() -> None:
     ) is True
     assert pid_checks == 3
 
+
+
+
+def test_package_uid_and_uid_package_resolution() -> None:
+    responses = {
+        ("devices", "-l"): _completed(
+            "List of devices attached\n"
+            "emulator-5554 device model:sdk_gphone transport_id:1\n"
+        ),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "cmd",
+            "package",
+            "list",
+            "packages",
+            "-U",
+            "com.example.app",
+        ): _completed(
+            "package:com.example.app uid:10234\n"
+        ),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "cmd",
+            "package",
+            "list",
+            "packages",
+            "-U",
+        ): _completed(
+            "package:com.example.app uid:10234\n"
+            "package:com.example.shared uid:10234\n"
+            "package:com.other uid:10300\n"
+        ),
+    }
+
+    def runner(
+        arguments: Sequence[str],
+        timeout: float,
+    ) -> subprocess.CompletedProcess[str]:
+        key = tuple(arguments)
+        if key == (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "getprop",
+            "ro.kernel.qemu",
+        ):
+            return _completed("1\n")
+        return responses[key]
+
+    client = AdbClient(Path("adb"), runner=runner)
+
+    assert client.get_package_uid(
+        "emulator-5554",
+        "com.example.app",
+    ) == 10234
+    assert client.get_packages_for_uid(
+        "emulator-5554",
+        10234,
+    ) == [
+        "com.example.app",
+        "com.example.shared",
+    ]
