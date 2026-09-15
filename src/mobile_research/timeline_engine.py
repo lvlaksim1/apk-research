@@ -15,6 +15,8 @@ MAX_AFTER_SECONDS = 2.0
 MAX_FLOW_SAMPLE = 12
 MAX_LOG_SAMPLE = 12
 
+_LEGACY_BUILD = legacy.build_research_timeline
+
 
 def _alignment(root: Path, fallback: dict[str, Any]) -> dict[str, Any]:
     calibration = legacy._read_json(
@@ -244,7 +246,7 @@ def _correlate(
 
 
 def build_research_timeline(session: SessionManager) -> dict[str, Any]:
-    timeline = legacy.build_research_timeline(session)
+    timeline = _LEGACY_BUILD(session)
     root = session.paths.root
     lifecycle = legacy._read_jsonl(
         root / "02_normalized" / "session-events.jsonl"
@@ -386,3 +388,9 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
         temporary.unlink(missing_ok=True)
 
     return timeline
+
+def install_timeline_engine() -> None:
+    """Install the v0.9.1 builder before orchestrator imports it."""
+
+    legacy.build_research_timeline = build_research_timeline
+
