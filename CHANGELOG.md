@@ -2,6 +2,16 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.7.12] - 2026-09-15
+
+### Boot-stall recovery loop fix
+
+- Removes the soft Emulator restart because the real-PC test confirmed it does not recover the affected AVD.
+- A guest boot timeout is now classified as an AVD/guest-state failure, not a graphics-profile failure.
+- On the first boot stall Mobile Research performs exactly one official `-wipe-data` recovery launch.
+- If the clean AVD still fails to boot, Mobile Research stops and reports the recovery failure instead of cycling through additional 150-second host/auto/gRPC/headless profiles.
+- Existing DWM source handling and real-time touch behavior are unchanged.
+
 ## [0.7.11] - 2026-09-15
 
 ### Release correction

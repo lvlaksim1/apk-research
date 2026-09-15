@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.7.12 — Single wipe recovery, no 150s loop
+
+После подтверждения на реальном ПК мягкий restart удалён. Boot stall теперь не считается graphics failure: выполняется ровно один `-wipe-data` launch. Если чистый AVD не загрузился, Mobile Research выдаёт ошибку и останавливается, а не запускает следующие 150-секундные host/auto/gRPC/headless циклы. DWM и потоковый swipe не изменены.
+
 ## v0.7.11 — Self-healing Android boot
 
 Release-ready сборка механизма v0.7.10. Runtime не изменён: один soft restart зависшего AVD, затем при повторном stall один штатный `-wipe-data`. Исправлен только release test gate.
@@ -99,7 +103,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.7.11 — Desktop Application** — release-ready baseline v0.7.9 плюс bounded self-healing private AVD boot: один soft restart, затем при повторном stall один штатный `-wipe-data` launch. DWM, input и evidence path не меняются.
+**v0.7.12 — Desktop Application** — baseline v0.7.9 плюс строго одноэтапный boot self-healing: при guest boot stall один штатный `-wipe-data` launch без soft restart и без последующего graphics-profile loop. DWM, input и evidence path не меняются.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

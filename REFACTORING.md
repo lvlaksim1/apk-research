@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.7.11 — release-ready bounded self-healing AVD boot.  
-**Stable baseline:** v0.7.8 display/runtime architecture + streaming touch + isolated startup cleanup + boot self-healing.  
+**Этап:** v0.7.12 — single wipe boot recovery without profile loop.  
+**Stable baseline:** v0.7.8 display/runtime architecture + streaming touch + isolated startup cleanup + single wipe recovery.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -275,3 +275,7 @@ DWM thumbnail композитится в top-level HWND и не являетс�
 
 ### ADR-072 — Зависшая загрузка AVD восстанавливается ограниченной двухступенчатой схемой
 Процесс Emulator и DWM surface могут быть живы, когда guest Android не достигает `sys.boot_completed=1`. Это отличается от stale process/lock и не лечится startup cleanup. v0.7.10 классифицирует hardware boot как stalled после 150 s total или 75 s continuous ADB-online без boot_completed. На первый stall выполняется soft restart того же AVD без изменения userdata. Только если повторный boot тоже stalled, один следующий launch получает официальный `-wipe-data`; флаг существует только в памяти до построения этой команды. Clean recovery имеет extended 240 s timeout. На один `ensure_ready` допускается максимум один recovery cycle, после чего сохраняется штатный graphics-profile fallback. DWM/native-window/input код не изменяется.
+
+
+### ADR-073 — Boot stall не участвует в graphics-profile fallback
+Реальный тест v0.7.11 показал, что soft restart не лечит affected AVD, а после failed recovery общий startup loop мог перейти к следующему GPU/display profile и снова ждать 150 s. Это неверная классификация: живой Emulator + доступный ADB + отсутствие `sys.boot_completed=1` является guest/AVD state failure. v0.7.12 при первом stall сразу выполняет ровно один `-wipe-data` launch. При его failure ошибка выходит наружу и boot sequence завершается; host/auto/grpc/headless fallback больше не применяется к boot timeout. Он остаётся только для настоящих process/graphics startup failures.

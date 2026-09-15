@@ -694,57 +694,7 @@ def test_wait_for_boot_detects_online_stall(
         )
 
 
-def test_stalled_boot_recovery_restarts_then_wipes(
-    tmp_path,
-    monkeypatch,
-) -> None:
-    manager = ComponentManager(tmp_path)
-    _make_components_ready(manager)
-    runtime = AndroidRuntime(manager)
-    starts: list[bool] = []
-    waits = [AndroidBootTimeout("stalled"), None]
-
-    monkeypatch.setattr(
-        runtime,
-        "stop",
-        lambda: None,
-    )
-    monkeypatch.setattr(
-        runtime,
-        "cleanup_stale_managed_runtime",
-        lambda: {},
-    )
-
-    def fake_start(progress):
-        starts.append(runtime._wipe_data_next_start)
-
-    def fake_wait(progress, **kwargs):
-        outcome = waits.pop(0)
-        if isinstance(outcome, Exception):
-            raise outcome
-
-    monkeypatch.setattr(
-        runtime,
-        "_start_emulator",
-        fake_start,
-    )
-    monkeypatch.setattr(
-        runtime,
-        "_wait_for_boot",
-        fake_wait,
-    )
-
-    stage = runtime._recover_stalled_boot(
-        None,
-        None,
-    )
-
-    assert stage == "wipe-data"
-    assert starts == [False, True]
-    assert runtime._wipe_data_next_start is False
-
-
-def test_stalled_boot_recovery_keeps_userdata_when_restart_works(
+def test_stalled_boot_recovery_uses_single_wipe_launch(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -781,5 +731,63 @@ def test_stalled_boot_recovery_keeps_userdata_when_restart_works(
         None,
     )
 
-    assert stage == "soft-restart"
-    assert starts == [False]
+    assert stage == "wipe-data"
+    assert starts == [True]
+    assert runtime._wipe_data_next_start is False
+
+
+def test_boot_timeout_does_not_fall_through_graphics_profiles(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    runtime = AndroidRuntime(manager)
+    runtime._software_acceleration = False
+    starts: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        runtime,
+        "_is_windows",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_start_emulator",
+        lambda progress: starts.append(
+            (
+                runtime._gpu_mode,
+                runtime._display_mode,
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_wait_for_boot",
+        lambda progress, **kwargs: (
+            (_ for _ in ()).throw(
+                AndroidBootTimeout("stalled")
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_recover_stalled_boot",
+        lambda progress, display_ready: (
+            (_ for _ in ()).throw(
+                AndroidRuntimeError("wipe failed")
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "stop",
+        lambda: None,
+    )
+
+    with pytest.raises(
+        AndroidRuntimeError,
+        match="Не удалось восстановить Android AVD",
+    ):
+        runtime._boot_managed_emulator(None)
+
+    assert starts == [("host", "dwm-live")]
