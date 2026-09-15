@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.9.1 — Timeline accuracy and GUI on the validated single-path runtime.
+**Этап:** v0.9.2 — Refined Timeline is canonical in exported Research ZIP.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -350,3 +350,8 @@ GUI action timestamp возникает на Windows и не должен пол
 ### ADR-092 — Текстовый ввод является локальным research evidence
 Для воспроизводимости user-action sequence текст, отправленный через встроенный Android keyboard path, сохраняется в `user-actions.jsonl`; adjacent characters могут группироваться в derived timeline. Это означает, что Research ZIP потенциально содержит чувствительный пользовательский ввод. Данные остаются локальными и рассматриваются как evidence наравне с logcat/screen/PCAP; документация обязана явно предупреждать об этом.
 
+### ADR-093 — Exported Research ZIP contains the canonical refined Timeline
+v0.9.1 introduced a refined Timeline engine with high-resolution Windows/Android calibration, exclusive non-overlapping post-action windows and explicit `temporal-only` attribution. A real v0.9.1 archive exposed that `ResearchOrchestrator.stop_and_export()` still called the legacy builder, while the GUI rebuilt the refined Timeline only when the archive was opened. Starting with v0.9.2 the orchestrator itself calls `timeline_engine.build_research_timeline` before export, so `02_normalized/research-timeline.json` inside the forensic ZIP is the canonical schema 0.2 representation. Acceptance must inspect the already-created ZIP and require schema 0.2, `adb-ntp-midpoint`, no causal claim, `temporal-only` attribution and exclusive correlation windows.
+
+### ADR-094 — Windows release installer filename always contains the product version
+Starting with v0.9.2 the public installer asset is named `MobileResearchSetup_v<version>.exe`. Inno Setup, Desktop Build, checksum generation, GitHub Release publication and WHPX acceptance all resolve the same versioned filename. `SHA256SUMS.txt` hashes that exact filename. This rule is part of the release contract for all subsequent Mobile Research releases.
