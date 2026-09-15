@@ -466,19 +466,28 @@ class SocketAttributionIndex:
                 "evidence": "packet-time-unavailable",
             }
 
-        candidates: list[tuple[int, dict[str, Any], str]] = []
+        candidates: list[
+            tuple[int, dict[str, Any], str, bool]
+        ] = []
         for observation in self.observations:
             if not self._time_matches(observation, epoch):
                 continue
             level = self._match_level(observation, packet)
             if level is None:
                 continue
+            directly_observed = (
+                float(observation["first_epoch"])
+                <= epoch
+                <= float(observation["last_epoch"])
+            )
             rank = {
-                "exact": 3,
+                "exact": 4 if directly_observed else 3,
                 "local-endpoint": 2,
                 "port-only": 1,
             }[level]
-            candidates.append((rank, observation, level))
+            candidates.append(
+                (rank, observation, level, directly_observed)
+            )
 
         if not candidates:
             return {
@@ -492,24 +501,37 @@ class SocketAttributionIndex:
                 ],
             }
 
-        _, observation, level = max(
+        _, observation, level, directly_observed = max(
             candidates,
             key=lambda value: value[0],
         )
         unique_uid = self.uid_packages == [self.package]
         inode = int(observation.get("inode") or 0)
-        if level == "exact" and unique_uid and inode > 0:
+        if (
+            level == "exact"
+            and unique_uid
+            and inode > 0
+            and directly_observed
+        ):
             confidence = "EXACT"
             evidence = "unique-package-uid+socket-inode+5-tuple"
             ambiguity: list[str] = []
         elif level == "exact":
             confidence = "HIGH"
             evidence = "package-uid+socket-inode+5-tuple"
-            ambiguity = (
-                ["uid-shared-by-multiple-packages"]
-                if not unique_uid
-                else ["socket-inode-unavailable"]
-            )
+            ambiguity = []
+            if not directly_observed:
+                ambiguity.append(
+                    "packet-matched-within-snapshot-margin"
+                )
+            if not unique_uid:
+                ambiguity.append(
+                    "uid-shared-by-multiple-packages"
+                )
+            if inode <= 0:
+                ambiguity.append(
+                    "socket-inode-unavailable"
+                )
         elif level == "local-endpoint":
             confidence = "HIGH" if unique_uid else "MEDIUM"
             evidence = "package-uid+local-endpoint+socket-inode"
