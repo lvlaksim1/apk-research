@@ -389,8 +389,3 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
 
     return timeline
 
-def install_timeline_engine() -> None:
-    """Install the v0.9.1 builder before orchestrator imports it."""
-
-    legacy.build_research_timeline = build_research_timeline
-
