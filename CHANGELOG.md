@@ -2,6 +2,10 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.9.1] - 2026-09-15
+
+Timeline reliability update.
+
 ## [0.9.0] - 2026-09-15
 
 ### User Actions + unified Research Timeline
