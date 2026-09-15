@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import time
+import zipfile
 from pathlib import Path
 
 from mobile_research.export import (
@@ -135,6 +136,59 @@ def main() -> int:
             )
         if not verification.valid:
             raise RuntimeError("Research ZIP verification failed")
+
+        with zipfile.ZipFile(result.archive) as archive:
+            archived_timeline = json.loads(
+                archive.read(
+                    "02_normalized/research-timeline.json"
+                )
+            )
+        if archived_timeline.get("schema_version") != "0.2":
+            raise RuntimeError(
+                "Exported Research Timeline is not schema 0.2"
+            )
+        archived_alignment = (
+            archived_timeline.get("clock_alignment") or {}
+        )
+        if (
+            archived_alignment.get("method")
+            != "adb-ntp-midpoint"
+        ):
+            raise RuntimeError(
+                "Exported Research Timeline does not use "
+                "high-resolution clock calibration"
+            )
+        archived_actions = (
+            archived_timeline.get("user_actions") or []
+        )
+        if not archived_actions:
+            raise RuntimeError(
+                "Exported Research Timeline has no user actions"
+            )
+        archived_correlation = (
+            archived_actions[0].get("correlation") or {}
+        )
+        archived_window = (
+            archived_correlation.get("window") or {}
+        )
+        if archived_correlation.get("causal_claim") is not False:
+            raise RuntimeError(
+                "Exported Timeline must not claim proven causality"
+            )
+        if (
+            archived_correlation.get("attribution")
+            != "temporal-only"
+        ):
+            raise RuntimeError(
+                "Exported Timeline attribution is not temporal-only"
+            )
+        if (
+            archived_window.get("exclusive_until_next_action")
+            is not True
+        ):
+            raise RuntimeError(
+                "Exported Timeline correlation window is not exclusive"
+            )
 
         audit = audit_complete_research_zip(result.archive)
         print(json.dumps({
