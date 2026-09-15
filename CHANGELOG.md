@@ -2,6 +2,18 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.7.9] - 2026-09-15
+
+### Startup recovery for stale private Emulator processes
+
+- Preserves the v0.7.8 runtime/DWM/swipe baseline and adds only pre-GUI stale-runtime cleanup.
+- Before the Mobile Research window is created, Windows is scanned for `emulator.exe` and `qemu-system-*.exe` processes whose command line belongs specifically to the private `mobile_research_api35` AVD and whose executable lives under Mobile Research's managed Android Emulator directory.
+- Matching processes are first asked to stop through `adb emu kill`; any survivors are terminated as a process tree with `taskkill /T /F`.
+- Generic `adb.exe` processes and unrelated Android Emulator instances are never terminated by startup cleanup.
+- A second running Mobile Research executable causes cleanup to be skipped, preventing a newly launched copy from killing the active copy's Emulator.
+- After no managed AVD processes remain, only root-level `*.lock` files/directories in the private AVD home/profile are removed. Userdata, config.ini, system images and SDK files are not touched.
+- Startup recovery is best-effort and cannot prevent the GUI from opening if process inspection itself fails.
+
 ## [0.7.8] - 2026-09-15
 
 ### Controlled rollback to v0.7.4 + real-time swipe only

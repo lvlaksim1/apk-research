@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.7.9 — Automatic stale-Emulator cleanup
+
+Поверх стабильной базы v0.7.8 добавлена только стартовая очистка private Android runtime. До создания GUI программа ищет зависшие `emulator.exe` / `qemu-system-*.exe`, относящиеся строго к `mobile_research_api35`, корректно завершает их и удаляет оставшиеся AVD `*.lock` только после исчезновения процессов. Сторонние Emulator и общий `adb.exe` не затрагиваются. DWM, загрузка Android, reset и real-time swipe не изменены.
+
 ## v0.7.8 — v0.7.4 baseline + real-time swipe only
 
 Полный функциональный baseline возвращён к v0.7.4. Единственное изменение поведения: свайп мышью передаётся как настоящий touch lifecycle DOWN → MOVE → UP и поэтому Android реагирует во время движения, а не после отпускания кнопки. Изменения v0.7.5–v0.7.7 в запуске Emulator, DWM, reset/AVD lifecycle и orphan cleanup не входят в этот релиз.
@@ -87,7 +91,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.7.8 — Desktop Application** — точный функциональный baseline v0.7.4 с единственным дополнением: потоковый gRPC touch DOWN/MOVE/UP для real-time swipe. Startup, DWM source handling, reset и AVD lifecycle оставлены как в v0.7.4.
+**v0.7.9 — Desktop Application** — baseline v0.7.8 без изменений DWM/boot/reset/swipe плюс безопасная startup-очистка зависших процессов и lock-файлов только private AVD `mobile_research_api35`.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.7.8 — controlled rollback to v0.7.4 + real-time swipe.  
-**Stable baseline:** v0.7.4 display/runtime architecture + streaming touch only.  
+**Этап:** v0.7.9 — v0.7.8 baseline + startup stale-runtime cleanup.  
+**Stable baseline:** v0.7.8 display/runtime architecture + streaming touch + isolated startup cleanup.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -267,3 +267,7 @@ DWM thumbnail композитится в top-level HWND и не являетс�
 
 ### ADR-070 — v0.7.8 намеренно ограничен одним изменением относительно v0.7.4
 После реальных тестов v0.7.5–v0.7.7 принято решение вернуть весь functional tree к v0.7.4. В v0.7.8 не переносятся изменения startup/DWM/reset/orphan/AVD lifecycle из последующих версий. Единственный retained delta — pointer drag как touch lifecycle: press → DOWN, move → streamed MOVE, release → UP. `AndroidView`, `DesktopController`, `AndroidRuntime` и `EmulatorGrpcClient` получают только необходимые touch methods; native display и Emulator startup code остаются байт-в-байт на baseline v0.7.4, кроме файлов, где touch integration требует изменений.
+
+
+### ADR-071 — Startup cleanup ограничен только private AVD
+После сбоя пользователь не должен перезагружать Windows ради освобождения AVD. v0.7.9 до создания GUI сканирует Windows процессы, но считает кандидатом только `emulator.exe`/`qemu-system-*.exe`, одновременно содержащий `mobile_research_api35` в command line и относящийся к managed Emulator directory Mobile Research. Сначала выполняется graceful `adb -s emulator-5554 emu kill`, затем surviving matching PID завершается `taskkill /T /F`. Общий adb server и сторонние AVD не затрагиваются. `*.lock` удаляются только если matching processes больше нет; userdata/config/system image не изменяются. При наличии второго живого процесса Mobile Research очистка пропускается, чтобы не уничтожить активный runtime другого окна. Этот механизм не меняет DWM, boot profiles, reset или input path v0.7.8.

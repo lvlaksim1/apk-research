@@ -526,3 +526,98 @@ def test_windows_boot_falls_back_across_embedded_gpu_modes(
         "completed",
     ]
     assert runtime.native_display_supported is False
+
+
+
+def test_startup_cleanup_removes_only_avd_lock_entries(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    manager.paths.avd_home.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    manager.paths.avd_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    keep = manager.paths.avd_dir / "userdata-qemu.img"
+    keep.write_bytes(b"data")
+    lock_file = (
+        manager.paths.avd_dir
+        / "hardware-qemu.ini.lock"
+    )
+    lock_file.write_text("lock", encoding="utf-8")
+    lock_dir = (
+        manager.paths.avd_home
+        / "multiinstance.lock"
+    )
+    lock_dir.mkdir()
+
+    runtime = AndroidRuntime(manager)
+    removed = runtime._remove_stale_avd_locks()
+
+    assert set(removed) == {
+        lock_file,
+        lock_dir,
+    }
+    assert keep.is_file()
+    assert not lock_file.exists()
+    assert not lock_dir.exists()
+
+
+def test_startup_cleanup_does_not_remove_locks_while_process_remains(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    manager.paths.avd_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    lock_file = manager.paths.avd_dir / "active.lock"
+    lock_file.write_text("lock", encoding="utf-8")
+    runtime = AndroidRuntime(manager)
+
+    monkeypatch.setattr(
+        runtime,
+        "_is_windows",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_other_mobile_research_instance_running",
+        lambda: False,
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_windows_managed_avd_processes",
+        lambda: [
+            {
+                "pid": 1234,
+                "name": "emulator.exe",
+                "command_line": "@mobile_research_api35",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_wait_for_managed_processes_to_exit",
+        lambda timeout: None,
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            1,
+            b"",
+            b"",
+        ),
+    )
+
+    report = runtime.cleanup_stale_managed_runtime()
+
+    assert report["remaining_processes"]
+    assert lock_file.is_file()

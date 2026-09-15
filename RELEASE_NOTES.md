@@ -1,31 +1,33 @@
-# Mobile Research v0.7.8
+# Mobile Research v0.7.9
 
-v0.7.8 is an intentional rollback release.
+v0.7.9 keeps the v0.7.8 functional baseline and adds one narrowly scoped recovery feature: automatic cleanup of stale Mobile Research Android Emulator processes at application startup.
 
-## Baseline
+## Startup cleanup
 
-The complete functional tree is restored to **v0.7.4**.
+Before the main window is created, Mobile Research checks Windows for processes belonging specifically to its private AVD `mobile_research_api35`.
 
-Changes introduced after v0.7.4 in these areas are not included:
+A process is eligible only when all of the following are true:
 
-- Emulator startup/window suppression;
-- DWM source-HWND discovery changes;
-- reset/wipe-data lifecycle changes;
-- orphan Emulator cleanup;
-- AVD shutdown/recovery changes.
+- it is `emulator.exe` or `qemu-system-*.exe`;
+- its command line contains the private AVD name;
+- its executable/command line points into Mobile Research's managed Android Emulator directory.
 
-The DWM, startup, reset and AVD behavior is therefore exactly the v0.7.4 implementation.
+This prevents the cleanup from touching unrelated Android Emulator instances.
 
-## Only retained change: real-time swipe
+If stale private processes are found:
 
-The only functional addition to the v0.7.4 baseline is continuous touch input:
+1. Mobile Research first requests a clean `adb emu kill`;
+2. waits briefly for normal shutdown;
+3. terminates only surviving matching process trees;
+4. waits until no matching private Emulator process remains;
+5. removes stale root-level `*.lock` entries from the private AVD home/profile.
 
-- mouse press → touch DOWN;
-- mouse movement while held → streamed touch MOVE;
-- mouse release → final MOVE if necessary + touch UP.
+No userdata, configuration, SDK, system image or APK data is deleted.
 
-MOVE events are rate-limited to roughly 80 Hz to avoid queue buildup.
+Generic `adb.exe` is not killed.
 
-If gRPC input is unavailable, the existing v0.7.4 ADB tap/swipe fallback remains.
+If another Mobile Research executable instance is already running, startup cleanup is skipped so the second launch cannot destroy the active instance's Android environment.
 
-No other runtime behavior is intentionally changed.
+## Unchanged
+
+DWM source-window behavior, Android boot logic, reset behavior and the real-time DOWN/MOVE/UP swipe implementation are unchanged from v0.7.8.

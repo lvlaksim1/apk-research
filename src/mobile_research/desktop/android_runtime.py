@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 import re
+import shutil
 import socket
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -109,6 +112,324 @@ class AndroidRuntime:
         ):
             return 0
         return int(process.pid)
+
+    def cleanup_stale_managed_runtime(
+        self,
+    ) -> dict[str, object]:
+        """Clean only orphaned processes/locks of Mobile Research's private AVD.
+
+        This deliberately does not touch generic adb.exe processes or any
+        Emulator whose command line does not belong to mobile_research_api35.
+        """
+
+        report: dict[str, object] = {
+            "supported": self._is_windows(),
+            "skipped": "",
+            "detected_processes": [],
+            "terminated_processes": [],
+            "locks_removed": [],
+            "remaining_processes": [],
+        }
+        if not self._is_windows():
+            return report
+
+        if self._other_mobile_research_instance_running():
+            report["skipped"] = (
+                "another Mobile Research instance is running"
+            )
+            return report
+
+        detected = self._windows_managed_avd_processes()
+        report["detected_processes"] = [
+            {
+                "pid": item["pid"],
+                "name": item["name"],
+            }
+            for item in detected
+        ]
+
+        if detected:
+            # First ask the running managed AVD to shut down cleanly when ADB
+            # still sees it. This is safe because process identity has already
+            # been restricted to our private AVD.
+            if self.paths.adb.is_file():
+                try:
+                    self._run(
+                        [
+                            str(self.paths.adb),
+                            "-s",
+                            self.SERIAL,
+                            "emu",
+                            "kill",
+                        ],
+                        timeout=5.0,
+                        check=False,
+                    )
+                except Exception:
+                    pass
+
+            self._wait_for_managed_processes_to_exit(
+                timeout=2.5
+            )
+            remaining = self._windows_managed_avd_processes()
+
+            for item in remaining:
+                pid = int(item["pid"])
+                try:
+                    result = subprocess.run(
+                        [
+                            "taskkill.exe",
+                            "/PID",
+                            str(pid),
+                            "/T",
+                            "/F",
+                        ],
+                        capture_output=True,
+                        timeout=8.0,
+                        check=False,
+                        creationflags=getattr(
+                            subprocess,
+                            "CREATE_NO_WINDOW",
+                            0,
+                        ),
+                    )
+                    if result.returncode == 0:
+                        cast_list = report[
+                            "terminated_processes"
+                        ]
+                        assert isinstance(cast_list, list)
+                        cast_list.append(
+                            {
+                                "pid": pid,
+                                "name": item["name"],
+                            }
+                        )
+                except (
+                    OSError,
+                    subprocess.TimeoutExpired,
+                ):
+                    pass
+
+            self._wait_for_managed_processes_to_exit(
+                timeout=5.0
+            )
+
+        remaining = self._windows_managed_avd_processes()
+        report["remaining_processes"] = [
+            {
+                "pid": item["pid"],
+                "name": item["name"],
+            }
+            for item in remaining
+        ]
+
+        # A lock is safe to remove only after no process belonging to this AVD
+        # remains. We never delete userdata or configuration here.
+        if not remaining:
+            removed = self._remove_stale_avd_locks()
+            report["locks_removed"] = [
+                str(path)
+                for path in removed
+            ]
+
+        return report
+
+    def _wait_for_managed_processes_to_exit(
+        self,
+        *,
+        timeout: float,
+    ) -> None:
+        deadline = time.monotonic() + max(
+            0.0,
+            float(timeout),
+        )
+        while time.monotonic() < deadline:
+            if not self._windows_managed_avd_processes():
+                return
+            time.sleep(0.2)
+
+    def _windows_managed_avd_processes(
+        self,
+    ) -> list[dict[str, object]]:
+        if not self._is_windows():
+            return []
+
+        avd = AVD_NAME.replace("'", "''")
+        emulator_root = str(
+            self.paths.sdk_root / "emulator"
+        ).replace("'", "''")
+        script = (
+            "[Console]::OutputEncoding="
+            "[System.Text.UTF8Encoding]::new();"
+            f"$avd='{avd}';"
+            f"$root='{emulator_root}';"
+            "$items=@(Get-CimInstance Win32_Process | "
+            "Where-Object {"
+            "($_.Name -ieq 'emulator.exe' -or "
+            "$_.Name -like 'qemu-system-*.exe') -and "
+            "$_.CommandLine -and "
+            "$_.CommandLine.IndexOf($avd,"
+            "[System.StringComparison]::OrdinalIgnoreCase) -ge 0 -and "
+            "(($_.ExecutablePath -and "
+            "$_.ExecutablePath.StartsWith($root,"
+            "[System.StringComparison]::OrdinalIgnoreCase)) -or "
+            "$_.CommandLine.IndexOf($root,"
+            "[System.StringComparison]::OrdinalIgnoreCase) -ge 0)"
+            "} | Select-Object ProcessId,Name,CommandLine);"
+            "$items | ConvertTo-Json -Compress"
+        )
+        try:
+            result = subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    script,
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=8.0,
+                check=False,
+                creationflags=getattr(
+                    subprocess,
+                    "CREATE_NO_WINDOW",
+                    0,
+                ),
+            )
+        except (
+            OSError,
+            subprocess.TimeoutExpired,
+        ):
+            return []
+        if result.returncode != 0:
+            return []
+        raw = result.stdout.strip()
+        if not raw:
+            return []
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+        if isinstance(value, dict):
+            value = [value]
+        if not isinstance(value, list):
+            return []
+
+        processes: list[dict[str, object]] = []
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            try:
+                pid = int(item.get("ProcessId") or 0)
+            except (TypeError, ValueError):
+                continue
+            if pid <= 0 or pid == os.getpid():
+                continue
+            processes.append(
+                {
+                    "pid": pid,
+                    "name": str(item.get("Name") or ""),
+                    "command_line": str(
+                        item.get("CommandLine") or ""
+                    ),
+                }
+            )
+        return processes
+
+    def _other_mobile_research_instance_running(
+        self,
+    ) -> bool:
+        if not self._is_windows():
+            return False
+
+        executable = Path(sys.executable)
+        name = executable.name.lower()
+        if "mobileresearch" not in name.replace(" ", ""):
+            # Development/test Python processes must not be treated as other
+            # application instances.
+            return False
+
+        path = str(executable.resolve()).replace("'", "''")
+        current_pid = os.getpid()
+        script = (
+            "[Console]::OutputEncoding="
+            "[System.Text.UTF8Encoding]::new();"
+            f"$path='{path}';"
+            f"$pid0={current_pid};"
+            "$count=@(Get-CimInstance Win32_Process | "
+            "Where-Object {"
+            "$_.ProcessId -ne $pid0 -and "
+            "$_.ExecutablePath -and "
+            "$_.ExecutablePath.Equals($path,"
+            "[System.StringComparison]::OrdinalIgnoreCase)"
+            "}).Count;"
+            "Write-Output $count"
+        )
+        try:
+            result = subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    script,
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=5.0,
+                check=False,
+                creationflags=getattr(
+                    subprocess,
+                    "CREATE_NO_WINDOW",
+                    0,
+                ),
+            )
+            return (
+                result.returncode == 0
+                and int(result.stdout.strip() or "0") > 0
+            )
+        except (
+            OSError,
+            ValueError,
+            subprocess.TimeoutExpired,
+        ):
+            return False
+
+    def _remove_stale_avd_locks(
+        self,
+    ) -> list[Path]:
+        removed: list[Path] = []
+        roots = (
+            self.paths.avd_home,
+            self.paths.avd_dir,
+        )
+        for root in roots:
+            if not root.is_dir():
+                continue
+            for path in root.glob("*.lock"):
+                try:
+                    if path.is_dir():
+                        shutil.rmtree(
+                            path,
+                            ignore_errors=False,
+                        )
+                    else:
+                        path.unlink(
+                            missing_ok=True
+                        )
+                    removed.append(path)
+                except OSError:
+                    continue
+        return removed
 
     def ensure_ready(
         self,
