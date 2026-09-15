@@ -146,8 +146,8 @@ jobs:
         run: |
           set -euo pipefail
           gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" \
-            --jq '.artifacts[] | [.id, .name, .workflow_run.id] | @tsv' |
-          while IFS=\t' read -r artifact_id artifact_name run_id; do
+            --jq '.artifacts[] | "\(.id)|\(.name)|\(.workflow_run.id)"' |
+          while IFS='|' read -r artifact_id artifact_name run_id; do
             [[ -z "$artifact_id" ]] && continue
 
             DELETE=false
