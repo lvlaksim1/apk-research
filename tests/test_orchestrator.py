@@ -197,6 +197,9 @@ class FakeContinuous:
         elif self.name == "raw_network":
             relative = "01_raw/network/traffic.pcap"
             data = b"pcap-data"
+        elif self.name == "socket_attribution":
+            relative = "02_normalized/socket-attribution.jsonl"
+            data = b"{}\n"
         else:
             raise AssertionError(self.name)
 
@@ -212,6 +215,11 @@ class FakeContinuous:
 
 
 class FakeNetwork(FakeContinuous):
+    def preflight(self) -> FakePreflight:
+        return FakePreflight()
+
+
+class FakeAttribution(FakeContinuous):
     def preflight(self) -> FakePreflight:
         return FakePreflight()
 
@@ -262,6 +270,16 @@ def make_orchestrator(
             order=adb.order,
         )
 
+    def attribution_factory(
+        adb_value: Any,
+        session: SessionManager,
+    ) -> FakeAttribution:
+        return FakeAttribution(
+            "socket_attribution",
+            session,
+            order=adb.order,
+        )
+
     orchestrator = ResearchOrchestrator(
         adb,  # type: ignore[arg-type]
         "emulator-5554",
@@ -272,6 +290,7 @@ def make_orchestrator(
         logcat_factory=logcat_factory,  # type: ignore[arg-type]
         screen_factory=screen_factory,  # type: ignore[arg-type]
         network_factory=network_factory,  # type: ignore[arg-type]
+        attribution_factory=attribution_factory,  # type: ignore[arg-type]
     )
     return orchestrator, adb
 
@@ -386,6 +405,9 @@ def test_start_failure_creates_failed_research_zip(
         network_factory=lambda a, s: FailingNetwork(
             "raw_network", s
         ),  # type: ignore[arg-type]
+        attribution_factory=lambda a, s: FakeAttribution(
+            "socket_attribution", s
+        ),  # type: ignore[arg-type]
     )
 
     with pytest.raises(OrchestratorError) as error:
@@ -427,6 +449,11 @@ def test_clean_launch_force_stops_after_collectors_before_launch(
         ),
         network_factory=lambda a, s: FakeNetwork(
             "raw_network",
+            s,
+            order=adb.order,
+        ),
+        attribution_factory=lambda a, s: FakeAttribution(
+            "socket_attribution",
             s,
             order=adb.order,
         ),
@@ -493,6 +520,10 @@ def test_clean_launch_rejects_reused_activity_instance(
         ),
         network_factory=lambda a, s: FakeNetwork(
             "raw_network",
+            s,
+        ),
+        attribution_factory=lambda a, s: FakeAttribution(
+            "socket_attribution",
             s,
         ),
     )
