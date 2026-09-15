@@ -55,7 +55,6 @@ class AndroidView(QLabel):
         self._source_image: QImage | None = None
         self._frame_owner = None
         self._display_rect = QRect()
-        self._press_pos: QPoint | None = None
         self._drag_active = False
         self._last_drag_point: tuple[int, int] | None = None
         self._last_drag_emit_ns = 0
@@ -166,7 +165,6 @@ class AndroidView(QLabel):
             point = event.position().toPoint()
             android = self._map_to_android(point)
             if android is not None:
-                self._press_pos = point
                 self._drag_active = True
                 self._last_drag_point = android
                 self._last_drag_emit_ns = (
@@ -227,7 +225,6 @@ class AndroidView(QLabel):
         android = self._map_to_android_clamped(
             event.position().toPoint()
         )
-        self._press_pos = None
         self._drag_active = False
         if android is None:
             android = self._last_drag_point
