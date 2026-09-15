@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import json
+import struct
+from datetime import datetime, timezone
+
 from mobile_research.network_attribution import (
     SocketAttributionIndex,
     parse_socket_snapshot_stream,
     summarize_snapshots,
+    write_normalized_attribution,
 )
+from mobile_research.session import SessionManager
+from mobile_research.timeline_engine import build_research_timeline
 
 
 PACKAGE = "com.example.app"
@@ -122,3 +129,134 @@ def test_packet_summary_separates_attributed_and_unknown() -> None:
     assert result["packet_counts"]["UNKNOWN"] == 1
     assert result["attributed_packet_count"] == 1
     assert result["total_packet_count"] == 2
+
+
+
+def _iso(value: float) -> str:
+    return (
+        datetime.fromtimestamp(value, tz=timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def _tcp_packet() -> bytes:
+    tcp = (
+        struct.pack("!HH", 40000, 443)
+        + b"\x00" * 8
+        + b"\x50\x18"
+        + b"\x00" * 6
+    )
+    total_length = 20 + len(tcp)
+    ip = (
+        b"\x45\x00"
+        + struct.pack("!H", total_length)
+        + b"\x00\x01\x00\x00\x40\x06\x00\x00"
+        + bytes([10, 0, 2, 15])
+        + bytes([93, 184, 216, 34])
+    )
+    ethernet = (
+        b"\x00\x11\x22\x33\x44\x55"
+        b"\x66\x77\x88\x99\xaa\xbb"
+        b"\x08\x00"
+    )
+    return ethernet + ip + tcp
+
+
+def _pcap(epoch: float, packet: bytes) -> bytes:
+    seconds = int(epoch)
+    micros = int(round((epoch - seconds) * 1_000_000))
+    return (
+        b"\xd4\xc3\xb2\xa1"
+        b"\x02\x00\x04\x00"
+        b"\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00"
+        b"\xff\xff\x00\x00"
+        b"\x01\x00\x00\x00"
+        + struct.pack(
+            "<IIII",
+            seconds,
+            micros,
+            len(packet),
+            len(packet),
+        )
+        + packet
+    )
+
+
+def test_refined_timeline_exposes_exact_package_flow_owner(
+    tmp_path,
+) -> None:
+    snapshots, summary = _raw_snapshot()
+    session = SessionManager.create(
+        tmp_path,
+        target={"serial": "emulator-5554"},
+        package={"name": PACKAGE},
+        session_id_factory=lambda: "attribution-timeline",
+    )
+    root = session.paths.root
+    write_normalized_attribution(root, snapshots, summary)
+
+    epoch = EPOCH_NS / 1_000_000_000
+    (
+        root / "02_normalized" / "session-events.jsonl"
+    ).write_text(
+        json.dumps(
+            {
+                "event": "package_launched",
+                "host_utc": _iso(epoch - 0.2),
+                "target_utc": _iso(epoch - 0.2),
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (
+        root / "02_normalized" / "user-actions.jsonl"
+    ).write_text(
+        json.dumps(
+            {
+                "action_id": "action-000001",
+                "sequence": 1,
+                "action": "tap",
+                "host_started_utc": _iso(epoch),
+                "host_utc": _iso(epoch),
+                "details": {},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (
+        root / "02_normalized" / "clock-calibration.json"
+    ).write_text(
+        json.dumps(
+            {
+                "method": "adb-ntp-midpoint",
+                "sample_count": 5,
+                "selected_count": 5,
+                "target_minus_host_seconds": 0.0,
+                "estimated_uncertainty_ns": 1_000_000,
+                "samples": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    network_path = root / "01_raw" / "network" / "traffic.pcap"
+    network_path.parent.mkdir(parents=True, exist_ok=True)
+    network_path.write_bytes(
+        _pcap(epoch + 0.05, _tcp_packet())
+    )
+
+    timeline = build_research_timeline(session)
+
+    assert timeline["schema_version"] == "0.3"
+    assert timeline["network_attribution"][
+        "packet_counts"
+    ]["EXACT"] == 1
+    flow = timeline["user_actions"][0][
+        "correlation"
+    ]["network"]["flows"][0]
+    assert flow["owner"]["package"] == PACKAGE
+    assert flow["owner"]["confidence"] == "EXACT"
+    assert flow["owner"]["inode"] == 55555
