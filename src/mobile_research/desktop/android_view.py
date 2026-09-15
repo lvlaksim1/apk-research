@@ -18,16 +18,15 @@ from mobile_research.desktop.emulator_grpc import (
     is_reverse_rotation,
     map_display_ratio_to_input,
 )
-from mobile_research.desktop.native_emulator import (
-    NativeEmulatorEmbedder,
-    windows_native_embedding_available,
+from mobile_research.desktop.dwm_emulator import (
+    DwmEmulatorPresenter,
+    windows_dwm_available,
 )
 
 
 class AndroidView(QLabel):
     """Embedded Android framebuffer optimized for continuous 60 Hz painting."""
 
-    tapRequested = Signal(int, int)
     swipeRequested = Signal(
         int,
         int,
@@ -40,8 +39,8 @@ class AndroidView(QLabel):
     touchUpRequested = Signal(int, int)
     keyRequested = Signal(int)
     textRequested = Signal(str)
-    nativeAttached = Signal(dict)
-    nativeAttachFailed = Signal(str)
+    dwmAttached = Signal(dict)
+    dwmAttachFailed = Signal(str)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -61,21 +60,17 @@ class AndroidView(QLabel):
         self.setFocusPolicy(
             Qt.FocusPolicy.StrongFocus
         )
-        self.setAttribute(
-            Qt.WidgetAttribute.WA_NativeWindow,
-            True,
-        )
-        self._native_embedder = (
-            NativeEmulatorEmbedder(self)
-            if windows_native_embedding_available()
+        self._dwm_presenter = (
+            DwmEmulatorPresenter(self)
+            if windows_dwm_available()
             else None
         )
-        if self._native_embedder is not None:
-            self._native_embedder.attached.connect(
-                self._on_native_attached
+        if self._dwm_presenter is not None:
+            self._dwm_presenter.attached.connect(
+                self._on_dwm_attached
             )
-            self._native_embedder.failed.connect(
-                self._on_native_failed
+            self._dwm_presenter.failed.connect(
+                self._on_dwm_failed
             )
         self._source_image: QImage | None = None
         self._frame_owner = None
@@ -92,18 +87,18 @@ class AndroidView(QLabel):
         self._bottom_up = False
 
     @property
-    def native_active(self) -> bool:
+    def dwm_active(self) -> bool:
         return bool(
-            self._native_embedder is not None
-            and self._native_embedder.active
+            self._dwm_presenter is not None
+            and self._dwm_presenter.active
         )
 
-    def attach_native(
+    def attach_dwm(
         self,
         process_id: int,
         avd_name: str,
     ) -> bool:
-        if self._native_embedder is None:
+        if self._dwm_presenter is None:
             return False
         self._source_image = None
         self._frame_owner = None
@@ -111,27 +106,27 @@ class AndroidView(QLabel):
             "Подключение DWM live Android Emulator…"
         )
         self.update()
-        self._native_embedder.attach(
+        self._dwm_presenter.attach(
             process_id,
             avd_name,
         )
         return True
 
-    def detach_native(self) -> None:
-        if self._native_embedder is not None:
-            self._native_embedder.detach()
+    def detach_dwm(self) -> None:
+        if self._dwm_presenter is not None:
+            self._dwm_presenter.detach()
 
-    def set_native_visible(
+    def set_dwm_visible(
         self,
         visible: bool,
     ) -> None:
-        if self._native_embedder is not None:
-            self._native_embedder.set_presentation_visible(
+        if self._dwm_presenter is not None:
+            self._dwm_presenter.set_presentation_visible(
                 visible
             )
 
     def set_frame(self, frame) -> None:
-        if self.native_active:
+        if self.dwm_active:
             return
         encoding = getattr(
             frame,
@@ -268,13 +263,13 @@ class AndroidView(QLabel):
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
         self._update_display_rect()
-        if self._native_embedder is not None:
-            self._native_embedder.resize_embedded()
+        if self._dwm_presenter is not None:
+            self._dwm_presenter.refresh_presentation()
 
     def moveEvent(self, event) -> None:  # noqa: N802
         super().moveEvent(event)
-        if self._native_embedder is not None:
-            self._native_embedder.resize_embedded()
+        if self._dwm_presenter is not None:
+            self._dwm_presenter.refresh_presentation()
 
     def mousePressEvent(
         self,
@@ -429,7 +424,7 @@ class AndroidView(QLabel):
             return
         super().keyPressEvent(event)
 
-    def _on_native_attached(
+    def _on_dwm_attached(
         self,
         details: dict,
     ) -> None:
@@ -451,13 +446,13 @@ class AndroidView(QLabel):
         self._bottom_up = False
         self._update_display_rect()
         self.setText("")
-        self.nativeAttached.emit(details)
+        self.dwmAttached.emit(details)
 
-    def _on_native_failed(
+    def _on_dwm_failed(
         self,
         message: str,
     ) -> None:
-        self.nativeAttachFailed.emit(message)
+        self.dwmAttachFailed.emit(message)
         if self._source_image is None:
             self.setText(
                 "DWM live недоступен\n"

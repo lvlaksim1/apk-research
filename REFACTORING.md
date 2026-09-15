@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.8.3 — technical cleanup after validated v0.8.2 runtime.  
+**Этап:** v0.8.4 — legacy display cleanup after validated v0.8.2 runtime.  
 **Stable baseline:** hidden Emulator + top-down gRPC/MMAP display + streaming gRPC input; DWM compatibility fallback only. Boot stall recovery: one `-wipe-data`, no soft restart, no graphics-profile cycling after guest stall.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -18,6 +18,8 @@
 - DWM остаётся только последним compatibility fallback;
 - graphics-profile fallback используется только для process/graphics startup failures;
 - guest/AVD boot stall получает ровно один `-wipe-data`; повторный stall завершает startup;
+- DWM compatibility implementation изолирована в `dwm_emulator.py`; active code не содержит SetParent/native-HWND embedding;
+- AndroidView не создаёт отдельный native HWND для rejected SetParent architecture;
 - старые ADR ниже сохраняются как история экспериментов. Если старое решение противоречит этому разделу или более новому superseding ADR, активным считается более новое решение.
 
 
@@ -305,4 +307,10 @@ Display lifecycle отделён от guest boot lifecycle. После process s
 
 ### ADR-078 — v0.8.2 display/input является замороженным baseline
 Реальный пользовательский тест v0.8.2 подтвердил одновременно четыре свойства: отдельное окно Emulator не вспыхивает, framebuffer ориентирован правильно, touch geometry совпадает с изображением, потоковый swipe плавный и отзывчивый. Поэтому technical cleanup v0.8.3 не меняет `AndroidView`, gRPC/MMAP row-order contract, input mapping или DOWN/MOVE/UP cadence. Дальнейшие изменения этого слоя допускаются только для конкретной воспроизводимой регрессии.
+
+### ADR-079 — DWM fallback отделён от отвергнутого native HWND embedding
+Аудит active runtime после v0.8.3 показал, что `native_emulator.py` уже фактически не содержал `SetParent`: файл обслуживал только DWM thumbnail compatibility path, но исторические имена `NativeEmulatorEmbedder`, `nativeDisplayAvailable`, `native_active` и связанные методы создавали ложное впечатление, что native HWND embedding всё ещё является частью архитектуры. v0.8.4 переименовывает модуль в `dwm_emulator.py`, класс в `DwmEmulatorPresenter`, а GUI/controller signals и state — в DWM-specific names. Исторические ADR v0.5-v0.6 остаются только журналом экспериментов; в active runtime нет SetParent path.
+
+### ADR-080 — AndroidView не требует собственного HWND для DWM
+`WA_NativeWindow` был нужен экспериментальной cross-process HWND embedding архитектуре. Текущий DWM presenter регистрирует thumbnail в top-level HWND Mobile Research и вычисляет destination rectangle через Qt mapping, поэтому отдельный native HWND у `AndroidView` не нужен. v0.8.4 удаляет этот флаг. Также удалены неиспользуемые virtual-screen constants, no-op `focus_embedded`, unused `restore` parameter и dead `tapRequested → controller.tap` chain. Runtime `AndroidRuntime.tap()` сохранён, поскольку он остаётся ADB fallback внутри touch lifecycle.
 

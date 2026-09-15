@@ -8,12 +8,12 @@ pytest.importorskip("PySide6.QtWidgets")
 
 from PySide6.QtWidgets import QApplication, QWidget
 
-from mobile_research.desktop.native_emulator import (
+from mobile_research.desktop.dwm_emulator import (
     _covered_source_geometry,
     _fit_rect,
     _phone_content_size,
-    find_emulator_window,
-    windows_native_embedding_available,
+    find_dwm_source_window,
+    windows_dwm_available,
 )
 
 
@@ -51,7 +51,7 @@ def test_source_geometry_is_fully_covered_by_mobile_research() -> None:
     os.name != "nt",
     reason="Win32 window discovery is Windows-only",
 )
-def test_visible_emulator_window_can_be_found() -> None:
+def test_visible_dwm_source_window_can_be_found() -> None:
     app = QApplication.instance() or QApplication([])
     fake_emulator = QWidget()
     fake_emulator.setWindowTitle(
@@ -61,7 +61,7 @@ def test_visible_emulator_window_can_be_found() -> None:
     fake_emulator.show()
     app.processEvents()
 
-    found = find_emulator_window(
+    found = find_dwm_source_window(
         os.getpid(),
         "AVD_RESEARCH",
         require_visible=True,
@@ -70,7 +70,7 @@ def test_visible_emulator_window_can_be_found() -> None:
     hwnd, details = found
     assert int(hwnd) == int(fake_emulator.winId())
     assert details["pid"] == os.getpid()
-    assert windows_native_embedding_available()
+    assert windows_dwm_available()
 
     fake_emulator.close()
     app.processEvents()
@@ -80,7 +80,7 @@ def test_visible_emulator_window_can_be_found() -> None:
     os.name != "nt",
     reason="Win32 window discovery is Windows-only",
 )
-def test_hidden_qt_window_is_not_a_dwm_candidate() -> None:
+def test_hidden_qt_window_is_not_a_dwm_source_candidate() -> None:
     app = QApplication.instance() or QApplication([])
     fake_emulator = QWidget()
     fake_emulator.setWindowTitle(
@@ -92,7 +92,7 @@ def test_hidden_qt_window_is_not_a_dwm_candidate() -> None:
     fake_emulator.hide()
     app.processEvents()
 
-    found = find_emulator_window(
+    found = find_dwm_source_window(
         os.getpid(),
         "AVD_RESEARCH",
         require_visible=True,

@@ -390,7 +390,7 @@ def test_windows_dwm_live_has_real_window(
 
     assert "-qt-hide-window" not in command
     assert "-no-window" not in command
-    assert runtime.native_display_supported is True
+    assert runtime.dwm_display_active is True
     gpu_index = command.index("-gpu")
     assert command[gpu_index + 1] == "host"
 
@@ -430,7 +430,7 @@ def test_windows_runtime_uses_framebuffer_not_native_hwnd(
     )
     runtime._display_mode = "grpc-embedded"
 
-    assert runtime.native_display_supported is False
+    assert runtime.dwm_display_active is False
     assert runtime.emulator_pid == 0
 
 
@@ -452,7 +452,7 @@ def test_windows_headless_mode_disables_native_embedding(
 
     command = runtime._emulator_command()
 
-    assert runtime.native_display_supported is False
+    assert runtime.dwm_display_active is False
     assert "-no-window" in command
     assert "-qt-hide-window" not in command
     gpu_index = command.index("-gpu")
@@ -533,7 +533,7 @@ def test_windows_boot_falls_back_across_embedded_gpu_modes(
         "failed",
         "completed",
     ]
-    assert runtime.native_display_supported is True
+    assert runtime.dwm_display_active is True
 
 
 

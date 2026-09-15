@@ -601,9 +601,6 @@ class MainWindow(QMainWindow):
         self.stop_button.clicked.connect(
             c.stop_research
         )
-        self.android_view.tapRequested.connect(
-            c.tap
-        )
         self.android_view.swipeRequested.connect(
             c.swipe
         )
@@ -622,11 +619,11 @@ class MainWindow(QMainWindow):
         self.android_view.textRequested.connect(
             c.text_input
         )
-        self.android_view.nativeAttached.connect(
-            self._on_native_display_attached
+        self.android_view.dwmAttached.connect(
+            self._on_dwm_display_attached
         )
-        self.android_view.nativeAttachFailed.connect(
-            self._on_native_display_failed
+        self.android_view.dwmAttachFailed.connect(
+            self._on_dwm_display_failed
         )
         c.progress.connect(
             self._on_progress
@@ -660,8 +657,8 @@ class MainWindow(QMainWindow):
         c.diagnosticsReady.connect(
             self._on_diagnostics
         )
-        c.nativeDisplayAvailable.connect(
-            self._on_native_display_available
+        c.dwmDisplayAvailable.connect(
+            self._on_dwm_display_available
         )
         self.tabs.currentChanged.connect(
             self._on_tab_changed
@@ -881,7 +878,7 @@ class MainWindow(QMainWindow):
                 gpu_mode or ""
             )
             suffix = ""
-            if self.android_view.native_active:
+            if self.android_view.dwm_active:
                 suffix += " • DWM live"
             elif transport_name:
                 suffix += f" • {transport_name}"
@@ -890,7 +887,7 @@ class MainWindow(QMainWindow):
             if (
                 transport_name
                 and str(transport_name).startswith("grpc")
-                and not self.android_view.native_active
+                and not self.android_view.dwm_active
             ):
                 self.android_hint.setText(
                     "Embedded gRPC/MMAP • мышь = touch • "
@@ -948,11 +945,11 @@ class MainWindow(QMainWindow):
         self,
         index: int,
     ) -> None:
-        self.android_view.set_native_visible(
+        self.android_view.set_dwm_visible(
             index == 0
         )
 
-    def _on_native_display_available(
+    def _on_dwm_display_available(
         self,
         details: dict,
     ) -> None:
@@ -964,20 +961,20 @@ class MainWindow(QMainWindow):
         self.android_hint.setText(
             "Подключение DWM live Android Emulator…"
         )
-        attached = self.android_view.attach_native(
+        attached = self.android_view.attach_dwm(
             int(details.get("process_id", 0) or 0),
             str(details.get("avd_name", "") or ""),
         )
         if not attached:
-            self.controller.set_native_display_attached(
+            self.controller.set_dwm_display_attached(
                 False
             )
 
-    def _on_native_display_attached(
+    def _on_dwm_display_attached(
         self,
         details: dict,
     ) -> None:
-        self.controller.set_native_display_attached(
+        self.controller.set_dwm_display_attached(
             True
         )
         suffix = " • DWM live"
@@ -992,7 +989,7 @@ class MainWindow(QMainWindow):
             "DWM live Android Emulator • "
             "управление через gRPC"
         )
-        self.android_view.set_native_visible(
+        self.android_view.set_dwm_visible(
             self.tabs.currentIndex() == 0
         )
         self._append_log(
@@ -1000,11 +997,11 @@ class MainWindow(QMainWindow):
             "без SetParent"
         )
 
-    def _on_native_display_failed(
+    def _on_dwm_display_failed(
         self,
         message: str,
     ) -> None:
-        self.controller.set_native_display_attached(
+        self.controller.set_dwm_display_attached(
             False
         )
         suffix = " • framebuffer fallback"

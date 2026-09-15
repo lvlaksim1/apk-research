@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.8.4 — Legacy display cleanup
+
+Второй этап technical cleanup. Активный DWM fallback сохранён без изменения поведения, но полностью отделён от отвергнутой native HWND/SetParent терминологии: модуль переименован в `dwm_emulator.py`, presentation-класс и сигналы получили DWM-имена, удалены неиспользуемые Win32 helpers и старый dead tap signal path. `AndroidView` больше не требует собственного native HWND только ради старой SetParent-архитектуры. Основной gRPC/MMAP display/input baseline v0.8.2 не изменён.
+
 ## v0.8.3 — Technical cleanup
 
 Технический cleanup после подтверждённого реального теста v0.8.2. Display/input baseline не меняется. Удалён бесполезный soft-restart из boot recovery: guest boot stall теперь получает ровно один официальный `-wipe-data`, а при повторном stall запуск останавливается без перехода к новым 150-секундным graphics cycles. Desktop contract и release-gate документация приведены в соответствие с фактической архитектурой.
@@ -115,7 +119,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.8.3 — Desktop Application** — stable v0.8.2 display/input baseline сохранён; boot recovery упрощён до одного `-wipe-data` без soft restart и без graphics-profile cycling после guest boot stall. Документация синхронизирована с фактическим runtime.
+**v0.8.4 — Desktop Application** — stable gRPC/MMAP baseline сохранён; legacy native HWND naming/code paths удалены из активного GUI слоя, DWM оформлен как отдельный explicit compatibility presenter. Boot policy v0.8.3 сохранён.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

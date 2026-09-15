@@ -32,11 +32,6 @@ if WINDOWS:
     SWP_NOACTIVATE = 0x0010
     SWP_FRAMECHANGED = 0x0020
 
-    SM_XVIRTUALSCREEN = 76
-    SM_YVIRTUALSCREEN = 77
-    SM_CXVIRTUALSCREEN = 78
-    SM_CYVIRTUALSCREEN = 79
-
     DWM_TNP_RECTDESTINATION = 0x00000001
     DWM_TNP_RECTSOURCE = 0x00000002
     DWM_TNP_OPACITY = 0x00000004
@@ -155,8 +150,6 @@ if WINDOWS:
         wintypes.UINT,
     ]
     user32.SetWindowPos.restype = wintypes.BOOL
-    user32.GetSystemMetrics.argtypes = [ctypes.c_int]
-    user32.GetSystemMetrics.restype = ctypes.c_int
 
     _get_window_long = getattr(
         user32,
@@ -199,7 +192,7 @@ if WINDOWS:
     dwmapi.DwmUpdateThumbnailProperties.restype = ctypes.c_long
 
 
-def windows_native_embedding_available() -> bool:
+def windows_dwm_available() -> bool:
     return WINDOWS
 
 
@@ -375,7 +368,7 @@ def _fit_rect(
     )
 
 
-def find_emulator_window(
+def find_dwm_source_window(
     root_pid: int,
     avd_name: str,
     *,
@@ -468,7 +461,7 @@ def find_emulator_window(
     return hwnd, details
 
 
-class NativeEmulatorEmbedder(QObject):
+class DwmEmulatorPresenter(QObject):
     """Render the real standalone Emulator through a live DWM thumbnail."""
 
     attached = Signal(dict)
@@ -523,7 +516,7 @@ class NativeEmulatorEmbedder(QObject):
         self._timer.start()
         self._poll()
 
-    def detach(self, *, restore: bool = False) -> None:
+    def detach(self) -> None:
         self._timer.stop()
         if WINDOWS and self.thumbnail:
             try:
@@ -553,7 +546,7 @@ class NativeEmulatorEmbedder(QObject):
                 + (str(exc) or exc.__class__.__name__)
             )
 
-    def resize_embedded(self) -> None:
+    def refresh_presentation(self) -> None:
         if not self.active:
             return
         try:
@@ -563,10 +556,6 @@ class NativeEmulatorEmbedder(QObject):
                 "DWM live display update failed: "
                 + (str(exc) or exc.__class__.__name__)
             )
-
-    def focus_embedded(self) -> None:
-        # Input is intentionally delivered through Emulator gRPC.
-        return
 
     def _poll(self) -> None:
         if self.active:
@@ -584,7 +573,7 @@ class NativeEmulatorEmbedder(QObject):
                 )
             return
 
-        found = find_emulator_window(
+        found = find_dwm_source_window(
             self._root_pid,
             self._avd_name,
             require_visible=True,

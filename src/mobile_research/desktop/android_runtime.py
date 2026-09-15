@@ -101,7 +101,7 @@ class AndroidRuntime:
         return self.components.paths
 
     @property
-    def native_display_supported(self) -> bool:
+    def dwm_display_active(self) -> bool:
         return (
             self._is_windows()
             and self._display_mode == "dwm-live"
@@ -1083,11 +1083,10 @@ class AndroidRuntime:
                     self._last_emulator_command
                 ),
             },
-            "native_display": {
-                "supported": self.native_display_supported,
+            "dwm_display": {
+                "active": self.dwm_display_active,
                 "process_id": self.emulator_pid,
                 "avd_name": AVD_NAME,
-                "preferred": "grpc-mmap",
             },
         }
 

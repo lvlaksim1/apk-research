@@ -2,6 +2,19 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.8.4] - 2026-09-15
+
+### Legacy display cleanup
+
+- Keeps the validated v0.8.2 gRPC/MMAP display/input behavior and the v0.8.3 boot policy unchanged.
+- Renames the active DWM compatibility module from `native_emulator.py` to `dwm_emulator.py`.
+- Replaces misleading Native/attach naming with explicit DWM presenter, signal and state names across AndroidView, DesktopController and MainWindow.
+- Removes the legacy `WA_NativeWindow` requirement from AndroidView; current DWM presentation targets the top-level Mobile Research HWND and does not use SetParent.
+- Removes unused Win32 virtual-screen constants, a no-op focus helper and an unused detach parameter from the DWM path.
+- Removes the dead GUI `tapRequested → controller.tap` chain; click/drag input continues through the already-active DOWN/MOVE/UP lifecycle, while AndroidRuntime.tap remains as the ADB fallback.
+- Renames DWM diagnostics from the obsolete `native_display` terminology.
+- Renames DWM tests accordingly and preserves visible-source discovery, toolbar crop and covered-source geometry coverage.
+
 ## [0.8.3] - 2026-09-15
 
 ### Technical cleanup

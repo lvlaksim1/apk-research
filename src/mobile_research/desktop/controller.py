@@ -37,7 +37,7 @@ class DesktopController(QObject):
     operationBusy = Signal(bool)
     archiveInspection = Signal(dict)
     diagnosticsReady = Signal(dict)
-    nativeDisplayAvailable = Signal(dict)
+    dwmDisplayAvailable = Signal(dict)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -56,7 +56,7 @@ class DesktopController(QObject):
             threading.Thread | None
         ) = None
         self._clean_launch = True
-        self._native_display_attached = False
+        self._dwm_display_attached = False
         self._input_queue: queue.Queue[
             tuple[str, tuple] | None
         ] = queue.Queue()
@@ -181,13 +181,6 @@ class DesktopController(QObject):
             y,
         )
 
-    def tap(self, x: int, y: int) -> None:
-        self._queue_input(
-            "tap",
-            x,
-            y,
-        )
-
     def swipe(
         self,
         x1: int,
@@ -217,11 +210,11 @@ class DesktopController(QObject):
             value,
         )
 
-    def set_native_display_attached(
+    def set_dwm_display_attached(
         self,
         attached: bool,
     ) -> None:
-        self._native_display_attached = bool(attached)
+        self._dwm_display_attached = bool(attached)
         if attached:
             self._stop_screen.set()
             return
@@ -238,7 +231,7 @@ class DesktopController(QObject):
             self._set_busy(True)
             self.runtime.ensure_ready(
                 self._progress_callback,
-                self._native_display_callback,
+                self._display_ready_callback,
             )
             self._prepare_display_transport()
             self.environmentReady.emit(
@@ -265,7 +258,7 @@ class DesktopController(QObject):
             self.package_name = None
             self.runtime.ensure_ready(
                 self._progress_callback,
-                self._native_display_callback,
+                self._display_ready_callback,
             )
             self._prepare_display_transport()
             package = self.runtime.install_apk(
@@ -569,7 +562,7 @@ class DesktopController(QObject):
             self._set_busy(False)
 
     def _prepare_display_transport(self) -> None:
-        if self._native_display_attached:
+        if self._dwm_display_attached:
             self._stop_screen.set()
             return
         self._start_screen_stream()
@@ -617,7 +610,7 @@ class DesktopController(QObject):
             )
         self.screenFrame.emit(frame)
 
-    def _native_display_callback(
+    def _display_ready_callback(
         self,
         process_id: int,
         avd_name: str,
@@ -625,7 +618,7 @@ class DesktopController(QObject):
     ) -> None:
         mode = str(display_mode or "")
         if mode == "dwm-live":
-            self.nativeDisplayAvailable.emit(
+            self.dwmDisplayAvailable.emit(
                 {
                     "process_id": int(process_id or 0),
                     "avd_name": str(avd_name or ""),
@@ -634,7 +627,7 @@ class DesktopController(QObject):
             )
             return
 
-        self._native_display_attached = False
+        self._dwm_display_attached = False
         self._start_screen_stream()
 
     def _progress_callback(
