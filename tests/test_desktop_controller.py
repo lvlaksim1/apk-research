@@ -108,3 +108,23 @@ def test_existing_failed_archive_is_reused_without_second_export(
     assert finished[0]["archive"].endswith(
         "failed.research.zip"
     )
+
+
+def test_display_ready_callback_starts_boot_frames_without_gating(
+    monkeypatch,
+) -> None:
+    controller = DesktopController()
+    calls: list[bool] = []
+
+    monkeypatch.setattr(
+        controller,
+        "_start_screen_stream",
+        lambda *, wait_for_first_frame=False: calls.append(
+            wait_for_first_frame
+        ),
+    )
+
+    controller._display_ready_callback()
+
+    assert calls == [False]
+    controller.close()

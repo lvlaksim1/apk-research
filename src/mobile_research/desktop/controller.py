@@ -587,7 +587,8 @@ class DesktopController(QObject):
         if not self._screen_ready.wait(15.0):
             raise RuntimeError(
                 "Обязательный gRPC/MMAP framebuffer "
-                "не выдал первый кадр за 15 секунд"
+                "не выдал первый кадр за 15 секунд "
+                "после завершения подготовки Android"
             )
         if self._screen_error:
             raise RuntimeError(
@@ -649,8 +650,10 @@ class DesktopController(QObject):
         self.screenFrame.emit(frame)
 
     def _display_ready_callback(self) -> None:
+        # Start presentation as early as possible so boot frames can appear,
+        # but do not gate startup before Android has completed boot/root setup.
         self._start_screen_stream(
-            wait_for_first_frame=True,
+            wait_for_first_frame=False,
         )
 
     def _progress_callback(
