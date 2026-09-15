@@ -11,6 +11,9 @@ from mobile_research.export import (
 )
 from mobile_research.orchestrator import OrchestratorError, ResearchOrchestrator
 from mobile_research.targets import AdbClient, AdbError
+from mobile_research.timeline_reader import (
+    read_refined_timeline_archive,
+)
 
 
 SERIAL = "emulator-5554"
@@ -94,6 +97,14 @@ def main() -> int:
 
         time.sleep(1)
 
+        orchestrator.record_user_action(
+            "key",
+            details={
+                "source": "avd-acceptance",
+                "key": "HOME",
+                "keycode": 3,
+            },
+        )
         client.shell_output(
             SERIAL,
             "input",
@@ -130,6 +141,42 @@ def main() -> int:
             "event": "semantic_audit",
             **audit.to_dict(),
         }, ensure_ascii=False))
+
+        refined = read_refined_timeline_archive(
+            result.archive
+        )
+        refined_actions = refined.get(
+            "user_actions"
+        ) or []
+        if len(refined_actions) < 1:
+            raise RuntimeError(
+                "Refined Research Timeline has no user actions"
+            )
+        alignment = refined.get(
+            "clock_alignment"
+        ) or {}
+        if alignment.get("method") != "adb-ntp-midpoint":
+            raise RuntimeError(
+                "High-resolution clock calibration is missing"
+            )
+        first_correlation = (
+            refined_actions[0].get(
+                "correlation"
+            )
+            or {}
+        )
+        window = first_correlation.get(
+            "window"
+        ) or {}
+        if (
+            window.get(
+                "exclusive_until_next_action"
+            )
+            is not True
+        ):
+            raise RuntimeError(
+                "Adaptive exclusive correlation window is missing"
+            )
 
         if audit.screen_last_frame_gap_seconds > 4.0:
             raise RuntimeError(
