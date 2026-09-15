@@ -352,7 +352,7 @@ class SocketAttributionCollector:
         package = shlex.quote(preflight.package)
         return (
             f"APP_UID={uid}; APP_PACKAGE={package}; PID_FILE={pid_file}; "
-            'echo $ > "$PID_FILE"; '
+            'echo $$ > "$PID_FILE"; '
             'trap \'rm -f "$PID_FILE"; exit 0\' INT TERM HUP; '
             "while :; do "
             'TS=$(date +%s%N); echo "SNAP|$TS"; '
