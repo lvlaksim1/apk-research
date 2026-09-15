@@ -458,6 +458,10 @@ class SocketAttributionCollector:
 
     def _mark_failed(self, message: str) -> None:
         try:
+            self._normalize_best_effort()
+        except Exception:
+            pass
+        try:
             self.session.update_collector(
                 self.NAME,
                 "failed",
