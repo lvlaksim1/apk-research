@@ -1,0 +1,602 @@
+from __future__ import annotations
+
+import ipaddress
+import json
+import statistics
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+SNAPSHOTS_ARTIFACT = "02_normalized/socket-attribution.jsonl"
+SUMMARY_ARTIFACT = "02_normalized/socket-attribution.json"
+
+_CONFIDENCE_ORDER = {
+    "UNKNOWN": 0,
+    "MEDIUM": 1,
+    "HIGH": 2,
+    "EXACT": 3,
+}
+
+
+def _iso_epoch(value: float) -> str:
+    return (
+        datetime.fromtimestamp(value, tz=timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def _normalize_ip(value: str) -> str:
+    address = ipaddress.ip_address(value)
+    if isinstance(address, ipaddress.IPv6Address):
+        mapped = address.ipv4_mapped
+        if mapped is not None:
+            return str(mapped)
+    return str(address)
+
+
+def _decode_proc_ip(value: str, family: str) -> str:
+    raw = bytes.fromhex(value)
+    if family == "ipv4":
+        if len(raw) != 4:
+            raise ValueError("invalid IPv4 /proc address")
+        return str(ipaddress.IPv4Address(raw[::-1]))
+    if len(raw) != 16:
+        raise ValueError("invalid IPv6 /proc address")
+    ordered = b"".join(
+        raw[index : index + 4][::-1]
+        for index in range(0, 16, 4)
+    )
+    return _normalize_ip(str(ipaddress.IPv6Address(ordered)))
+
+
+def _decode_endpoint(value: str, family: str) -> tuple[str, int]:
+    address_hex, port_hex = value.split(":", 1)
+    return _decode_proc_ip(address_hex, family), int(port_hex, 16)
+
+
+def parse_proc_socket_row(
+    table: str,
+    line: str,
+    *,
+    package_uid: int,
+) -> dict[str, Any] | None:
+    parts = line.split()
+    if len(parts) < 10 or parts[0].lower().startswith("sl"):
+        return None
+    family = "ipv6" if table.endswith("6") else "ipv4"
+    protocol = "udp" if table.startswith("udp") else "tcp"
+    try:
+        uid = int(parts[7])
+        if uid != package_uid:
+            return None
+        local_ip, local_port = _decode_endpoint(parts[1], family)
+        remote_ip, remote_port = _decode_endpoint(parts[2], family)
+        inode = int(parts[9])
+    except (ValueError, IndexError):
+        return None
+    return {
+        "protocol": protocol,
+        "family": family,
+        "local_ip": local_ip,
+        "local_port": local_port,
+        "remote_ip": remote_ip,
+        "remote_port": remote_port,
+        "state": parts[3],
+        "uid": uid,
+        "inode": inode,
+    }
+
+
+def parse_socket_snapshot_stream(
+    text: str,
+    *,
+    package: str,
+    package_uid: int,
+    uid_packages: list[str],
+) -> list[dict[str, Any]]:
+    snapshots: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip("\r\n")
+        if not line:
+            continue
+        kind, separator, payload = line.partition("|")
+        if not separator:
+            continue
+
+        if kind == "SNAP":
+            fields = payload.split("|")
+            if not fields:
+                continue
+            try:
+                target_ns = int(fields[0])
+            except ValueError:
+                continue
+            current = {
+                "target_epoch_ns": target_ns,
+                "target_utc": _iso_epoch(target_ns / 1_000_000_000),
+                "package": package,
+                "package_uid": package_uid,
+                "uid_packages": list(uid_packages),
+                "_rows": [],
+                "_processes": {},
+                "_fds": {},
+            }
+            continue
+
+        if current is None:
+            continue
+
+        if kind == "ROW":
+            table, sep, row = payload.partition("|")
+            if not sep:
+                continue
+            socket = parse_proc_socket_row(
+                table,
+                row,
+                package_uid=package_uid,
+            )
+            if socket is not None:
+                current["_rows"].append(socket)
+            continue
+
+        if kind == "PROC":
+            fields = payload.split("|", 2)
+            if len(fields) < 2:
+                continue
+            try:
+                pid = int(fields[0])
+                uid = int(fields[1])
+            except ValueError:
+                continue
+            if uid != package_uid:
+                continue
+            name = fields[2].strip() if len(fields) > 2 else ""
+            current["_processes"][pid] = {
+                "pid": pid,
+                "uid": uid,
+                "name": name,
+            }
+            continue
+
+        if kind == "FD":
+            fields = payload.split("|", 1)
+            if len(fields) != 2:
+                continue
+            try:
+                pid = int(fields[0])
+                inode = int(fields[1])
+            except ValueError:
+                continue
+            current["_fds"].setdefault(inode, set()).add(pid)
+            continue
+
+        if kind == "END":
+            rows = current.pop("_rows")
+            processes = current.pop("_processes")
+            fds = current.pop("_fds")
+            normalized_sockets: list[dict[str, Any]] = []
+            for socket in rows:
+                pids = sorted(fds.get(int(socket["inode"]), set()))
+                socket["pids"] = pids
+                socket["processes"] = [
+                    processes[pid]["name"]
+                    for pid in pids
+                    if pid in processes and processes[pid]["name"]
+                ]
+                normalized_sockets.append(socket)
+            current["processes"] = [
+                processes[pid]
+                for pid in sorted(processes)
+            ]
+            current["sockets"] = normalized_sockets
+            snapshots.append(current)
+            current = None
+
+    return snapshots
+
+
+def load_socket_attribution(root: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    summary: dict[str, Any] = {}
+    try:
+        value = json.loads(
+            (root / SUMMARY_ARTIFACT).read_text(encoding="utf-8")
+        )
+        if isinstance(value, dict):
+            summary = value
+    except (FileNotFoundError, UnicodeDecodeError, json.JSONDecodeError):
+        pass
+
+    snapshots: list[dict[str, Any]] = []
+    try:
+        text = (root / SNAPSHOTS_ARTIFACT).read_text(
+            encoding="utf-8",
+            errors="replace",
+        )
+    except FileNotFoundError:
+        return summary, snapshots
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            snapshots.append(value)
+    return summary, snapshots
+
+
+def summarize_snapshots(
+    snapshots: list[dict[str, Any]],
+    *,
+    package: str,
+    package_uid: int,
+    uid_packages: list[str],
+    sample_interval_seconds: float,
+) -> dict[str, Any]:
+    socket_count = sum(
+        len(snapshot.get("sockets") or [])
+        for snapshot in snapshots
+    )
+    process_count = sum(
+        len(snapshot.get("processes") or [])
+        for snapshot in snapshots
+    )
+    linked_socket_count = sum(
+        1
+        for snapshot in snapshots
+        for socket in snapshot.get("sockets") or []
+        if socket.get("pids")
+    )
+    return {
+        "schema_version": "0.1",
+        "method": "android-proc-socket-snapshots",
+        "package": package,
+        "package_uid": package_uid,
+        "uid_packages": sorted(set(uid_packages)),
+        "uid_is_unique_to_package": sorted(set(uid_packages)) == [package],
+        "sample_interval_seconds": sample_interval_seconds,
+        "snapshot_count": len(snapshots),
+        "socket_observations": socket_count,
+        "process_observations": process_count,
+        "pid_socket_links": linked_socket_count,
+        "first_target_utc": (
+            snapshots[0].get("target_utc") if snapshots else None
+        ),
+        "last_target_utc": (
+            snapshots[-1].get("target_utc") if snapshots else None
+        ),
+    }
+
+
+def write_normalized_attribution(
+    root: Path,
+    snapshots: list[dict[str, Any]],
+    summary: dict[str, Any],
+) -> None:
+    snapshots_path = root / SNAPSHOTS_ARTIFACT
+    snapshots_path.parent.mkdir(parents=True, exist_ok=True)
+    with snapshots_path.open("w", encoding="utf-8", newline="\n") as handle:
+        for snapshot in snapshots:
+            handle.write(
+                json.dumps(
+                    snapshot,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+            )
+            handle.write("\n")
+    summary_path = root / SUMMARY_ARTIFACT
+    summary_path.write_text(
+        json.dumps(
+            summary,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _socket_identity(socket: dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        socket.get("protocol"),
+        socket.get("local_ip"),
+        socket.get("local_port"),
+        socket.get("remote_ip"),
+        socket.get("remote_port"),
+        socket.get("inode"),
+    )
+
+
+def _is_wildcard_ip(value: str | None) -> bool:
+    return value in {None, "", "0.0.0.0", "::"}
+
+
+class SocketAttributionIndex:
+    def __init__(
+        self,
+        summary: dict[str, Any],
+        snapshots: list[dict[str, Any]],
+    ) -> None:
+        self.summary = dict(summary)
+        self.package = str(summary.get("package") or "")
+        self.package_uid = summary.get("package_uid")
+        self.uid_packages = [
+            str(value)
+            for value in summary.get("uid_packages") or []
+        ]
+        interval = float(
+            summary.get("sample_interval_seconds") or 0.2
+        )
+        self.margin_seconds = max(0.25, interval * 1.5)
+
+        observations: dict[tuple[Any, ...], dict[str, Any]] = {}
+        for snapshot in snapshots:
+            try:
+                epoch = int(snapshot["target_epoch_ns"]) / 1_000_000_000
+            except (KeyError, TypeError, ValueError):
+                continue
+            for socket in snapshot.get("sockets") or []:
+                if not isinstance(socket, dict):
+                    continue
+                key = _socket_identity(socket)
+                current = observations.get(key)
+                if current is None:
+                    current = {
+                        **socket,
+                        "first_epoch": epoch,
+                        "last_epoch": epoch,
+                        "pids": set(),
+                        "processes": set(),
+                    }
+                    observations[key] = current
+                else:
+                    current["last_epoch"] = epoch
+                current["pids"].update(
+                    int(value)
+                    for value in socket.get("pids") or []
+                    if isinstance(value, int) or str(value).isdigit()
+                )
+                current["processes"].update(
+                    str(value)
+                    for value in socket.get("processes") or []
+                    if value
+                )
+
+        self.observations: list[dict[str, Any]] = []
+        for value in observations.values():
+            value["pids"] = sorted(value["pids"])
+            value["processes"] = sorted(value["processes"])
+            self.observations.append(value)
+
+    @property
+    def available(self) -> bool:
+        return bool(self.summary) and self.package_uid is not None
+
+    def _time_matches(self, observation: dict[str, Any], epoch: float) -> bool:
+        return (
+            float(observation["first_epoch"]) - self.margin_seconds
+            <= epoch
+            <= float(observation["last_epoch"]) + self.margin_seconds
+        )
+
+    def _match_level(
+        self,
+        observation: dict[str, Any],
+        packet: dict[str, Any],
+    ) -> str | None:
+        protocol = str(packet.get("protocol") or "")
+        if protocol not in {"tcp", "udp"}:
+            return None
+        if protocol != observation.get("protocol"):
+            return None
+
+        src = packet.get("src")
+        dst = packet.get("dst")
+        src_port = packet.get("src_port")
+        dst_port = packet.get("dst_port")
+        if (
+            src is None
+            or dst is None
+            or src_port is None
+            or dst_port is None
+        ):
+            return None
+
+        local_ip = observation.get("local_ip")
+        local_port = observation.get("local_port")
+        remote_ip = observation.get("remote_ip")
+        remote_port = observation.get("remote_port")
+
+        forward = (
+            src == local_ip
+            and src_port == local_port
+            and dst == remote_ip
+            and dst_port == remote_port
+        )
+        reverse = (
+            dst == local_ip
+            and dst_port == local_port
+            and src == remote_ip
+            and src_port == remote_port
+        )
+        if forward or reverse:
+            return "exact"
+
+        remote_wildcard = (
+            _is_wildcard_ip(str(remote_ip) if remote_ip is not None else None)
+            and int(remote_port or 0) == 0
+        )
+        if not remote_wildcard:
+            return None
+
+        local_ip_wildcard = _is_wildcard_ip(
+            str(local_ip) if local_ip is not None else None
+        )
+        local_match = (
+            src_port == local_port
+            and (local_ip_wildcard or src == local_ip)
+        ) or (
+            dst_port == local_port
+            and (local_ip_wildcard or dst == local_ip)
+        )
+        if not local_match:
+            return None
+        return "port-only" if local_ip_wildcard else "local-endpoint"
+
+    def attribute_packet(self, packet: dict[str, Any]) -> dict[str, Any]:
+        if not self.available:
+            return {
+                "confidence": "UNKNOWN",
+                "evidence": "socket-attribution-unavailable",
+            }
+        try:
+            epoch = float(packet["epoch"])
+        except (KeyError, TypeError, ValueError):
+            return {
+                "package": self.package,
+                "uid": self.package_uid,
+                "confidence": "UNKNOWN",
+                "evidence": "packet-time-unavailable",
+            }
+
+        candidates: list[tuple[int, dict[str, Any], str]] = []
+        for observation in self.observations:
+            if not self._time_matches(observation, epoch):
+                continue
+            level = self._match_level(observation, packet)
+            if level is None:
+                continue
+            rank = {
+                "exact": 3,
+                "local-endpoint": 2,
+                "port-only": 1,
+            }[level]
+            candidates.append((rank, observation, level))
+
+        if not candidates:
+            return {
+                "package": self.package,
+                "uid": self.package_uid,
+                "uid_packages": self.uid_packages,
+                "confidence": "UNKNOWN",
+                "evidence": "no-matching-socket-observation",
+                "ambiguity": [
+                    "snapshot-sampling-may-miss-short-lived-sockets"
+                ],
+            }
+
+        _, observation, level = max(
+            candidates,
+            key=lambda value: value[0],
+        )
+        unique_uid = self.uid_packages == [self.package]
+        inode = int(observation.get("inode") or 0)
+        if level == "exact" and unique_uid and inode > 0:
+            confidence = "EXACT"
+            evidence = "unique-package-uid+socket-inode+5-tuple"
+            ambiguity: list[str] = []
+        elif level == "exact":
+            confidence = "HIGH"
+            evidence = "package-uid+socket-inode+5-tuple"
+            ambiguity = (
+                ["uid-shared-by-multiple-packages"]
+                if not unique_uid
+                else ["socket-inode-unavailable"]
+            )
+        elif level == "local-endpoint":
+            confidence = "HIGH" if unique_uid else "MEDIUM"
+            evidence = "package-uid+local-endpoint+socket-inode"
+            ambiguity = ["remote-endpoint-wildcard"]
+            if not unique_uid:
+                ambiguity.append("uid-shared-by-multiple-packages")
+        else:
+            confidence = "MEDIUM"
+            evidence = "package-uid+local-port+socket-inode"
+            ambiguity = ["local-and-remote-address-wildcard"]
+            if not unique_uid:
+                ambiguity.append("uid-shared-by-multiple-packages")
+
+        return {
+            "package": self.package,
+            "uid": self.package_uid,
+            "uid_packages": self.uid_packages,
+            "confidence": confidence,
+            "evidence": evidence,
+            "inode": inode,
+            "pids": observation.get("pids") or [],
+            "processes": observation.get("processes") or [],
+            "socket": {
+                key: observation.get(key)
+                for key in (
+                    "protocol",
+                    "family",
+                    "local_ip",
+                    "local_port",
+                    "remote_ip",
+                    "remote_port",
+                    "state",
+                )
+            },
+            "first_observed_utc": _iso_epoch(
+                float(observation["first_epoch"])
+            ),
+            "last_observed_utc": _iso_epoch(
+                float(observation["last_epoch"])
+            ),
+            "ambiguity": ambiguity,
+        }
+
+    def summarize_packets(
+        self,
+        packets: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        counts = {
+            "EXACT": 0,
+            "HIGH": 0,
+            "MEDIUM": 0,
+            "UNKNOWN": 0,
+        }
+        for packet in packets:
+            owner = self.attribute_packet(packet)
+            confidence = str(owner.get("confidence") or "UNKNOWN")
+            counts[confidence if confidence in counts else "UNKNOWN"] += 1
+        attributed = counts["EXACT"] + counts["HIGH"] + counts["MEDIUM"]
+        return {
+            "method": self.summary.get("method")
+            or "android-proc-socket-snapshots",
+            "package": self.package,
+            "package_uid": self.package_uid,
+            "uid_packages": self.uid_packages,
+            "snapshot_count": int(
+                self.summary.get("snapshot_count") or 0
+            ),
+            "sample_interval_seconds": float(
+                self.summary.get("sample_interval_seconds") or 0.0
+            ),
+            "packet_counts": counts,
+            "attributed_packet_count": attributed,
+            "total_packet_count": len(packets),
+        }
+
+
+def best_owner(
+    first: dict[str, Any] | None,
+    second: dict[str, Any],
+) -> dict[str, Any]:
+    if first is None:
+        return second
+    left = _CONFIDENCE_ORDER.get(
+        str(first.get("confidence") or "UNKNOWN"),
+        0,
+    )
+    right = _CONFIDENCE_ORDER.get(
+        str(second.get("confidence") or "UNKNOWN"),
+        0,
+    )
+    return second if right > left else first
