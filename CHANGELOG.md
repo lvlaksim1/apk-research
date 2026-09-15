@@ -2,6 +2,20 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.8.6] - 2026-09-15
+
+### Single required runtime architecture
+
+- Removes the DWM compatibility presenter and its Windows source-window code/tests.
+- Windows now has exactly one supported interactive path: `-qt-hide-window → gRPC → MMAP → AndroidView`.
+- Removes gRPC byte-frame fallback and ADB screencap fallback from the interactive framebuffer pipeline.
+- Removes unary `sendTouch` / `sendKey` and ADB input fallbacks; touch, swipe, key and text input require persistent gRPC `streamInputEvent`.
+- Removes the graphics/display profile ladder. Windows startup uses the required hidden gRPC/MMAP path with the selected primary GPU backend and fails explicitly if it cannot start.
+- Keeps one-shot `-wipe-data` recovery for a stalled guest and private-AVD stale-process/lock cleanup; these repair the required path rather than switching architecture.
+- Makes initial framebuffer delivery a preparation gate and surfaces later framebuffer/input transport failures instead of swallowing them.
+- Updates Windows runtime acceptance to validate a real `grpc-mmap` frame rather than ADB PNG screencap.
+- Keeps non-Windows headless gRPC/MMAP only for automated AVD acceptance; it is not a Windows user fallback.
+
 ## [0.8.5] - 2026-09-15
 
 ### GUI smoke correction

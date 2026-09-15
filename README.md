@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.8.6 — Single required runtime path
+
+Mobile Research больше не имеет пользовательской страховочной display/input-архитектуры. Штатный Windows runtime теперь один: скрытый Android Emulator `-qt-hide-window` → Emulator gRPC → MMAP framebuffer → `AndroidView`; ввод — только через постоянный gRPC `streamInputEvent`. DWM, visible Emulator, gRPC byte-frame fallback, ADB screencap и ADB input fallback удалены. Если обязательный transport не работает, подготовка завершается диагностической ошибкой вместо перехода в другой режим. Startup cleanup и один `-wipe-data` при guest boot stall сохранены как recovery, а не как альтернативный runtime.
+
 ## v0.8.5 — GUI smoke correction
 
 Release-candidate v0.8.4 не был опубликован: Desktop Build выявил оставшуюся старую ссылку `detach_native()` в `MainWindow.closeEvent` после DWM-переименования. v0.8.5 исправляет shutdown path на `detach_dwm()` и дочищает последние legacy native-имена в runtime-тестах. Архитектура и поведение v0.8.4 не меняются.
@@ -123,7 +127,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.8.5 — Desktop Application** — release-ready legacy display cleanup: DWM naming cleanup завершён, shutdown path исправлен и GUI smoke gate подтверждает закрытие приложения. Stable gRPC/MMAP baseline и boot policy не изменены.
+**v0.8.6 — Desktop Application** — один обязательный Windows runtime: hidden Emulator + gRPC/MMAP framebuffer + streaming gRPC input. Альтернативные display/input fallbacks удалены; transport failure теперь является явной ошибкой. Recovery private AVD сохранён.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

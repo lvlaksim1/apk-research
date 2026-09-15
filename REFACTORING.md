@@ -4,23 +4,23 @@
 
 ## Текущее состояние
 
-**Этап:** v0.8.5 — release-ready legacy display cleanup after GUI smoke correction.  
-**Stable baseline:** hidden Emulator + top-down gRPC/MMAP display + streaming gRPC input; DWM compatibility fallback only. Boot stall recovery: one `-wipe-data`, no soft restart, no graphics-profile cycling after guest stall.  
+**Этап:** v0.8.6 — single required runtime path.  
+**Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
 
 ### Активный runtime contract
 
-- штатный Windows display: `-qt-hide-window → gRPC streamScreenshot → MMAP → AndroidView`;
-- input: persistent gRPC `streamInputEvent`, pointer drag = DOWN → MOVE → UP;
-- framebuffer `top-down`; display и input geometry совпадают;
-- DWM остаётся только последним compatibility fallback;
-- graphics-profile fallback используется только для process/graphics startup failures;
-- guest/AVD boot stall получает ровно один `-wipe-data`; повторный stall завершает startup;
-- DWM compatibility implementation изолирована в `dwm_emulator.py`; active code не содержит SetParent/native-HWND embedding;
-- AndroidView не создаёт отдельный native HWND для rejected SetParent architecture;
-- старые ADR ниже сохраняются как история экспериментов. Если старое решение противоречит этому разделу или более новому superseding ADR, активным считается более новое решение.
+- Windows: `emulator -qt-hide-window → gRPC streamScreenshot → MMAP → AndroidView`;
+- input: only persistent gRPC `streamInputEvent`, pointer drag = DOWN → MOVE → UP;
+- framebuffer: only `grpc-mmap`, top-down row order;
+- no DWM, visible Emulator, gRPC-bytes, ADB screencap or ADB input fallback;
+- no automatic graphics/display profile ladder on Windows;
+- failure of required gRPC/MMAP or streamInputEvent is a product error and is surfaced explicitly;
+- private-AVD stale-process/lock cleanup and one `-wipe-data` guest recovery remain allowed because they restore the same required architecture;
+- Linux/KVM acceptance may use `-no-window`, but still requires the same gRPC/MMAP framebuffer/input transport;
+- older display ADRs remain historical only; ADR-082 defines the active policy.
 
 
 ## Зафиксированные решения
@@ -316,4 +316,10 @@ Display lifecycle отделён от guest boot lifecycle. После process s
 
 ### ADR-081 — GUI smoke является обязательным gate для display-refactor
 Release-candidate v0.8.4 прошёл unit tests и AVD acceptance, но Desktop Build остановился на standalone GUI smoke: после переименования `detach_native()` → `detach_dwm()` одна stale-ссылка осталась в `MainWindow.closeEvent`. Это не затрагивало normal runtime до закрытия окна, поэтому обычные unit tests её не обнаружили. v0.8.5 исправляет shutdown call и фиксирует правило: любое переименование display lifecycle считается завершённым только после standalone GUI open/close smoke-test собранного EXE. Непрошедший v0.8.4 не публикуется и не считается release baseline.
+
+### ADR-082 — Единственный пользовательский runtime является fail-fast
+После реального подтверждения v0.8.2 пользователь не планирует работать в degraded/compatibility display mode. Начиная с v0.8.6 Windows runtime имеет только одну поддерживаемую интерактивную архитектуру: hidden `-qt-hide-window` Emulator, gRPC `streamScreenshot` с MMAP и `AndroidView`; ввод идёт только через persistent `streamInputEvent`. DWM presenter, visible standalone Emulator, gRPC-bytes framebuffer, ADB screencap и ADB input fallbacks удалены. Если обязательный transport не запускается или прекращает работу, Mobile Research сообщает ошибку вместо незаметного переключения режима. Это делает дефекты primary path воспроизводимыми и не позволяет fallback-коду маскировать регрессии.
+
+### ADR-083 — Recovery не является fallback
+Startup cleanup строго private AVD, удаление stale locks после завершения принадлежащих Mobile Research процессов и один официальный `-wipe-data` при guest boot stall сохраняются. Они не меняют display/input architecture и поэтому считаются восстановлением штатного runtime. Повторный stall после clean boot или отказ обязательного gRPC/MMAP завершают startup с ошибкой.
 
