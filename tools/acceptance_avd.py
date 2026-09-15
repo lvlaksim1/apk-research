@@ -143,9 +143,9 @@ def main() -> int:
                     "02_normalized/research-timeline.json"
                 )
             )
-        if archived_timeline.get("schema_version") != "0.2":
+        if archived_timeline.get("schema_version") != "0.3":
             raise RuntimeError(
-                "Exported Research Timeline is not schema 0.2"
+                "Exported Research Timeline is not schema 0.3"
             )
         archived_alignment = (
             archived_timeline.get("clock_alignment") or {}
@@ -158,6 +158,45 @@ def main() -> int:
                 "Exported Research Timeline does not use "
                 "high-resolution clock calibration"
             )
+        network_attribution = (
+            archived_timeline.get("network_attribution") or {}
+        )
+        if (
+            network_attribution.get("method")
+            != "android-proc-socket-snapshots"
+        ):
+            raise RuntimeError(
+                "Package-aware network attribution is missing"
+            )
+        if int(
+            network_attribution.get("snapshot_count") or 0
+        ) <= 0:
+            raise RuntimeError(
+                "Socket attribution produced no snapshots"
+            )
+        with zipfile.ZipFile(result.archive) as archive:
+            attribution_summary = json.loads(
+                archive.read(
+                    "02_normalized/socket-attribution.json"
+                )
+            )
+            attribution_lines = archive.read(
+                "02_normalized/socket-attribution.jsonl"
+            ).decode("utf-8").splitlines()
+        if (
+            attribution_summary.get("method")
+            != "android-proc-socket-snapshots"
+        ):
+            raise RuntimeError(
+                "Socket attribution summary is invalid"
+            )
+        if int(
+            attribution_summary.get("snapshot_count") or 0
+        ) <= 0 or not attribution_lines:
+            raise RuntimeError(
+                "Socket attribution evidence is empty"
+            )
+
         archived_actions = (
             archived_timeline.get("user_actions") or []
         )
