@@ -1,15 +1,8 @@
 name: Desktop Build
+run-name: "Desktop Build • ${{ github.event.pull_request.title || github.event.head_commit.message || github.ref_name }}"
 
 on:
-  push:
-    paths:
-      - "src/mobile_research/**"
-      - "packaging/**"
-      - "pyproject.toml"
-      - "tests/**"
-      - "tools/check_desktop_android_components.py"
-      - ".github/workflows/desktop-build.yml"
-      - ".github/workflows/windows-whpx-acceptance.yml"
+  workflow_call:
   pull_request:
     paths:
       - "src/mobile_research/**"
