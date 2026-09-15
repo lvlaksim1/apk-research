@@ -76,7 +76,10 @@ jobs:
         shell: pwsh
         run: |
           $installDir = Join-Path $env:RUNNER_TEMP "MobileResearchInstalled"
-          $installer = (Resolve-Path "installer\MobileResearchSetup.exe").Path
+          $text = Get-Content pyproject.toml -Raw
+          if ($text -notmatch '(?m)^version\s*=\s*"([^"]+)"') { throw "Version not found" }
+          $version = $Matches[1]
+          $installer = (Resolve-Path "installer\MobileResearchSetup_v$version.exe").Path
           $process = Start-Process -FilePath $installer -ArgumentList @(
             "/VERYSILENT",
             "/SUPPRESSMSGBOXES",
@@ -99,8 +102,13 @@ jobs:
       - name: Hash installer
         shell: pwsh
         run: |
-          $hash = (Get-FileHash installer\MobileResearchSetup.exe -Algorithm SHA256).Hash.ToLower()
-          "$hash  MobileResearchSetup.exe" | Set-Content installer\SHA256SUMS.txt -Encoding ascii
+          $text = Get-Content pyproject.toml -Raw
+          if ($text -notmatch '(?m)^version\s*=\s*"([^"]+)"') { throw "Version not found" }
+          $version = $Matches[1]
+          $installerName = "MobileResearchSetup_v$version.exe"
+          $installer = Join-Path "installer" $installerName
+          $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
+          "$hash  $installerName" | Set-Content installer\SHA256SUMS.txt -Encoding ascii
           Get-Content installer\SHA256SUMS.txt
 
       - name: Upload temporary release installer
@@ -110,7 +118,7 @@ jobs:
           name: mobile-research-windows-desktop
           retention-days: 1
           path: |
-            installer/MobileResearchSetup.exe
+            installer/MobileResearchSetup_v*.exe
             installer/SHA256SUMS.txt
 
   windows-provisioning-acceptance:
