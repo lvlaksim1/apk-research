@@ -23,10 +23,8 @@ from mobile_research.session import (
     TERMINAL_STATUSES,
 )
 from mobile_research.targets import AdbClient, AdbError, validate_package_name
-from mobile_research.timeline import (
-    USER_ACTIONS_ARTIFACT,
-    build_research_timeline,
-)
+from mobile_research.timeline import USER_ACTIONS_ARTIFACT
+from mobile_research.timeline_engine import build_research_timeline
 
 Clock = Callable[[], datetime]
 
