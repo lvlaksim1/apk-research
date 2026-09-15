@@ -1,6 +1,6 @@
 # Mobile Research
 
-## v0.9.0 — User Actions + Research Timeline
+## v0.9.1 / v0.9.0 — User Actions + Research Timeline
 
 Mobile Research теперь фиксирует действия пользователя во время активного исследования и строит производный `02_normalized/research-timeline.json`, объединяющий lifecycle, пользовательские действия и сетевые маркеры. Pointer gesture сохраняется как один `tap` или `swipe`, wheel — как swipe, клавиши и текстовый ввод — как user actions; последовательные символы группируются в timeline. Для каждого action рассчитывается временное окно и привязываются packet/flow statistics, новые network flows, DNS queries, best-effort TLS SNI и релевантный logcat sample. Host action clock переводится в target clock по сохранённым clock markers, поэтому correlation не предполагает, что Windows и Android имеют нулевой clock skew. В GUI вкладки «Результаты» добавлена кнопка **Research Timeline**.
 
