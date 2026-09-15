@@ -2,6 +2,18 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.9.2] - 2026-09-16
+
+### Canonical refined Timeline export
+
+- Switches ResearchOrchestrator export from the legacy Timeline builder to the refined schema 0.2 engine.
+- The Timeline stored inside the final Research ZIP now uses the saved high-resolution `adb-ntp-midpoint` clock calibration.
+- Exported action correlations use exclusive non-overlapping windows and explicitly remain `temporal-only` with `causal_claim=false`.
+- Real AVD acceptance validates these invariants by reading `02_normalized/research-timeline.json` directly from the completed ZIP.
+- Adds an end-to-end regression assertion that the exported ZIP itself contains the refined Timeline contract.
+- Windows installer assets are now versioned as `MobileResearchSetup_v<version>.exe`; build, checksum, release and WHPX workflows use the same name.
+- The validated hidden Emulator + gRPC/MMAP framebuffer + persistent gRPC input runtime is unchanged.
+
 ## [0.9.1] - 2026-09-15
 
 Timeline reliability update.
