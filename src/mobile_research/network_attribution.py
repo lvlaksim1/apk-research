@@ -540,9 +540,9 @@ class SocketAttributionIndex:
         ):
             confidence = "EXACT"
             evidence = (
-                "target-process+socket-inode+5-tuple"
-                if target_process_link
-                else "unique-package-uid+socket-inode+5-tuple"
+                "unique-package-uid+socket-inode+5-tuple"
+                if unique_uid
+                else "target-process+socket-inode+5-tuple"
             )
             ambiguity: list[str] = []
         elif level == "exact":
