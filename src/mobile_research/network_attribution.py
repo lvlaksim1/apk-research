@@ -507,18 +507,47 @@ class SocketAttributionIndex:
         )
         unique_uid = self.uid_packages == [self.package]
         inode = int(observation.get("inode") or 0)
+        process_names = [
+            str(value)
+            for value in observation.get("processes") or []
+        ]
+        target_process_link = any(
+            value == self.package
+            or value.startswith(self.package + ":")
+            for value in process_names
+        )
+
+        if not unique_uid and not target_process_link:
+            return {
+                "package": self.package,
+                "uid": self.package_uid,
+                "uid_packages": self.uid_packages,
+                "confidence": "UNKNOWN",
+                "evidence": "shared-uid-without-target-process-socket-link",
+                "inode": inode,
+                "pids": observation.get("pids") or [],
+                "processes": process_names,
+                "ambiguity": [
+                    "uid-shared-by-multiple-packages",
+                    "target-package-pid-not-linked-to-socket",
+                ],
+            }
+
         if (
             level == "exact"
-            and unique_uid
             and inode > 0
             and directly_observed
         ):
             confidence = "EXACT"
-            evidence = "unique-package-uid+socket-inode+5-tuple"
+            evidence = (
+                "target-process+socket-inode+5-tuple"
+                if target_process_link
+                else "unique-package-uid+socket-inode+5-tuple"
+            )
             ambiguity: list[str] = []
         elif level == "exact":
             confidence = "HIGH"
-            evidence = "package-uid+socket-inode+5-tuple"
+            evidence = "package-owner+socket-inode+5-tuple"
             ambiguity = []
             if not directly_observed:
                 ambiguity.append(
@@ -526,24 +555,24 @@ class SocketAttributionIndex:
                 )
             if not unique_uid:
                 ambiguity.append(
-                    "uid-shared-by-multiple-packages"
+                    "uid-shared-but-target-process-linked"
                 )
             if inode <= 0:
                 ambiguity.append(
                     "socket-inode-unavailable"
                 )
         elif level == "local-endpoint":
-            confidence = "HIGH" if unique_uid else "MEDIUM"
-            evidence = "package-uid+local-endpoint+socket-inode"
+            confidence = "HIGH" if target_process_link or unique_uid else "MEDIUM"
+            evidence = "package-owner+local-endpoint+socket-inode"
             ambiguity = ["remote-endpoint-wildcard"]
             if not unique_uid:
-                ambiguity.append("uid-shared-by-multiple-packages")
+                ambiguity.append("uid-shared-but-target-process-linked")
         else:
             confidence = "MEDIUM"
-            evidence = "package-uid+local-port+socket-inode"
+            evidence = "package-owner+local-port+socket-inode"
             ambiguity = ["local-and-remote-address-wildcard"]
             if not unique_uid:
-                ambiguity.append("uid-shared-by-multiple-packages")
+                ambiguity.append("uid-shared-but-target-process-linked")
 
         return {
             "package": self.package,
