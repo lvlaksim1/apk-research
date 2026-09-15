@@ -1,5 +1,11 @@
 # Mobile Research
 
+## v0.10.0 — Package-aware Network Attribution
+
+Mobile Research теперь сопоставляет сетевой трафик с исследуемым Android package по цепочке `package → UID → PID/process → socket inode → 5-tuple → PCAP flow`. Во время исследования отдельный collector снимает временные snapshots `/proc/net/tcp*` / `/proc/net/udp*` и socket-FD процессов целевого UID. Производные evidence сохраняются в `02_normalized/socket-attribution.jsonl`, `02_normalized/socket-attribution.json` и `02_normalized/network-flows.json`.
+
+Для каждого flow/packet ownership имеет доказательный уровень `EXACT`, `HIGH`, `MEDIUM` или `UNKNOWN`. `EXACT` требует уникального UID пакета, socket inode, точного 5-tuple и попадания пакета в непосредственно наблюдавшийся интервал жизни сокета. Shared UID, sampling margin и wildcard endpoints явно понижают confidence. Raw `traffic.pcap` остаётся первичным источником истины. При этом связь user action → network по-прежнему маркируется отдельно как `temporal-only` с `causal_claim=false`: доказанная принадлежность сокета приложению не означает доказанную причинность конкретного tap/swipe.
+
 ## v0.9.2 — Refined Timeline is canonical in Research ZIP
 
 v0.9.2 исправляет разрыв между GUI-анализом и forensic archive: `ResearchOrchestrator` теперь записывает в итоговый `.research.zip` тот же refined Timeline schema 0.2, который использует GUI. Экспортируемый Timeline использует high-resolution `adb-ntp-midpoint` calibration, неперекрывающиеся action windows и явно маркирует корреляцию как `temporal-only` без ложного утверждения причинности. Real AVD acceptance теперь проверяет именно Timeline внутри готового ZIP. Windows installer начиная с этого релиза всегда содержит версию в имени: `MobileResearchSetup_v<version>.exe`.

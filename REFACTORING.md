@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.9.2 — Refined Timeline is canonical in exported Research ZIP.
+**Этап:** v0.10.0 — Package-aware Network Attribution on the validated single-path runtime.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -355,3 +355,18 @@ v0.9.1 introduced a refined Timeline engine with high-resolution Windows/Android
 
 ### ADR-094 — Windows release installer filename always contains the product version
 Starting with v0.9.2 the public installer asset is named `MobileResearchSetup_v<version>.exe`. Inno Setup, Desktop Build, checksum generation, GitHub Release publication and WHPX acceptance all resolve the same versioned filename. `SHA256SUMS.txt` hashes that exact filename. This rule is part of the release contract for all subsequent Mobile Research releases.
+
+### ADR-095 — Package network ownership derives from Android socket evidence
+v0.10.0 adds a dedicated `socket_attribution` evidence layer on rooted AVD-RESEARCH. The collector resolves the target package UID, samples `/proc/net/tcp`, `tcp6`, `udp`, `udp6`, enumerates processes carrying that UID, and resolves `/proc/<pid>/fd` socket symlinks to inode numbers. The resulting temporal socket observations are joined to raw PCAP 5-tuples. This does not replace `traffic.pcap`; it adds ownership evidence to it.
+
+### ADR-096 — Attribution confidence is evidence-graded and must not overclaim
+`EXACT` requires a unique package UID, socket inode, exact bidirectional 5-tuple and a packet timestamp inside the directly observed socket lifetime. An exact tuple matched only inside the sampler margin is `HIGH`, not `EXACT`. A shared Android UID also downgrades ownership because more than one package may legally use it. Wildcard/local-endpoint evidence is weaker and is reported as `HIGH` or `MEDIUM`; an unmatched packet remains `UNKNOWN`. Every downgrade carries explicit ambiguity tags.
+
+### ADR-097 — Socket attribution is additive evidence; capture truth remains RAW-first
+The attribution collector is registered as non-core derived evidence so a future attribution-specific failure cannot erase otherwise valid raw PCAP/logcat/screen evidence. The supported rooted AVD-RESEARCH release gate nevertheless requires the standard collector to produce non-empty socket snapshots. Sampling can miss very short-lived sockets; such absence must remain `UNKNOWN`, never be converted into proof that the target package did not create the traffic.
+
+### ADR-098 — Whole-session flow inventory preserves background package traffic
+Action windows are not sufficient for network research because an app can communicate without a contemporaneous tap/swipe. v0.10.0 therefore persists `02_normalized/network-flows.json`, a whole-session inventory built from PCAP plus package attribution. It records first/last target time, packet/byte totals, DNS/TLS markers and the best ownership evidence for every observed flow.
+
+### ADR-099 — Network ownership and user-action causality are separate claims
+Socket attribution may prove that a flow belongs to the target package, but it does not by itself prove that a particular user action caused that flow. Research Timeline keeps `causal_claim=false` and `attribution=temporal-only` for action correlation even when the enclosed network flow has `owner.confidence=EXACT`. This separation is mandatory forensic semantics.
