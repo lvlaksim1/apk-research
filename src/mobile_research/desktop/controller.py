@@ -16,9 +16,6 @@ from mobile_research.export import (
 from mobile_research.orchestrator import (
     ResearchOrchestrator,
 )
-from mobile_research.session import (
-    default_runtime_root,
-)
 from mobile_research.targets import AdbClient
 
 
@@ -83,10 +80,6 @@ class DesktopController(QObject):
     @property
     def component_state(self):
         return self.runtime.components.state()
-
-    @property
-    def session_root(self) -> Path:
-        return default_runtime_root()
 
     def prepare_apk(self, apk_path: str) -> None:
         path = Path(
@@ -715,16 +708,3 @@ class DesktopController(QObject):
                     "остановлен: "
                     + (str(exc) or exc.__class__.__name__)
                 )
-
-    def _thread_quiet(
-        self,
-        function,
-        *args,
-    ) -> None:
-        def worker() -> None:
-            try:
-                function(*args)
-            except Exception:
-                pass
-
-        self._thread(worker)
