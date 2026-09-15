@@ -2,6 +2,22 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.9.0] - 2026-09-15
+
+### User Actions + unified Research Timeline
+
+- Captures GUI-originated pointer gestures as one semantic `tap` or `swipe` action instead of flooding evidence with every MOVE event.
+- Captures wheel swipes, Android key events and text input; adjacent text input is coalesced in the derived timeline.
+- Adds immutable-session derived evidence `02_normalized/user-actions.jsonl` and `02_normalized/research-timeline.json`.
+- Aligns host-side action timestamps to Android/target time using saved clock calibration instead of assuming zero host/guest skew.
+- Parses raw PCAP for IPv4/IPv6 TCP/UDP flow tuples, Linux SLL/SLL2 direction, DNS queries and best-effort TLS ClientHello SNI without replacing the raw PCAP.
+- Correlates each user action with nearby packet counts/bytes, active/new flows, DNS/SNI markers and a bounded relevant logcat sample.
+- Merges lifecycle, user actions and first-observed network markers into one chronologically sorted timeline.
+- Adds a Results-tab **Research Timeline** action for inspecting the generated timeline from a Research ZIP.
+- Extends semantic audit results with `user_actions` and `timeline_events` metrics while remaining compatible with older archives that have no timeline.
+- Strengthens real AVD runtime acceptance: the acceptance session now records real swipe actions and requires the generated Research Timeline to contain them plus non-action events.
+- The v0.8.9 gRPC/MMAP runtime, clean-launch boundary, metadata and screen-timing contracts are unchanged.
+
 ## [0.8.9] - 2026-09-15
 
 ### Research evidence hardening
