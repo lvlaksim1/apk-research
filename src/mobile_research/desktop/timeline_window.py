@@ -3,6 +3,9 @@ from __future__ import annotations
 from PySide6.QtWidgets import QTableWidget, QTableWidgetItem
 
 from mobile_research.desktop.main_window import MainWindow
+from mobile_research.timeline_reader import (
+    read_refined_timeline_archive,
+)
 
 
 class TimelineMainWindow(MainWindow):
@@ -28,6 +31,39 @@ class TimelineMainWindow(MainWindow):
             2,
         )
         return page
+
+    def _inspect_selected_timeline(
+        self,
+    ) -> None:
+        path = self._selected_table_path(
+            self.results_table
+        )
+        if not path:
+            return
+        self.controller._thread(
+            self._load_refined_timeline,
+            path,
+        )
+
+    def _load_refined_timeline(
+        self,
+        path,
+    ) -> None:
+        try:
+            data = read_refined_timeline_archive(
+                path
+            )
+            self.controller.timelineReady.emit(
+                {
+                    "mode": "timeline",
+                    **data,
+                }
+            )
+        except Exception as exc:
+            self.controller.error.emit(
+                str(exc)
+                or exc.__class__.__name__
+            )
 
     def _on_timeline_ready(self, data: dict) -> None:
         actions = {
@@ -71,7 +107,10 @@ class TimelineMainWindow(MainWindow):
                 str(event.get("kind") or ""),
                 str(event.get("name") or ""),
                 (
-                    f"{int(network.get('packet_count') or 0)} pkt"
+                    (
+                        f"{int(network.get('packet_count') or 0)} pkt"
+                        f" • {correlation.get('causal_confidence', '')}"
+                    ).rstrip(" •")
                     if network
                     else ""
                 ),
