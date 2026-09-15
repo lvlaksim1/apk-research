@@ -23,6 +23,12 @@ from .raw_network import (
     RawNetworkResult,
     inspect_pcap,
 )
+from .socket_attribution import (
+    SocketAttributionCollector,
+    SocketAttributionCollectorError,
+    SocketAttributionPreflight,
+    SocketAttributionResult,
+)
 
 __all__ = [
     "DeviceMetadataCollector",
@@ -40,4 +46,8 @@ __all__ = [
     "RawNetworkPreflight",
     "RawNetworkResult",
     "inspect_pcap",
+    "SocketAttributionCollector",
+    "SocketAttributionCollectorError",
+    "SocketAttributionPreflight",
+    "SocketAttributionResult",
 ]
