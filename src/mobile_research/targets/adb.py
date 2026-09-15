@@ -546,6 +546,23 @@ class AdbClient:
             "+%Y-%m-%dT%H:%M:%SZ",
         )
 
+    def get_unix_time_ns(self, serial: str) -> int:
+        """Return Android realtime in nanoseconds for clock calibration."""
+
+        self.ensure_ready(serial)
+        value = self._shell_value(
+            serial,
+            "date",
+            "+%s%N",
+            timeout=3.0,
+        )
+        if not value.isdigit():
+            raise AdbError(
+                "Unable to parse Android nanosecond clock: "
+                f"{value!r}"
+            )
+        return int(value)
+
     def get_uid(self, serial: str) -> int:
         self.ensure_ready(serial)
         value = self._shell_value(serial, "id", "-u")
