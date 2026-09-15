@@ -7,12 +7,6 @@ on:
     paths:
       - "pyproject.toml"
       - "src/mobile_research/__init__.py"
-  workflow_dispatch:
-    inputs:
-      commit_sha:
-        description: "Exact commit SHA to validate; defaults to selected ref SHA"
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -35,13 +29,10 @@ jobs:
       - name: Resolve target SHA
         id: target
         shell: bash
-        env:
-          REQUESTED_SHA: ${{ inputs.commit_sha }}
         run: |
           set -euo pipefail
-          SHA="${REQUESTED_SHA:-$GITHUB_SHA}"
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-          echo "Target SHA: $SHA"
+          echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "Target SHA: $GITHUB_SHA"
 
       - name: Wait for exact-SHA published release
         id: resolve
