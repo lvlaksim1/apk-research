@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.9.2 — Refined Timeline is canonical in Research ZIP
+
+v0.9.2 исправляет разрыв между GUI-анализом и forensic archive: `ResearchOrchestrator` теперь записывает в итоговый `.research.zip` тот же refined Timeline schema 0.2, который использует GUI. Экспортируемый Timeline использует high-resolution `adb-ntp-midpoint` calibration, неперекрывающиеся action windows и явно маркирует корреляцию как `temporal-only` без ложного утверждения причинности. Real AVD acceptance теперь проверяет именно Timeline внутри готового ZIP. Windows installer начиная с этого релиза всегда содержит версию в имени: `MobileResearchSetup_v<version>.exe`.
+
 ## v0.9.1 / v0.9.0 — User Actions + Research Timeline
 
 Mobile Research теперь фиксирует действия пользователя во время активного исследования и строит производный `02_normalized/research-timeline.json`, объединяющий lifecycle, пользовательские действия и сетевые маркеры. Pointer gesture сохраняется как один `tap` или `swipe`, wheel — как swipe, клавиши и текстовый ввод — как user actions; последовательные символы группируются в timeline. Для каждого action рассчитывается временное окно и привязываются packet/flow statistics, новые network flows, DNS queries, best-effort TLS SNI и релевантный logcat sample. Host action clock переводится в target clock по сохранённым clock markers, поэтому correlation не предполагает, что Windows и Android имеют нулевой clock skew. В GUI вкладки «Результаты» добавлена кнопка **Research Timeline**.
