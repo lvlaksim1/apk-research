@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.8.8 — Final technical cleanup
+
+Финальный cleanup стабильного v0.8.7 runtime без изменения пользовательского поведения. Удалены подтверждённо мёртвые desktop state/helpers, package-level monkeypatch выбора Android repository archive заменён прямым стабильным policy-вызовом, а regression contract теперь запрещает возврат удалённых DWM/native/fallback путей и ручных workflow triggers. Рабочая цепочка hidden Emulator → gRPC/MMAP → AndroidView и persistent streamInputEvent не изменена.
+
 ## v0.8.7 — Frame readiness sequencing fix
 
 Исправлена гонка v0.8.6, обнаруженная на реальном Windows-ПК: framebuffer worker запускался сразу после поднятия gRPC и одновременно требовал первый кадр в течение 15 секунд, то есть ещё до завершения Android boot. Теперь worker по-прежнему стартует рано и может показывать boot-кадры, но обязательный first-frame gate выполняется только после завершения Android boot/root preparation. Архитектура single required path не меняется и fallback не возвращается.

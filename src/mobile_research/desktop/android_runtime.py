@@ -93,17 +93,6 @@ class AndroidRuntime:
     def paths(self):
         return self.components.paths
 
-    @property
-    def emulator_pid(self) -> int:
-        with self._process_lock:
-            process = self.process
-        if (
-            process is None
-            or process.poll() is not None
-        ):
-            return 0
-        return int(process.pid)
-
     def cleanup_stale_managed_runtime(
         self,
     ) -> dict[str, object]:

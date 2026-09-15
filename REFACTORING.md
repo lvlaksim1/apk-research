@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.8.7 — single required runtime path with corrected frame-readiness sequencing.  
+**Этап:** v0.8.8 — final technical cleanup of the validated single-path runtime.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -325,4 +325,7 @@ Startup cleanup строго private AVD, удаление stale locks посл�
 
 ### ADR-084 — Early framebuffer start and readiness gate are separate lifecycle stages
 Real-PC v0.8.6 testing showed that Emulator gRPC readiness precedes guaranteed production of the first Android framebuffer frame. Starting the framebuffer worker early is useful because it allows boot frames to appear as soon as available, but it must not impose a short blocking deadline before Android boot completes. From v0.8.7 the display callback only starts the gRPC/MMAP worker non-blockingly. The mandatory first-frame gate is evaluated after `AndroidRuntime.ensure_ready()` completes boot, root enablement, orientation normalization and final transport verification. This preserves fail-fast semantics without misclassifying normal Android startup latency as a transport failure.
+
+### ADR-085 — После v0.8.8 runtime cleanup считается завершённым
+Реальный Windows-тест v0.8.7 подтвердил полную готовность среды: embedded Android загрузился, обязательный gRPC/MMAP framebuffer работал, Root/PCAP/APK readiness завершились успешно. Финальный cleanup v0.8.8 не меняет эту цепочку. Удалены только доказанно мёртвые поля/helpers и исторический package-level monkeypatch repository policy. Добавлен source-level regression contract, который запрещает возврат DWM/native display, ADB screencap/input fallback, graphics profile ladder и manual workflow triggers. Дальнейшие изменения runtime допустимы только для конкретной воспроизводимой проблемы; следующий продуктовый этап — User Actions + Research Timeline.
 

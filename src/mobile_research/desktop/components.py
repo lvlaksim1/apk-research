@@ -11,7 +11,6 @@ import zipfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable
-from xml.etree import ElementTree
 
 ProgressCallback = Callable[[str, int | None, int | None], None]
 
@@ -102,18 +101,6 @@ def repository_base_url(repository_url: str) -> str:
     )
 
 
-def _local_name(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1]
-
-
-def _child_text(element: ElementTree.Element, name: str) -> str | None:
-    for child in element:
-        if _local_name(child.tag) == name:
-            text = child.text or ""
-            return text.strip() or None
-    return None
-
-
 def select_archive_from_repository_xml(
     xml_bytes: bytes,
     package_path: str,
@@ -121,86 +108,18 @@ def select_archive_from_repository_xml(
     host_os: str = "windows",
     base_url: str = ANDROID_REPOSITORY_BASE,
 ) -> ArchiveInfo:
-    """Select one complete archive from Google's repository XML.
+    """Select the newest stable archive for the requested host."""
 
-    The parser intentionally ignores XML namespace versions so the runtime can
-    consume newer repository schema revisions without code changes.
-    """
+    from mobile_research.desktop.repository_policy import (
+        select_stable_archive,
+    )
 
-    try:
-        root = ElementTree.fromstring(xml_bytes)
-    except ElementTree.ParseError as exc:
-        raise ComponentInstallError(
-            "Android repository metadata is invalid XML"
-        ) from exc
-
-    package: ElementTree.Element | None = None
-    for element in root.iter():
-        if _local_name(element.tag) != "remotePackage":
-            continue
-        if element.attrib.get("path") == package_path:
-            package = element
-            break
-
-    if package is None:
-        raise ComponentInstallError(
-            f"Android repository package is unavailable: {package_path}"
-        )
-
-    candidates: list[ArchiveInfo] = []
-    for archive in package.iter():
-        if _local_name(archive.tag) != "archive":
-            continue
-
-        archive_host = _child_text(archive, "host-os")
-        if archive_host and archive_host.lower() != host_os.lower():
-            continue
-
-        complete: ElementTree.Element | None = None
-        for child in archive:
-            if _local_name(child.tag) == "complete":
-                complete = child
-                break
-        if complete is None:
-            continue
-
-        url_text = _child_text(complete, "url")
-        if not url_text:
-            continue
-
-        size_text = _child_text(complete, "size")
-        size: int | None = None
-        if size_text:
-            try:
-                size = int(size_text)
-            except ValueError:
-                size = None
-
-        checksum_text: str | None = None
-        checksum_type: str | None = None
-        for child in complete:
-            if _local_name(child.tag) != "checksum":
-                continue
-            checksum_text = (child.text or "").strip() or None
-            checksum_type = child.attrib.get("type") or "sha1"
-            break
-
-        candidates.append(
-            ArchiveInfo(
-                package_path=package_path,
-                url=urllib.parse.urljoin(base_url, url_text),
-                size=size,
-                checksum=checksum_text,
-                checksum_type=checksum_type,
-            )
-        )
-
-    if not candidates:
-        raise ComponentInstallError(
-            f"No Windows archive found for Android package: {package_path}"
-        )
-
-    return candidates[0]
+    return select_stable_archive(
+        xml_bytes,
+        package_path,
+        host_os=host_os,
+        base_url=base_url,
+    )
 
 
 class ComponentManager:

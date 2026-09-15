@@ -63,3 +63,17 @@ def test_workflows_have_no_manual_dispatch() -> None:
     workflows = ROOT / ".github" / "workflows"
     for path in workflows.glob("*.yml"):
         assert "workflow_dispatch" not in path.read_text(encoding="utf-8")
+
+
+def test_legacy_cleanup_shims_stay_removed() -> None:
+    runtime = _read("src/mobile_research/desktop/android_runtime.py")
+    main_window = _read("src/mobile_research/desktop/main_window.py")
+    desktop_init = _read("src/mobile_research/desktop/__init__.py")
+    components = _read("src/mobile_research/desktop/components.py")
+
+    assert "def emulator_pid(" not in runtime
+    assert "_last_gpu_mode" not in main_window
+    assert "select_archive_from_repository_xml =" not in desktop_init
+    assert "def _local_name(" not in components
+    assert "def _child_text(" not in components
+    assert "select_stable_archive" in components

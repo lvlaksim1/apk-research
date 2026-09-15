@@ -1,37 +1,31 @@
-# Mobile Research v0.8.7
+# Mobile Research v0.8.8
 
-v0.8.7 fixes the startup sequencing regression found during the first real-PC test of the v0.8.6 fail-fast runtime.
+v0.8.8 завершает technical cleanup runtime-слоя после успешного реального теста v0.8.7.
 
-## Problem reproduced
+## Что подтверждено реальным тестом
 
-v0.8.6 started the gRPC/MMAP framebuffer worker immediately after the Emulator gRPC endpoint became ready and also synchronously required the first frame within 15 seconds.
+- Android Emulator загружается внутри Mobile Research;
+- отдельное окно Emulator не используется;
+- gRPC/MMAP framebuffer работает штатно;
+- Root, PCAP и APK readiness завершаются успешно;
+- текущая display/input architecture не требует compatibility fallback.
 
-On the real Windows machine, gRPC was ready before Android's graphics/compositor path produced the first frame. Mobile Research therefore reported:
+## Cleanup
 
-`Обязательный gRPC/MMAP framebuffer не выдал первый кадр за 15 секунд`
+- удалено неиспользуемое pointer-state поле из `AndroidView`;
+- удалены мёртвые `DesktopController.session_root` и `_thread_quiet`;
+- удалены неиспользуемые `AndroidRuntime.emulator_pid` и GUI `_last_gpu_mode`;
+- убран package-level monkeypatch Android repository selector;
+- `components.py` теперь напрямую делегирует выбор архива единой stable repository policy;
+- удалён дублирующий старый XML parser;
+- добавлен regression contract, запрещающий возврат DWM/native/ADB-display fallback и `workflow_dispatch`.
 
-The framebuffer worker itself remained alive, and the same gRPC/MMAP stream later produced the Android image. However, the preparation worker had already aborted, so root, PCAP readiness and APK installation were not completed.
+## Runtime contract не изменён
 
-## Fix
+Windows: `-qt-hide-window → Emulator gRPC → MMAP → AndroidView`.
 
-The two concerns are now separated:
+Input: `AndroidView → persistent gRPC streamInputEvent → Android`.
 
-1. the framebuffer worker starts immediately after gRPC becomes ready so boot frames may appear early;
-2. this early start is non-blocking;
-3. Android continues normal boot and root preparation;
-4. after `ensure_ready` finishes, Mobile Research requires the first real `grpc-mmap` frame;
-5. only a failure at that point is treated as a required-transport error.
+Private-AVD stale-process cleanup и один `-wipe-data` при guest boot stall остаются recovery того же runtime, а не альтернативными режимами.
 
-No compatibility or fallback mode has been reintroduced.
-
-## Preserved architecture
-
-Windows remains:
-
-`-qt-hide-window → gRPC → MMAP → AndroidView`
-
-Input remains:
-
-`AndroidView → persistent gRPC streamInputEvent → Android`
-
-Private-AVD cleanup and one-shot `-wipe-data` recovery remain unchanged.
+После этого релиза runtime technical cleanup считается завершённым. Следующий этап разработки — User Actions + Research Timeline.

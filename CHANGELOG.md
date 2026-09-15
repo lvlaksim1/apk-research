@@ -2,6 +2,19 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.8.8] - 2026-09-15
+
+### Final technical cleanup
+
+- Preserves the real-PC validated v0.8.7 runtime and research behavior.
+- Removes unused AndroidView pointer state and dead DesktopController helpers.
+- Removes the now-unused Emulator PID compatibility property and stale GUI GPU-cache field left from the former alternate display paths.
+- Replaces the package-import monkeypatch for Android repository selection with a direct stable-policy delegation while preserving the public selector API.
+- Removes the duplicate legacy XML archive parser helpers from `components.py`.
+- Adds a source-level cleanup contract preventing DWM/native/ADB-display fallbacks, dead helpers and manual `workflow_dispatch` from returning unnoticed.
+- Audits the active lifecycle as `startup cleanup → hidden Emulator → gRPC/MMAP → Android boot/root → first-frame gate → APK → research → stop/export`; no alternate display/input branch remains.
+- Historical release information remains in this changelog; active documentation is synchronized to the single required runtime.
+
 ## [0.8.7] - 2026-09-15
 
 ### Frame readiness sequencing fix

@@ -58,7 +58,6 @@ class MainWindow(QMainWindow):
         self._research_active = False
         self._busy = False
         self._last_archive: str | None = None
-        self._last_gpu_mode = ""
         self._build_ui()
         self._connect_signals()
         self._refresh_component_state()
@@ -857,9 +856,6 @@ class MainWindow(QMainWindow):
                 transport.get("gpu_mode")
                 if isinstance(transport, dict)
                 else ""
-            )
-            self._last_gpu_mode = str(
-                gpu_mode or ""
             )
             suffix = ""
             if transport_name:
