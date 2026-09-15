@@ -5,6 +5,7 @@ import struct
 from datetime import datetime, timezone
 
 from mobile_research.network_attribution import (
+    FLOW_INVENTORY_ARTIFACT,
     SocketAttributionIndex,
     parse_socket_snapshot_stream,
     summarize_snapshots,
@@ -260,3 +261,12 @@ def test_refined_timeline_exposes_exact_package_flow_owner(
     assert flow["owner"]["package"] == PACKAGE
     assert flow["owner"]["confidence"] == "EXACT"
     assert flow["owner"]["inode"] == 55555
+
+    inventory = json.loads(
+        (root / FLOW_INVENTORY_ARTIFACT).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert inventory["summary"]["flow_count"] == 1
+    assert inventory["summary"]["attributed_flow_count"] == 1
+    assert inventory["flows"][0]["owner"]["confidence"] == "EXACT"
