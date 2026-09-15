@@ -338,6 +338,17 @@ def run_runtime_acceptance() -> int:
                     f"{exc}"
                 )
 
+            orchestrator.record_user_action(
+                "swipe",
+                details={
+                    "source": "runtime-acceptance",
+                    "start_x": 540,
+                    "start_y": 1450,
+                    "end_x": 540,
+                    "end_y": 600,
+                    "duration_ms": 280,
+                },
+            )
             runtime.swipe(
                 540,
                 1450,
@@ -385,6 +396,16 @@ def run_runtime_acceptance() -> int:
         if not verification.valid:
             raise RuntimeError(
                 "Windows runtime Research ZIP verification failed"
+            )
+        if audit.user_actions < 4:
+            raise RuntimeError(
+                "Research Timeline did not preserve acceptance "
+                f"user actions: {audit.user_actions}"
+            )
+        if audit.timeline_events <= audit.user_actions:
+            raise RuntimeError(
+                "Research Timeline did not merge lifecycle/network "
+                "events with user actions"
             )
 
         payload["status"] = "success"
