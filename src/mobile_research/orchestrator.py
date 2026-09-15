@@ -15,6 +15,7 @@ from mobile_research.collectors import (
     LogcatCollector,
     RawNetworkCollector,
     ScreenRecordingCollector,
+    SocketAttributionCollector,
 )
 from mobile_research.export import ExportResult, export_research_zip
 from mobile_research.session import (
@@ -39,6 +40,10 @@ class NetworkCollectorLike(CollectorLike, Protocol):
     def preflight(self) -> Any: ...
 
 
+class AttributionCollectorLike(CollectorLike, Protocol):
+    def preflight(self) -> Any: ...
+
+
 class MetadataCollectorLike(Protocol):
     def collect(self) -> Any: ...
 
@@ -54,6 +59,10 @@ CollectorFactory = Callable[
 NetworkFactory = Callable[
     [AdbClient, SessionManager],
     NetworkCollectorLike,
+]
+AttributionFactory = Callable[
+    [AdbClient, SessionManager],
+    AttributionCollectorLike,
 ]
 ScreenFactory = Callable[
     [AdbClient, SessionManager, int],
@@ -180,6 +189,13 @@ def _network_factory(
     return RawNetworkCollector(adb, session)
 
 
+def _attribution_factory(
+    adb: AdbClient,
+    session: SessionManager,
+) -> AttributionCollectorLike:
+    return SocketAttributionCollector(adb, session)
+
+
 def _screen_factory(
     adb: AdbClient,
     session: SessionManager,
@@ -217,6 +233,7 @@ class ResearchOrchestrator:
         logcat_factory: CollectorFactory = _logcat_factory,
         screen_factory: ScreenFactory = _screen_factory,
         network_factory: NetworkFactory = _network_factory,
+        attribution_factory: AttributionFactory = _attribution_factory,
         exporter: Exporter = export_research_zip,
         launch_mode: str = "continue",
     ) -> None:
@@ -233,6 +250,7 @@ class ResearchOrchestrator:
         self.logcat_factory = logcat_factory
         self.screen_factory = screen_factory
         self.network_factory = network_factory
+        self.attribution_factory = attribution_factory
         self.exporter = exporter
         if launch_mode not in {
             "clean",
@@ -247,6 +265,7 @@ class ResearchOrchestrator:
         self.logcat: CollectorLike | None = None
         self.screen: CollectorLike | None = None
         self.network: NetworkCollectorLike | None = None
+        self.attribution: AttributionCollectorLike | None = None
         self._started_collectors: list[tuple[str, CollectorLike]] = []
         self._event_registered = False
         self._user_action_registered = False
@@ -310,6 +329,20 @@ class ResearchOrchestrator:
                 ),
             )
 
+            self.attribution = self.attribution_factory(
+                self.adb,
+                self.session,
+            )
+            attribution_preflight = self.attribution.preflight()
+            self._event(
+                "socket_attribution_preflight_completed",
+                details=(
+                    attribution_preflight.to_dict()
+                    if hasattr(attribution_preflight, "to_dict")
+                    else None
+                ),
+            )
+
             self.logcat = self.logcat_factory(
                 self.adb,
                 self.session,
@@ -327,6 +360,10 @@ class ResearchOrchestrator:
             self._start_collector("logcat", self.logcat)
             self._start_collector("screen_recording", self.screen)
             self._start_collector("raw_network", self.network)
+            self._start_collector(
+                "socket_attribution",
+                self.attribution,
+            )
 
             self.session.mark_active()
             self._event(
