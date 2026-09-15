@@ -10,9 +10,12 @@ from typing import Any
 
 from mobile_research import timeline as legacy
 from mobile_research.network_attribution import (
+    FLOW_INVENTORY_ARTIFACT,
     SocketAttributionIndex,
     best_owner,
+    build_flow_inventory,
     load_socket_attribution,
+    write_flow_inventory,
 )
 from mobile_research.session import SessionManager
 
@@ -350,6 +353,24 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
         attribution_summary,
         attribution_snapshots,
     )
+    flow_inventory = build_flow_inventory(
+        packets,
+        attribution_index,
+    )
+    write_flow_inventory(
+        root,
+        flow_inventory,
+    )
+    if not any(
+        artifact.get("path") == FLOW_INVENTORY_ARTIFACT
+        for artifact in session.manifest.get("artifacts", [])
+    ):
+        session.register_artifact(
+            kind="network_flow_inventory",
+            relative_path=FLOW_INVENTORY_ARTIFACT,
+            source="timeline",
+            raw=False,
+        )
 
     package_name = str(timeline.get("package") or "")
     logcat = legacy._read_logcat(
@@ -434,6 +455,12 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
     timeline["network_attribution"] = (
         attribution_index.summarize_packets(packets)
     )
+    timeline["network_attribution"][
+        "flow_inventory_artifact"
+    ] = FLOW_INVENTORY_ARTIFACT
+    timeline["network_attribution"][
+        "flow_summary"
+    ] = flow_inventory.get("summary") or {}
     timeline["user_actions"] = actions
     timeline["events"] = events
     timeline["correlation_window"] = {
