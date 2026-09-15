@@ -3,6 +3,11 @@ run-name: "Desktop Build • ${{ github.event.pull_request.title || github.event
 
 on:
   workflow_call:
+    inputs:
+      release_candidate:
+        required: false
+        type: boolean
+        default: false
   pull_request:
     paths:
       - "src/mobile_research/**"
@@ -112,7 +117,7 @@ jobs:
           Get-Content installer\SHA256SUMS.txt
 
       - name: Upload temporary release installer
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release Mobile Research v')
+        if: inputs.release_candidate == true
         uses: actions/upload-artifact@v4
         with:
           name: mobile-research-windows-desktop
