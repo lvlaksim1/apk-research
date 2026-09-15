@@ -1,6 +1,6 @@
 """Mobile Research core package."""
 
-__version__ = "0.8.9"
+__version__ = "0.9.0"
 
-# v0.8.9 hardens research evidence sequencing and timing.
+# v0.9.0 adds user actions and the unified Research Timeline.
 __all__ = ["__version__"]
