@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh run list --workflow main-pipeline.yml --branch main --limit 50 \
+          gh run list -R "$GITHUB_REPOSITORY" --workflow main-pipeline.yml --branch main --limit 50 \
             --json databaseId,status \
             --jq '.[] | select(.status == "in_progress" or .status == "queued") | .databaseId' |
           while read -r run_id; do
