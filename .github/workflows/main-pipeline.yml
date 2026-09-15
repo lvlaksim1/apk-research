@@ -124,13 +124,32 @@ jobs:
         run: |
           set -euo pipefail
           gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" \
-            --jq '.artifacts[] | select(.name == "mobile-research-windows-desktop") | [.id, .workflow_run.id] | @tsv' |
-          while IFS=$'\t' read -r artifact_id run_id; do
+            --jq '.artifacts[] | [.id, .name, .workflow_run.id] | @tsv' |
+          while IFS=\t' read -r artifact_id artifact_name run_id; do
             [[ -z "$artifact_id" ]] && continue
-            if [[ "$run_id" == "$GITHUB_RUN_ID" ]]; then
-              echo "Keep current-run artifact $artifact_id"
+
+            DELETE=false
+            case "$artifact_name" in
+              mobile-research-windows-desktop|mobile-research-windows-provisioning|avd-research-acceptance)
+                DELETE=true
+                ;;
+              mobile-research-windows-whpx-*)
+                if [[ "$artifact_name" != *"-failure-"* ]]; then
+                  DELETE=true
+                fi
+                ;;
+            esac
+
+            if [[ "$DELETE" != true ]]; then
+              echo "Keep diagnostic/unknown artifact: $artifact_name ($artifact_id)"
               continue
             fi
-            echo "Delete orphaned installer artifact $artifact_id from run $run_id"
+
+            if [[ "$run_id" == "$GITHUB_RUN_ID" ]]; then
+              echo "Keep current-run artifact: $artifact_name ($artifact_id)"
+              continue
+            fi
+
+            echo "Delete obsolete artifact: $artifact_name ($artifact_id) from run $run_id"
             gh api --method DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id"
           done
