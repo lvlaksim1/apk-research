@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.8.9 — research evidence sequencing and timing hardening on the validated single-path runtime.
+**Этап:** v0.9.0 — User Actions + unified Research Timeline on the validated single-path runtime.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -337,4 +337,16 @@ Clean launch должен быть доказуемым состоянием в 
 
 ### ADR-088 — Recorder coverage и frame presentation timeline различаются
 Android `screenrecord` может оставаться активным, когда display не генерирует новые кадры; поэтому MP4/Winscope frame span может быть короче wall-clock времени collector process без потери самого capture. Raw MP4 никогда не дополняется синтетическими кадрами. `screen.json` хранит два независимых слоя: (1) host/target start/finish recorder process и `capture_span_seconds`, описывающие coverage; (2) Winscope v2 elapsed frame timestamps + realtime offset, описывающие фактически представленные кадры. Semantic audit требует process coverage через package launch и STOP и отдельно проверяет frame timeline.
+
+### ADR-089 — User Action является semantic evidence, а не копией transport MOVE
+gRPC input transport продолжает передавать DOWN → MOVE → UP в реальном времени, но normalized research evidence не должен содержать десятки MOVE events на один жест. DesktopController фиксирует начало pointer gesture и при release классифицирует его как `tap` либо `swipe`, сохраняя start/end coordinates, duration и distance. Wheel swipe, key и text input фиксируются отдельными semantic actions. Это не меняет input transport и не добавляет задержку в Android interaction path.
+
+### ADR-090 — User Actions сохраняются в host clock и переводятся в target clock при анализе
+GUI action timestamp возникает на Windows и не должен получать target time через синхронный ADB-вызов на каждом клике: такой вызов добавил бы latency в input path. Поэтому `user-actions.jsonl` хранит high-resolution host UTC. Timeline builder использует уже сохранённые metadata clock markers, вычисляет robust median `target_minus_host_seconds` и получает target-time estimate для корреляции с PCAP/logcat. Если calibration отсутствует, fallback явно помечается как identity/no-clock-samples.
+
+### ADR-091 — Research Timeline является производным индексом, RAW остаётся источником истины
+`research-timeline.json` не заменяет `traffic.pcap`, `logcat.txt`, screen MP4 или lifecycle JSONL. Timeline — воспроизводимый derived index: lifecycle + user actions + first-observed network markers, а у каждого action есть bounded correlation summary. PCAP parser извлекает flow tuples, DNS и best-effort TLS SNI только когда эти данные реально присутствуют в raw packet. Неуспешный protocol decode не изменяет raw evidence и не интерпретируется как отсутствие трафика.
+
+### ADR-092 — Текстовый ввод является локальным research evidence
+Для воспроизводимости user-action sequence текст, отправленный через встроенный Android keyboard path, сохраняется в `user-actions.jsonl`; adjacent characters могут группироваться в derived timeline. Это означает, что Research ZIP потенциально содержит чувствительный пользовательский ввод. Данные остаются локальными и рассматриваются как evidence наравне с logcat/screen/PCAP; документация обязана явно предупреждать об этом.
 
