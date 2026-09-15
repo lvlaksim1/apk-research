@@ -421,6 +421,69 @@ class AdbClient:
         package_name = validate_package_name(package_name)
         return self.shell_output(serial, "pm", "path", package_name)
 
+    def get_package_uid(
+        self,
+        serial: str,
+        package_name: str,
+    ) -> int:
+        self.ensure_ready(serial)
+        package_name = validate_package_name(package_name)
+        output = self.shell_output(
+            serial,
+            "cmd",
+            "package",
+            "list",
+            "packages",
+            "-U",
+            package_name,
+        )
+        for line in output.splitlines():
+            line = line.strip()
+            if not line.startswith(f"package:{package_name} "):
+                continue
+            for token in line.split():
+                if not token.startswith("uid:"):
+                    continue
+                value = token[4:]
+                if value.isdigit():
+                    return int(value)
+        raise AdbError(
+            f"Unable to resolve package UID for {package_name}"
+        )
+
+    def get_packages_for_uid(
+        self,
+        serial: str,
+        uid: int,
+    ) -> list[str]:
+        self.ensure_ready(serial)
+        if uid < 0:
+            raise ValueError("uid must be non-negative")
+        output = self.shell_output(
+            serial,
+            "cmd",
+            "package",
+            "list",
+            "packages",
+            "-U",
+        )
+        packages: list[str] = []
+        expected = f"uid:{uid}"
+        for line in output.splitlines():
+            fields = line.strip().split()
+            if expected not in fields or not fields:
+                continue
+            package_field = fields[0]
+            if not package_field.startswith("package:"):
+                continue
+            package_name = package_field[len("package:") :]
+            try:
+                validate_package_name(package_name)
+            except ValueError:
+                continue
+            packages.append(package_name)
+        return sorted(set(packages))
+
     def resolve_launch_activity(
         self,
         serial: str,
