@@ -20,7 +20,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply final cleanup and release metadata
+      - name: Apply cleanup and release metadata
         shell: bash
         run: |
           set -euo pipefail
@@ -32,44 +32,39 @@ jobs:
 
           runtime_path = Path("src/mobile_research/desktop/android_runtime.py")
           runtime = runtime_path.read_text(encoding="utf-8")
-          emulator_pid_block = '''    @property
-          def emulator_pid(self) -> int:
-              with self._process_lock:
-                  process = self.process
-              if (
-                  process is None
-                  or process.poll() is not None
-              ):
-                  return 0
-              return int(process.pid)
-
-          '''
-          if emulator_pid_block not in runtime:
+          runtime, count = re.subn(
+              r"    @property\n    def emulator_pid\(self\) -> int:\n.*?        return int\(process\.pid\)\n\n",
+              "",
+              runtime,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
               raise SystemExit("emulator_pid cleanup target not found")
-          runtime = runtime.replace(emulator_pid_block, "", 1)
           runtime_path.write_text(runtime, encoding="utf-8")
 
           main_path = Path("src/mobile_research/desktop/main_window.py")
           main = main_path.read_text(encoding="utf-8")
-          if '        self._last_gpu_mode = ""\n' not in main:
-              raise SystemExit("_last_gpu_mode init target not found")
-          main = main.replace('        self._last_gpu_mode = ""\n', "", 1)
-          assignment = '''            self._last_gpu_mode = str(
-              gpu_mode or ""
+          main, count1 = re.subn(
+              r'^        self\._last_gpu_mode = ""\n',
+              "",
+              main,
+              count=1,
+              flags=re.M,
           )
-          '''
-          if assignment not in main:
-              raise SystemExit("_last_gpu_mode assignment target not found")
-          main = main.replace(assignment, "", 1)
+          main, count2 = re.subn(
+              r"            self\._last_gpu_mode = str\(\n                gpu_mode or \"\"\n            \)\n",
+              "",
+              main,
+              count=1,
+          )
+          if count1 != 1 or count2 != 1:
+              raise SystemExit("_last_gpu_mode cleanup target not found")
           main_path.write_text(main, encoding="utf-8")
 
           components_path = Path("src/mobile_research/desktop/components.py")
           components = components_path.read_text(encoding="utf-8")
-          components = components.replace(
-              "from xml.etree import ElementTree\n",
-              "",
-              1,
-          )
+          components = components.replace("from xml.etree import ElementTree\n", "", 1)
           parser_start = components.index("def _local_name(")
           manager_start = components.index("class ComponentManager:")
           selector = '''def select_archive_from_repository_xml(
@@ -94,11 +89,7 @@ jobs:
 
 
           '''
-          components = (
-              components[:parser_start]
-              + selector
-              + components[manager_start:]
-          )
+          components = components[:parser_start] + selector + components[manager_start:]
           components_path.write_text(components, encoding="utf-8")
 
           Path("src/mobile_research/desktop/__init__.py").write_text(
@@ -108,24 +99,21 @@ jobs:
 
           contract_path = Path("tests/test_runtime_cleanup_contract.py")
           contract = contract_path.read_text(encoding="utf-8")
-          extra = '''\n\ndef test_legacy_cleanup_shims_stay_removed() -> None:\n    runtime = _read("src/mobile_research/desktop/android_runtime.py")\n    main_window = _read("src/mobile_research/desktop/main_window.py")\n    desktop_init = _read("src/mobile_research/desktop/__init__.py")\n    components = _read("src/mobile_research/desktop/components.py")\n\n    assert "def emulator_pid(" not in runtime\n    assert "_last_gpu_mode" not in main_window\n    assert "select_archive_from_repository_xml =" not in desktop_init\n    assert "def _local_name(" not in components\n    assert "def _child_text(" not in components\n    assert "select_stable_archive" in components\n'''
           if "test_legacy_cleanup_shims_stay_removed" not in contract:
-              contract += extra
+              contract += '''\n\ndef test_legacy_cleanup_shims_stay_removed() -> None:\n    runtime = _read("src/mobile_research/desktop/android_runtime.py")\n    main_window = _read("src/mobile_research/desktop/main_window.py")\n    desktop_init = _read("src/mobile_research/desktop/__init__.py")\n    components = _read("src/mobile_research/desktop/components.py")\n\n    assert "def emulator_pid(" not in runtime\n    assert "_last_gpu_mode" not in main_window\n    assert "select_archive_from_repository_xml =" not in desktop_init\n    assert "def _local_name(" not in components\n    assert "def _child_text(" not in components\n    assert "select_stable_archive" in components\n'''
           contract_path.write_text(contract, encoding="utf-8")
 
           pyproject = Path("pyproject.toml")
           text = pyproject.read_text(encoding="utf-8")
-          text = text.replace('version = "0.8.7"', f'version = "{version}"', 1)
-          pyproject.write_text(text, encoding="utf-8")
+          if 'version = "0.8.7"' not in text:
+              raise SystemExit("pyproject version target not found")
+          pyproject.write_text(text.replace('version = "0.8.7"', f'version = "{version}"', 1), encoding="utf-8")
 
           init_path = Path("src/mobile_research/__init__.py")
           text = init_path.read_text(encoding="utf-8")
-          text = text.replace(
-              '__version__ = "0.8.7"',
-              f'__version__ = "{version}"',
-              1,
-          )
-          init_path.write_text(text, encoding="utf-8")
+          if '__version__ = "0.8.7"' not in text:
+              raise SystemExit("package version target not found")
+          init_path.write_text(text.replace('__version__ = "0.8.7"', f'__version__ = "{version}"', 1), encoding="utf-8")
 
           readme = Path("README.md")
           text = readme.read_text(encoding="utf-8")
@@ -164,11 +152,9 @@ jobs:
           )
           desktop_doc.write_text(text, encoding="utf-8")
 
-          release_notes = Path("RELEASE_NOTES.md")
-          release_notes.write_text('''# Mobile Research v0.8.8\n\nv0.8.8 завершает technical cleanup runtime-слоя после успешного реального теста v0.8.7.\n\n## Что подтверждено реальным тестом\n\n- Android Emulator загружается внутри Mobile Research;\n- отдельное окно Emulator не используется;\n- gRPC/MMAP framebuffer работает штатно;\n- Root, PCAP и APK readiness завершаются успешно;\n- текущая display/input architecture не требует compatibility fallback.\n\n## Cleanup\n\n- удалено неиспользуемое pointer-state поле из `AndroidView`;\n- удалены мёртвые `DesktopController.session_root` и `_thread_quiet`;\n- удалены неиспользуемые `AndroidRuntime.emulator_pid` и GUI `_last_gpu_mode`;\n- убран package-level monkeypatch Android repository selector;\n- `components.py` теперь напрямую делегирует выбор архива единой stable repository policy;\n- удалён дублирующий старый XML parser;\n- добавлен regression contract, запрещающий возврат DWM/native/ADB-display fallback и `workflow_dispatch`.\n\n## Runtime contract не изменён\n\nWindows: `-qt-hide-window → Emulator gRPC → MMAP → AndroidView`.\n\nInput: `AndroidView → persistent gRPC streamInputEvent → Android`.\n\nPrivate-AVD stale-process cleanup и один `-wipe-data` при guest boot stall остаются recovery того же runtime, а не альтернативными режимами.\n\nПосле этого релиза runtime technical cleanup считается завершённым. Следующий этап разработки — User Actions + Research Timeline.\n''', encoding="utf-8")
+          Path("RELEASE_NOTES.md").write_text('''# Mobile Research v0.8.8\n\nv0.8.8 завершает technical cleanup runtime-слоя после успешного реального теста v0.8.7.\n\n## Что подтверждено реальным тестом\n\n- Android Emulator загружается внутри Mobile Research;\n- отдельное окно Emulator не используется;\n- gRPC/MMAP framebuffer работает штатно;\n- Root, PCAP и APK readiness завершаются успешно;\n- текущая display/input architecture не требует compatibility fallback.\n\n## Cleanup\n\n- удалено неиспользуемое pointer-state поле из `AndroidView`;\n- удалены мёртвые `DesktopController.session_root` и `_thread_quiet`;\n- удалены неиспользуемые `AndroidRuntime.emulator_pid` и GUI `_last_gpu_mode`;\n- убран package-level monkeypatch Android repository selector;\n- `components.py` теперь напрямую делегирует выбор архива единой stable repository policy;\n- удалён дублирующий старый XML parser;\n- добавлен regression contract, запрещающий возврат DWM/native/ADB-display fallback и `workflow_dispatch`.\n\n## Runtime contract не изменён\n\nWindows: `-qt-hide-window → Emulator gRPC → MMAP → AndroidView`.\n\nInput: `AndroidView → persistent gRPC streamInputEvent → Android`.\n\nPrivate-AVD stale-process cleanup и один `-wipe-data` при guest boot stall остаются recovery того же runtime, а не альтернативными режимами.\n\nПосле этого релиза runtime technical cleanup считается завершённым. Следующий этап разработки — User Actions + Research Timeline.\n''', encoding="utf-8")
 
-          workflow = Path(".github/workflows/finalize-technical-cleanup.yml")
-          workflow.unlink()
+          Path(".github/workflows/finalize-technical-cleanup.yml").unlink()
           PY
 
       - name: Commit release
