@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from mobile_research.desktop.emulator_grpc import (
+    FRAME_ROWS_BOTTOM_UP,
+    FRAME_ROWS_TOP_DOWN,
+    EmulatorGrpcClient,
     Image,
     ImageFormat,
     ImageTransport,
@@ -9,6 +12,7 @@ from mobile_research.desktop.emulator_grpc import (
     Rotation,
     Touch,
     TouchEvent,
+    frame_rows_are_bottom_up,
     is_reverse_rotation,
     map_display_ratio_to_input,
 )
@@ -130,6 +134,36 @@ def test_reverse_rotation_mapping_is_normalized() -> None:
     ) == (750, 1600)
 
 
+
+
+def test_stream_screenshot_rows_are_top_down() -> None:
+    client = EmulatorGrpcClient(8554)
+    request = ImageFormat(
+        format=1,
+        width=2,
+        height=3,
+        display=0,
+    )
+    reply = Image(
+        format=request,
+        image=bytes(range(24)),
+        seq=9,
+        timestampUs=456,
+    )
+    frame = client._frame_from_reply(
+        reply,
+        data=reply.image,
+        transport="grpc-bytes",
+    )
+    assert frame is not None
+    assert frame.row_order == FRAME_ROWS_TOP_DOWN
+    assert not frame_rows_are_bottom_up(
+        frame.row_order
+    )
+    assert frame_rows_are_bottom_up(
+        FRAME_ROWS_BOTTOM_UP
+    )
+    client.close()
 
 def test_continuous_touch_states_use_stream_queue(monkeypatch) -> None:
     from mobile_research.desktop.emulator_grpc import EmulatorGrpcClient

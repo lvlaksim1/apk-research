@@ -13,6 +13,8 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QLabel
 
 from mobile_research.desktop.emulator_grpc import (
+    FRAME_ROWS_TOP_DOWN,
+    frame_rows_are_bottom_up,
     is_reverse_rotation,
     map_display_ratio_to_input,
 )
@@ -170,7 +172,13 @@ class AndroidView(QLabel):
                 image_format,
             )
             self._frame_owner = frame
-            self._bottom_up = True
+            self._bottom_up = frame_rows_are_bottom_up(
+                getattr(
+                    frame,
+                    "row_order",
+                    FRAME_ROWS_TOP_DOWN,
+                )
+            )
             self._rotation = int(
                 getattr(frame, "rotation", 0)
                 or 0

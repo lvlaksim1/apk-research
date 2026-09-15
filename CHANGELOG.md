@@ -2,6 +2,16 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.8.2] - 2026-09-15
+
+### gRPC/MMAP display orientation correction
+
+- Real-PC v0.8.1 validation confirmed the hidden `-qt-hide-window + gRPC/MMAP` architecture eliminates the standalone Emulator flash and preserves low-latency smooth streaming touch.
+- Fixes the remaining display-only inversion: `AndroidView` no longer assumes every raw `streamScreenshot` frame is bottom-up.
+- `LiveFrame` now carries an explicit row-order contract. Emulator `streamScreenshot` frames are marked `top-down`; vertical flipping is performed only for an explicitly `bottom-up` source.
+- Touch coordinate mapping and persistent gRPC DOWN/MOVE/UP input are intentionally unchanged.
+- Adds a transport-level regression test for the top-down frame contract and bottom-up compatibility predicate.
+
 ## [0.8.1] - 2026-09-15
 
 ### Release test correction

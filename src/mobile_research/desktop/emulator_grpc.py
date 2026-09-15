@@ -25,8 +25,16 @@ class EmulatorGrpcError(RuntimeError):
     """Raised when the low-latency Emulator control plane is unavailable."""
 
 
+FRAME_ROWS_TOP_DOWN = "top-down"
+FRAME_ROWS_BOTTOM_UP = "bottom-up"
+
+
 def is_reverse_rotation(rotation: int) -> bool:
     return int(rotation) in {2, 3}
+
+
+def frame_rows_are_bottom_up(row_order: str) -> bool:
+    return str(row_order).strip().lower() == FRAME_ROWS_BOTTOM_UP
 
 
 def map_display_ratio_to_input(
@@ -61,6 +69,7 @@ class LiveFrame:
     input_width: int
     input_height: int
     rotation: int = 0
+    row_order: str = FRAME_ROWS_TOP_DOWN
     seq: int = 0
     timestamp_us: int = 0
     transport: str = "grpc-bytes"
@@ -629,6 +638,7 @@ class EmulatorGrpcClient:
             input_width=input_width,
             input_height=input_height,
             rotation=rotation,
+            row_order=FRAME_ROWS_TOP_DOWN,
             seq=int(reply.seq),
             timestamp_us=int(reply.timestampUs),
             transport=transport,

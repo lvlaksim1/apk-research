@@ -4,8 +4,8 @@
 
 ## Текущее состояние
 
-**Этап:** v0.8.1 — release-ready embedded gRPC/MMAP primary display.  
-**Stable baseline:** hidden Emulator + gRPC/MMAP display/input; DWM compatibility fallback only.  
+**Этап:** v0.8.2 — corrected gRPC/MMAP framebuffer row-order contract.  
+**Stable baseline:** hidden Emulator + top-down gRPC/MMAP display + streaming gRPC input; DWM compatibility fallback only.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
 **Принцип:** v0.1.0 raw evidence contract не ослабляется.
@@ -285,3 +285,7 @@ DWM код не удалён. Порядок Windows profiles: grpc-embedded hos
 
 ### ADR-075 — Framebuffer запускается до Android boot_completed
 Display lifecycle отделён от guest boot lifecycle. После process spawn Mobile Research пытается поднять gRPC до 20 s и сообщает controller о display mode независимо от DWM. Controller немедленно запускает frame worker; Android boot framebuffer может отображаться внутри приложения до `sys.boot_completed=1`. Если gRPC появляется позже, `screen_frames` повторно проверяет client и автоматически переключается с временного ADB fallback на MMAP.
+
+### ADR-076 — Ориентация framebuffer является свойством транспорта, а не предположением UI
+Реальный тест v0.8.1 подтвердил, что Emulator `streamScreenshot` через gRPC/MMAP уже отдаёт логически ориентированный top-down raw frame. Старый `AndroidView` безусловно помечал любой RGBA/RGB raw frame как bottom-up и выполнял дополнительный vertical flip, из-за чего изображение оказывалось перевёрнуто относительно корректной Android input geometry. Начиная с v0.8.2 `LiveFrame` несёт явный `row_order`. gRPC/MMAP и gRPC bytes выставляют `top-down`; UI выполняет flip только при явном `bottom-up`. Input mapping, DOWN/MOVE/UP stream и rotation metadata этим изменением не модифицируются.
+

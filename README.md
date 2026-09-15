@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.8.2 — Correct gRPC/MMAP display orientation
+
+Исправлена единственная проблема, обнаруженная реальным тестом v0.8.1: raw-кадр `streamScreenshot` больше не переворачивается повторно по вертикали. Для кадров введён явный `row_order`; gRPC/MMAP помечается как `top-down`, поэтому изображение совпадает с реальными координатами Android. Потоковый touch DOWN/MOVE/UP не изменён. Безоконный `-qt-hide-window` startup и отсутствие вспышек сохранены.
+
 ## v0.8.1 — Native embedded Emulator path
 
 Release-ready сборка новой архитектуры: основной Windows startup использует `-qt-hide-window + gRPC/MMAP`; DWM остаётся только последним compatibility fallback. Runtime соответствует v0.8.0, исправлен только release test gate.
@@ -107,7 +111,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.8.1 — Desktop Application** — release-ready primary Windows architecture на `-qt-hide-window + gRPC/MMAP`. DWM не участвует в нормальном startup и остаётся только последним compatibility fallback. Потоковый touch и evidence pipeline сохранены.
+**v0.8.2 — Desktop Application** — primary Windows architecture остаётся `-qt-hide-window + gRPC/MMAP`; исправлена display-only инверсия raw framebuffer через явный top-down row-order contract. Потоковый touch и evidence pipeline не изменены.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 

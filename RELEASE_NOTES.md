@@ -1,42 +1,39 @@
-# Mobile Research v0.8.1
+# Mobile Research v0.8.2
 
-v0.8.1 is the release-ready embedded-display build. Runtime behavior is the v0.8.0 architecture; this commit corrects the exact-SHA test gate.
+v0.8.2 fixes the display-only inversion found during the real-PC validation of v0.8.1.
 
-## Primary startup sequence
+## Real-PC result carried forward
 
-On Windows the normal startup sequence is now:
+The v0.8.1 test confirmed that the new primary architecture is correct:
 
-1. Mobile Research starts the managed Android Emulator with `-qt-hide-window`.
-2. The Emulator therefore has no normal user-visible desktop window.
-3. Mobile Research waits briefly for the local Emulator gRPC service.
-4. As soon as gRPC is ready, the controller starts the framebuffer worker.
-5. The worker consumes `streamScreenshot`, preferring MMAP transport.
-6. Android boot frames are painted directly by `AndroidView`.
-7. Input continues through persistent gRPC `streamInputEvent`.
-8. Android boot completion, root ADB and APK preparation continue independently.
+- no standalone Android Emulator window flash;
+- hidden `-qt-hide-window` startup works;
+- gRPC/MMAP framebuffer is responsive;
+- continuous DOWN/MOVE/UP swipe is smooth and low-latency.
 
-There is no HWND discovery, Z-order manipulation or DWM thumbnail in the successful primary path.
+Those parts are unchanged in v0.8.2.
 
-## Windows compatibility order
+## Fixed
 
-1. embedded gRPC/MMAP + GPU host;
-2. embedded gRPC/MMAP + GPU auto;
-3. headless SwiftShader compatibility;
-4. DWM live + GPU host compatibility;
-5. DWM live + GPU auto compatibility.
+`AndroidView` previously assumed every raw RGBA/RGB framebuffer was bottom-up and always applied a vertical flip. The current Android Emulator `streamScreenshot` transport already supplies the frame in logical top-down row order, so that second flip inverted the picture while Android input coordinates remained correct.
 
-DWM remains available only as a last-resort compatibility fallback.
+v0.8.2 makes row order explicit:
 
-## Early display
+1. `LiveFrame` carries `row_order`.
+2. gRPC/MMAP and gRPC byte `streamScreenshot` frames are marked `top-down`.
+3. `AndroidView` paints top-down frames without any vertical transformation.
+4. A vertical flip is retained only for a source explicitly marked `bottom-up`.
 
-The framebuffer worker starts before `sys.boot_completed`, so the user can see the actual boot framebuffer inside Mobile Research.
+## Deliberately unchanged
 
-If gRPC is not ready at the instant the worker starts, the worker can temporarily use ADB screenshots and automatically upgrade to gRPC/MMAP when the client becomes available.
+- touch coordinate mapping;
+- persistent gRPC `streamInputEvent`;
+- mouse DOWN/MOVE/UP swipe cadence;
+- hidden Emulator startup;
+- DWM last-resort fallback;
+- ADB/root preparation;
+- evidence collection and Research ZIP pipeline.
 
-## Unchanged
+## Regression protection
 
-- real-time mouse DOWN/MOVE/UP swipe behavior;
-- evidence collection;
-- root/ADB preparation;
-- research ZIP pipeline;
-- DWM fallback implementation itself.
+The transport test suite now verifies that Emulator `streamScreenshot` frames carry the top-down row-order contract and that bottom-up compatibility remains explicit rather than implicit.
