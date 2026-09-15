@@ -9,6 +9,7 @@ from typing import Any
 
 SNAPSHOTS_ARTIFACT = "02_normalized/socket-attribution.jsonl"
 SUMMARY_ARTIFACT = "02_normalized/socket-attribution.json"
+FLOW_INVENTORY_ARTIFACT = "02_normalized/network-flows.json"
 
 _CONFIDENCE_ORDER = {
     "UNKNOWN": 0,
@@ -600,3 +601,166 @@ def best_owner(
         0,
     )
     return second if right > left else first
+
+
+
+def build_flow_inventory(
+    packets: list[dict[str, Any]],
+    index: SocketAttributionIndex,
+) -> dict[str, Any]:
+    flows: dict[tuple[Any, ...], dict[str, Any]] = {}
+
+    for packet in packets:
+        try:
+            epoch = float(packet["epoch"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        owner = index.attribute_packet(packet)
+        confidence = str(owner.get("confidence") or "UNKNOWN")
+        socket = owner.get("socket")
+        if (
+            confidence != "UNKNOWN"
+            and isinstance(socket, dict)
+            and socket.get("protocol")
+        ):
+            key = (
+                "owned",
+                socket.get("protocol"),
+                socket.get("local_ip"),
+                socket.get("local_port"),
+                socket.get("remote_ip"),
+                socket.get("remote_port"),
+                owner.get("inode"),
+            )
+            flow_value = {
+                "protocol": socket.get("protocol"),
+                "local_ip": socket.get("local_ip"),
+                "local_port": socket.get("local_port"),
+                "remote_ip": socket.get("remote_ip"),
+                "remote_port": socket.get("remote_port"),
+            }
+        else:
+            key = (
+                "raw",
+                packet.get("direction"),
+                packet.get("protocol"),
+                packet.get("src"),
+                packet.get("src_port"),
+                packet.get("dst"),
+                packet.get("dst_port"),
+            )
+            flow_value = {
+                "direction": packet.get("direction"),
+                "protocol": packet.get("protocol"),
+                "src": packet.get("src"),
+                "src_port": packet.get("src_port"),
+                "dst": packet.get("dst"),
+                "dst_port": packet.get("dst_port"),
+            }
+
+        current = flows.get(key)
+        if current is None:
+            current = {
+                **flow_value,
+                "first_epoch": epoch,
+                "last_epoch": epoch,
+                "packet_count": 0,
+                "captured_bytes": 0,
+                "owner": owner,
+                "dns_queries": [],
+                "tls_sni": [],
+                "_dns": set(),
+                "_sni": set(),
+            }
+            flows[key] = current
+        else:
+            current["last_epoch"] = epoch
+            current["owner"] = best_owner(
+                current.get("owner"),
+                owner,
+            )
+
+        current["packet_count"] += 1
+        current["captured_bytes"] += int(
+            packet.get("captured_length") or 0
+        )
+        dns = packet.get("dns_query")
+        if (
+            isinstance(dns, str)
+            and dns
+            and dns not in current["_dns"]
+        ):
+            current["_dns"].add(dns)
+            current["dns_queries"].append(dns)
+        sni = packet.get("tls_sni")
+        if (
+            isinstance(sni, str)
+            and sni
+            and sni not in current["_sni"]
+        ):
+            current["_sni"].add(sni)
+            current["tls_sni"].append(sni)
+
+    values: list[dict[str, Any]] = []
+    confidence_counts = {
+        "EXACT": 0,
+        "HIGH": 0,
+        "MEDIUM": 0,
+        "UNKNOWN": 0,
+    }
+    for current in sorted(
+        flows.values(),
+        key=lambda value: float(value["first_epoch"]),
+    ):
+        current.pop("_dns", None)
+        current.pop("_sni", None)
+        first_epoch = float(current.pop("first_epoch"))
+        last_epoch = float(current.pop("last_epoch"))
+        current["first_target_utc"] = _iso_epoch(first_epoch)
+        current["last_target_utc"] = _iso_epoch(last_epoch)
+        confidence = str(
+            (current.get("owner") or {}).get("confidence")
+            or "UNKNOWN"
+        )
+        if confidence not in confidence_counts:
+            confidence = "UNKNOWN"
+        confidence_counts[confidence] += 1
+        current["flow_id"] = f"flow-{len(values) + 1:06d}"
+        values.append(current)
+
+    attributed = (
+        confidence_counts["EXACT"]
+        + confidence_counts["HIGH"]
+        + confidence_counts["MEDIUM"]
+    )
+    return {
+        "schema_version": "0.1",
+        "method": "pcap+android-proc-socket-attribution",
+        "package": index.package,
+        "package_uid": index.package_uid,
+        "uid_packages": index.uid_packages,
+        "summary": {
+            "flow_count": len(values),
+            "attributed_flow_count": attributed,
+            "confidence_counts": confidence_counts,
+        },
+        "flows": values,
+    }
+
+
+def write_flow_inventory(
+    root: Path,
+    inventory: dict[str, Any],
+) -> None:
+    path = root / FLOW_INVENTORY_ARTIFACT
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            inventory,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
