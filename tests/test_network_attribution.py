@@ -21,17 +21,24 @@ EPOCH_NS = 1_700_000_000_000_000_000
 
 
 def _raw_snapshot(*, uid_packages: list[str] | None = None) -> tuple[list[dict], dict]:
+    socket_row = (
+        "ROW|tcp|  0: 0F02000A:9C40 22D8B85D:01BB "
+        "01 00000000:00000000 02:00000000 00000000 "
+        f"{UID} 0 55555 1 0000000000000000 20 4 30 10 -1"
+    )
+    second_ns = EPOCH_NS + 200_000_000
     raw = "\n".join(
         [
             f"SNAP|{EPOCH_NS}",
-            (
-                "ROW|tcp|  0: 0F02000A:9C40 22D8B85D:01BB "
-                "01 00000000:00000000 02:00000000 00000000 "
-                f"{UID} 0 55555 1 0000000000000000 20 4 30 10 -1"
-            ),
+            socket_row,
             f"PROC|4321|{UID}|{PACKAGE}",
             "FD|4321|55555",
             f"END|{EPOCH_NS}",
+            f"SNAP|{second_ns}",
+            socket_row,
+            f"PROC|4321|{UID}|{PACKAGE}",
+            "FD|4321|55555",
+            f"END|{second_ns}",
         ]
     )
     packages = uid_packages or [PACKAGE]
@@ -65,9 +72,9 @@ def _packet() -> dict:
 def test_proc_snapshot_decodes_uid_inode_pid_and_tuple() -> None:
     snapshots, summary = _raw_snapshot()
 
-    assert summary["snapshot_count"] == 1
-    assert summary["socket_observations"] == 1
-    assert summary["pid_socket_links"] == 1
+    assert summary["snapshot_count"] == 2
+    assert summary["socket_observations"] == 2
+    assert summary["pid_socket_links"] == 2
     socket = snapshots[0]["sockets"][0]
     assert socket["local_ip"] == "10.0.2.15"
     assert socket["local_port"] == 40000
