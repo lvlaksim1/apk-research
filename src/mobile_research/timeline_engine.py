@@ -9,6 +9,11 @@ from pathlib import Path
 from typing import Any
 
 from mobile_research import timeline as legacy
+from mobile_research.network_attribution import (
+    SocketAttributionIndex,
+    best_owner,
+    load_socket_attribution,
+)
 from mobile_research.session import SessionManager
 
 MAX_AFTER_SECONDS = 2.0
@@ -47,20 +52,39 @@ def _flow_summary(
     first_flow: dict[tuple[Any, ...], float],
     window_start: float,
     window_end: float,
+    attribution_index: SocketAttributionIndex,
 ) -> dict[str, Any]:
     counts: Counter[tuple[Any, ...]] = Counter()
+    owners: dict[tuple[Any, ...], dict[str, Any]] = {}
     new_flows: list[dict[str, Any]] = []
     dns: list[str] = []
     sni: list[str] = []
+    package_dns: list[str] = []
+    package_sni: list[str] = []
     dns_seen: set[str] = set()
     sni_seen: set[str] = set()
+    package_dns_seen: set[str] = set()
+    package_sni_seen: set[str] = set()
     total_bytes = 0
+    attribution_counts = {
+        "EXACT": 0,
+        "HIGH": 0,
+        "MEDIUM": 0,
+        "UNKNOWN": 0,
+    }
 
     for packet in packets:
         total_bytes += int(packet.get("captured_length") or 0)
+        owner = attribution_index.attribute_packet(packet)
+        confidence = str(owner.get("confidence") or "UNKNOWN")
+        if confidence not in attribution_counts:
+            confidence = "UNKNOWN"
+        attribution_counts[confidence] += 1
+
         key = legacy._flow_key(packet)
         if key is not None:
             counts[key] += 1
+            owners[key] = best_owner(owners.get(key), owner)
             first_epoch = first_flow.get(key)
             if (
                 first_epoch is not None
@@ -74,28 +98,53 @@ def _flow_summary(
                     {
                         "target_utc": legacy._iso_epoch(first_epoch),
                         "flow": legacy._flow_value(key),
+                        "owner": owners[key],
                     }
                 )
+
         query = packet.get("dns_query")
-        if isinstance(query, str) and query and query not in dns_seen:
-            dns_seen.add(query)
-            dns.append(query)
+        if isinstance(query, str) and query:
+            if query not in dns_seen:
+                dns_seen.add(query)
+                dns.append(query)
+            if (
+                confidence != "UNKNOWN"
+                and query not in package_dns_seen
+            ):
+                package_dns_seen.add(query)
+                package_dns.append(query)
+
         server_name = packet.get("tls_sni")
-        if (
-            isinstance(server_name, str)
-            and server_name
-            and server_name not in sni_seen
-        ):
-            sni_seen.add(server_name)
-            sni.append(server_name)
+        if isinstance(server_name, str) and server_name:
+            if server_name not in sni_seen:
+                sni_seen.add(server_name)
+                sni.append(server_name)
+            if (
+                confidence != "UNKNOWN"
+                and server_name not in package_sni_seen
+            ):
+                package_sni_seen.add(server_name)
+                package_sni.append(server_name)
 
     flows = [
         {
             **legacy._flow_value(key),
             "packet_count": count,
+            "owner": owners.get(
+                key,
+                {
+                    "confidence": "UNKNOWN",
+                    "evidence": "no-matching-socket-observation",
+                },
+            ),
         }
         for key, count in counts.most_common(MAX_FLOW_SAMPLE)
     ]
+    attributed_packets = (
+        attribution_counts["EXACT"]
+        + attribution_counts["HIGH"]
+        + attribution_counts["MEDIUM"]
+    )
     return {
         "packet_count": len(packets),
         "captured_bytes": total_bytes,
@@ -103,6 +152,13 @@ def _flow_summary(
         "new_flows": new_flows[:MAX_FLOW_SAMPLE],
         "dns_queries": dns,
         "tls_sni": sni,
+        "package_dns_queries": package_dns,
+        "package_tls_sni": package_sni,
+        "package_attribution": {
+            "packet_counts": attribution_counts,
+            "attributed_packet_count": attributed_packets,
+            "total_packet_count": len(packets),
+        },
     }
 
 
@@ -127,6 +183,11 @@ def _confidence(
         ambiguity.append("clock_uncertainty_above_100ms")
     if (
         network["packet_count"] > 0
+        and (
+            network.get("package_attribution", {})
+            .get("attributed_packet_count", 0)
+            == 0
+        )
         and not network["new_flows"]
         and not network["dns_queries"]
         and not network["tls_sni"]
@@ -140,6 +201,11 @@ def _confidence(
         network["new_flows"]
         or network["dns_queries"]
         or network["tls_sni"]
+        or (
+            network.get("package_attribution", {})
+            .get("attributed_packet_count", 0)
+            > 0
+        )
     )
     if strong_network and package_log and uncertainty_seconds <= 0.1:
         return "high", ambiguity
@@ -159,6 +225,7 @@ def _correlate(
     logcat: list[dict[str, Any]],
     log_epochs: list[float],
     first_flow: dict[tuple[Any, ...], float],
+    attribution_index: SocketAttributionIndex,
 ) -> dict[str, Any]:
     host_start = legacy._parse_utc(
         str(action.get("host_started_utc") or action["host_utc"])
@@ -188,6 +255,7 @@ def _correlate(
         first_flow,
         window_start,
         window_end,
+        attribution_index,
     )
 
     l0 = bisect.bisect_left(log_epochs, window_start)
@@ -275,6 +343,13 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
         packets,
         offset,
     )
+    attribution_summary, attribution_snapshots = (
+        load_socket_attribution(root)
+    )
+    attribution_index = SocketAttributionIndex(
+        attribution_summary,
+        attribution_snapshots,
+    )
 
     package_name = str(timeline.get("package") or "")
     logcat = legacy._read_logcat(
@@ -314,6 +389,7 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
                 logcat=logcat,
                 log_epochs=log_epochs,
                 first_flow=first_flow,
+                attribution_index=attribution_index,
             )
         except (KeyError, TypeError, ValueError) as exc:
             action["correlation"] = {
@@ -353,8 +429,11 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
     events.extend(network_markers)
     events.sort(key=lambda item: str(item.get("host_utc") or ""))
 
-    timeline["schema_version"] = "0.2"
+    timeline["schema_version"] = "0.3"
     timeline["clock_alignment"] = alignment
+    timeline["network_attribution"] = (
+        attribution_index.summarize_packets(packets)
+    )
     timeline["user_actions"] = actions
     timeline["events"] = events
     timeline["correlation_window"] = {
