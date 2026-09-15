@@ -10,37 +10,16 @@ permissions:
   contents: write
   actions: write
 
-concurrency:
-  group: main-pipeline-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   changes:
     name: Resolve changed areas
     runs-on: ubuntu-24.04
     outputs:
+      current: ${{ steps.filter.outputs.current }}
       desktop: ${{ steps.filter.outputs.desktop }}
       avd: ${{ steps.filter.outputs.avd }}
       release: ${{ steps.filter.outputs.release }}
     steps:
-      - name: Cancel superseded pipeline runs
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh run list -R "$GITHUB_REPOSITORY" --workflow main-pipeline.yml --branch main --limit 50 \
-            --json databaseId,status \
-            --jq '.[] | select(.status == "in_progress" or .status == "queued") | .databaseId' |
-          while read -r run_id; do
-            [[ -z "$run_id" ]] && continue
-            if [[ "$run_id" == "$GITHUB_RUN_ID" ]]; then
-              continue
-            fi
-            echo "Cancel superseded Main Pipeline run $run_id"
-            gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/cancel" || true
-          done
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -49,8 +28,21 @@ jobs:
       - name: Resolve changed files
         id: filter
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          HEAD_SHA="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "$HEAD_SHA" != "$GITHUB_SHA" ]]; then
+            echo "Stale pipeline: $GITHUB_SHA is not current main ($HEAD_SHA)"
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "desktop=false" >> "$GITHUB_OUTPUT"
+            echo "avd=false" >> "$GITHUB_OUTPUT"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "current=true" >> "$GITHUB_OUTPUT"
+
           BEFORE="${{ github.event.before }}"
           if [[ "$BEFORE" == "0000000000000000000000000000000000000000" ]] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
             FILES="$(git show --pretty='' --name-only "$GITHUB_SHA")"
@@ -92,6 +84,7 @@ jobs:
   ci:
     name: CI
     needs: changes
+    if: needs.changes.outputs.current == 'true'
     uses: ./.github/workflows/ci.yml
 
   desktop:
@@ -99,7 +92,7 @@ jobs:
     needs:
       - changes
       - ci
-    if: needs.changes.outputs.desktop == 'true'
+    if: needs.changes.outputs.current == 'true' && needs.changes.outputs.desktop == 'true'
     uses: ./.github/workflows/desktop-build.yml
 
   avd:
@@ -107,7 +100,7 @@ jobs:
     needs:
       - changes
       - ci
-    if: needs.changes.outputs.avd == 'true'
+    if: needs.changes.outputs.current == 'true' && needs.changes.outputs.avd == 'true'
     uses: ./.github/workflows/avd-research-acceptance.yml
 
   release:
@@ -119,6 +112,7 @@ jobs:
       - avd
     if: |
       always() &&
+      needs.changes.outputs.current == 'true' &&
       needs.changes.outputs.release == 'true' &&
       needs.ci.result == 'success' &&
       needs.desktop.result == 'success' &&
@@ -133,7 +127,7 @@ jobs:
       - desktop
       - avd
       - release
-    if: always()
+    if: always() && needs.changes.outputs.current == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
