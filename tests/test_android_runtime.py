@@ -416,7 +416,7 @@ def test_non_windows_emulator_remains_headless(
 
 
 
-def test_windows_runtime_uses_framebuffer_not_native_hwnd(
+def test_windows_primary_mode_uses_framebuffer_not_dwm(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -434,7 +434,7 @@ def test_windows_runtime_uses_framebuffer_not_native_hwnd(
     assert runtime.emulator_pid == 0
 
 
-def test_windows_headless_mode_disables_native_embedding(
+def test_windows_headless_mode_disables_dwm_presentation(
     tmp_path,
     monkeypatch,
 ) -> None:

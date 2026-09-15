@@ -99,7 +99,7 @@ class MainWindow(QMainWindow):
         # process has stopped. Unregistering first would briefly reveal
         # the off-screen standalone source window during shutdown.
         self.controller.close()
-        self.android_view.detach_native()
+        self.android_view.detach_dwm()
         event.accept()
 
     def _build_ui(self) -> None:
@@ -994,7 +994,7 @@ class MainWindow(QMainWindow):
         )
         self._append_log(
             "DWM live Android Emulator подключён "
-            "без SetParent"
+            "через DWM thumbnail"
         )
 
     def _on_dwm_display_failed(

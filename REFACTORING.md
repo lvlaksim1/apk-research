@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.8.4 — legacy display cleanup after validated v0.8.2 runtime.  
+**Этап:** v0.8.5 — release-ready legacy display cleanup after GUI smoke correction.  
 **Stable baseline:** hidden Emulator + top-down gRPC/MMAP display + streaming gRPC input; DWM compatibility fallback only. Boot stall recovery: one `-wipe-data`, no soft restart, no graphics-profile cycling after guest stall.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -313,4 +313,7 @@ Display lifecycle отделён от guest boot lifecycle. После process s
 
 ### ADR-080 — AndroidView не требует собственного HWND для DWM
 `WA_NativeWindow` был нужен экспериментальной cross-process HWND embedding архитектуре. Текущий DWM presenter регистрирует thumbnail в top-level HWND Mobile Research и вычисляет destination rectangle через Qt mapping, поэтому отдельный native HWND у `AndroidView` не нужен. v0.8.4 удаляет этот флаг. Также удалены неиспользуемые virtual-screen constants, no-op `focus_embedded`, unused `restore` parameter и dead `tapRequested → controller.tap` chain. Runtime `AndroidRuntime.tap()` сохранён, поскольку он остаётся ADB fallback внутри touch lifecycle.
+
+### ADR-081 — GUI smoke является обязательным gate для display-refactor
+Release-candidate v0.8.4 прошёл unit tests и AVD acceptance, но Desktop Build остановился на standalone GUI smoke: после переименования `detach_native()` → `detach_dwm()` одна stale-ссылка осталась в `MainWindow.closeEvent`. Это не затрагивало normal runtime до закрытия окна, поэтому обычные unit tests её не обнаружили. v0.8.5 исправляет shutdown call и фиксирует правило: любое переименование display lifecycle считается завершённым только после standalone GUI open/close smoke-test собранного EXE. Непрошедший v0.8.4 не публикуется и не считается release baseline.
 

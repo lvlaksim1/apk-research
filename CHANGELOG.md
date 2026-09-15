@@ -2,6 +2,15 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.8.5] - 2026-09-15
+
+### GUI smoke correction
+
+- v0.8.4 release candidate was not published because Desktop Build exposed one stale `detach_native()` call in `MainWindow.closeEvent`.
+- Corrects shutdown to `detach_dwm()`, allowing the standalone GUI smoke test to open and close the packaged application cleanly.
+- Renames the last two legacy native-HWND test names to current framebuffer/DWM terminology.
+- No display, input, DWM, boot-recovery or evidence behavior changes relative to the intended v0.8.4 cleanup.
+
 ## [0.8.4] - 2026-09-15
 
 ### Legacy display cleanup

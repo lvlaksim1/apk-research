@@ -1,5 +1,9 @@
 # Mobile Research
 
+## v0.8.5 — GUI smoke correction
+
+Release-candidate v0.8.4 не был опубликован: Desktop Build выявил оставшуюся старую ссылку `detach_native()` в `MainWindow.closeEvent` после DWM-переименования. v0.8.5 исправляет shutdown path на `detach_dwm()` и дочищает последние legacy native-имена в runtime-тестах. Архитектура и поведение v0.8.4 не меняются.
+
 ## v0.8.4 — Legacy display cleanup
 
 Второй этап technical cleanup. Активный DWM fallback сохранён без изменения поведения, но полностью отделён от отвергнутой native HWND/SetParent терминологии: модуль переименован в `dwm_emulator.py`, presentation-класс и сигналы получили DWM-имена, удалены неиспользуемые Win32 helpers и старый dead tap signal path. `AndroidView` больше не требует собственного native HWND только ради старой SetParent-архитектуры. Основной gRPC/MMAP display/input baseline v0.8.2 не изменён.
@@ -119,7 +123,7 @@ Mobile Research — Windows-система для воспроизводимог
 
 ## Статус
 
-**v0.8.4 — Desktop Application** — stable gRPC/MMAP baseline сохранён; legacy native HWND naming/code paths удалены из активного GUI слоя, DWM оформлен как отдельный explicit compatibility presenter. Boot policy v0.8.3 сохранён.
+**v0.8.5 — Desktop Application** — release-ready legacy display cleanup: DWM naming cleanup завершён, shutdown path исправлен и GUI smoke gate подтверждает закрытие приложения. Stable gRPC/MMAP baseline и boot policy не изменены.
 
 **v0.1.0 — Research Session Core** остаётся базовым evidence contract: RAW-first capture, complete/partial/failed semantics, Research ZIP и semantic audit.
 
