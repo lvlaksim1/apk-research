@@ -74,6 +74,8 @@ jobs:
         run: |
           set -euo pipefail
           cd release-assets
+          VERSION="${{ steps.version.outputs.version }}"
+          test -f "MobileResearchSetup_v${VERSION}.exe"
           sha256sum -c SHA256SUMS.txt
       - name: Publish GitHub Release
         if: steps.version.outputs.stable == 'true'
@@ -81,7 +83,9 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ steps.version.outputs.tag }}"
-          gh release create "$TAG" release-assets/MobileResearchSetup.exe release-assets/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Mobile Research $TAG" --notes-file RELEASE_NOTES.md
+          VERSION="${{ steps.version.outputs.version }}"
+          INSTALLER="MobileResearchSetup_v${VERSION}.exe"
+          gh release create "$TAG" "release-assets/$INSTALLER" release-assets/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Mobile Research $TAG" --notes-file RELEASE_NOTES.md
 
       - name: Delete temporary installer artifact
         if: steps.version.outputs.stable == 'true' && success()
