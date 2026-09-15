@@ -367,6 +367,9 @@ class MainWindow(QMainWindow):
         self.results_audit = QPushButton(
             "Полный аудит"
         )
+        self.results_timeline = QPushButton(
+            "Research Timeline"
+        )
         self.results_open = QPushButton(
             "Открыть папку"
         )
@@ -378,6 +381,9 @@ class MainWindow(QMainWindow):
         )
         buttons.addWidget(
             self.results_audit
+        )
+        buttons.addWidget(
+            self.results_timeline
         )
         buttons.addWidget(
             self.results_open
@@ -643,6 +649,9 @@ class MainWindow(QMainWindow):
         c.archiveInspection.connect(
             self._on_archive_inspection
         )
+        c.timelineReady.connect(
+            self._on_timeline_ready
+        )
         c.diagnosticsReady.connect(
             self._on_diagnostics
         )
@@ -659,6 +668,9 @@ class MainWindow(QMainWindow):
             lambda: self._inspect_selected_archive(
                 True
             )
+        )
+        self.results_timeline.clicked.connect(
+            self._inspect_selected_timeline
         )
         self.results_open.clicked.connect(
             self._open_selected_archive_folder
@@ -1044,6 +1056,19 @@ class MainWindow(QMainWindow):
         )
         self.tabs.setCurrentIndex(1)
 
+    def _on_timeline_ready(
+        self,
+        data: dict,
+    ) -> None:
+        self.result_details.setPlainText(
+            json.dumps(
+                data,
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        self.tabs.setCurrentIndex(1)
+
     def _on_diagnostics(
         self,
         data: dict,
@@ -1322,6 +1347,17 @@ class MainWindow(QMainWindow):
             self.controller.inspect_archive(
                 path,
                 audit=audit,
+            )
+
+    def _inspect_selected_timeline(
+        self,
+    ) -> None:
+        path = self._selected_table_path(
+            self.results_table
+        )
+        if path:
+            self.controller.inspect_timeline(
+                path
             )
 
     def _open_selected_archive_folder(

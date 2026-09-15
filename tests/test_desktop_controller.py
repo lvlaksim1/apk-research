@@ -128,3 +128,98 @@ def test_display_ready_callback_starts_boot_frames_without_gating(
 
     assert calls == [False]
     controller.close()
+
+def test_pointer_tap_is_recorded_as_user_action(
+    monkeypatch,
+) -> None:
+    controller = DesktopController()
+    recorded: list[dict] = []
+
+    class Recorder:
+        def record_user_action(
+            self,
+            action: str,
+            **kwargs,
+        ) -> bool:
+            recorded.append(
+                {
+                    "action": action,
+                    **kwargs,
+                }
+            )
+            return True
+
+    controller.orchestrator = Recorder()
+    monkeypatch.setattr(
+        controller,
+        "_queue_input",
+        lambda *args: None,
+    )
+    timestamps = iter(
+        [
+            "2026-09-15T12:00:00.000000Z",
+            "2026-09-15T12:00:00.100000Z",
+        ]
+    )
+    monkeypatch.setattr(
+        controller,
+        "_host_utc_now",
+        lambda: next(timestamps),
+    )
+
+    controller.touch_down(100, 200)
+    controller.touch_up(100, 200)
+
+    assert len(recorded) == 1
+    assert recorded[0]["action"] == "tap"
+    assert recorded[0]["details"]["source"] == "pointer"
+    assert recorded[0]["details"]["start_x"] == 100
+    assert recorded[0]["details"]["end_y"] == 200
+    controller.close()
+
+
+def test_wheel_swipe_is_recorded_as_user_action(
+    monkeypatch,
+) -> None:
+    controller = DesktopController()
+    recorded: list[dict] = []
+
+    class Recorder:
+        def record_user_action(
+            self,
+            action: str,
+            **kwargs,
+        ) -> bool:
+            recorded.append(
+                {
+                    "action": action,
+                    **kwargs,
+                }
+            )
+            return True
+
+    controller.orchestrator = Recorder()
+    monkeypatch.setattr(
+        controller,
+        "_queue_input",
+        lambda *args: None,
+    )
+    monkeypatch.setattr(
+        controller,
+        "_host_utc_now",
+        lambda: "2026-09-15T12:00:00Z",
+    )
+
+    controller.swipe(
+        100,
+        500,
+        100,
+        250,
+        220,
+    )
+
+    assert recorded[0]["action"] == "swipe"
+    assert recorded[0]["details"]["source"] == "wheel"
+    assert recorded[0]["details"]["duration_ms"] == 220
+    controller.close()
+

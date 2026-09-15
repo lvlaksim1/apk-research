@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import json
+import math
 import queue
 import threading
+import time
+import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer, Qt, Signal
@@ -17,6 +22,7 @@ from mobile_research.orchestrator import (
     ResearchOrchestrator,
 )
 from mobile_research.targets import AdbClient
+from mobile_research.timeline import TIMELINE_ARTIFACT
 
 
 class DesktopController(QObject):
@@ -33,6 +39,7 @@ class DesktopController(QObject):
     screenFrame = Signal(object)
     operationBusy = Signal(bool)
     archiveInspection = Signal(dict)
+    timelineReady = Signal(dict)
     diagnosticsReady = Signal(dict)
 
     def __init__(self, parent=None) -> None:
@@ -52,6 +59,11 @@ class DesktopController(QObject):
             threading.Thread | None
         ) = None
         self._clean_launch = True
+        self._gesture_start_point: (
+            tuple[int, int] | None
+        ) = None
+        self._gesture_started_utc: str | None = None
+        self._gesture_started_ns = 0
         self._input_queue: queue.Queue[
             tuple[str, tuple] | None
         ] = queue.Queue()
@@ -139,6 +151,15 @@ class DesktopController(QObject):
             audit,
         )
 
+    def inspect_timeline(
+        self,
+        archive_path: str,
+    ) -> None:
+        self._thread(
+            self._inspect_timeline_worker,
+            Path(archive_path),
+        )
+
     def refresh_diagnostics(self) -> None:
         self._thread(
             self._diagnostics_worker
@@ -155,6 +176,16 @@ class DesktopController(QObject):
         )
 
     def touch_down(self, x: int, y: int) -> None:
+        self._gesture_start_point = (
+            int(x),
+            int(y),
+        )
+        self._gesture_started_utc = (
+            self._host_utc_now()
+        )
+        self._gesture_started_ns = (
+            time.monotonic_ns()
+        )
         self._queue_input(
             "touch_down",
             x,
@@ -174,6 +205,57 @@ class DesktopController(QObject):
             x,
             y,
         )
+        ended_utc = self._host_utc_now()
+        started = (
+            self._gesture_start_point
+            or (int(x), int(y))
+        )
+        started_utc = (
+            self._gesture_started_utc
+            or ended_utc
+        )
+        duration_ms = 0
+        if self._gesture_started_ns:
+            duration_ms = max(
+                0,
+                round(
+                    (
+                        time.monotonic_ns()
+                        - self._gesture_started_ns
+                    )
+                    / 1_000_000
+                ),
+            )
+        distance = math.hypot(
+            int(x) - started[0],
+            int(y) - started[1],
+        )
+        action = (
+            "tap"
+            if distance <= 12
+            and duration_ms <= 750
+            else "swipe"
+        )
+        self._record_user_action(
+            action,
+            {
+                "source": "pointer",
+                "start_x": started[0],
+                "start_y": started[1],
+                "end_x": int(x),
+                "end_y": int(y),
+                "duration_ms": duration_ms,
+                "distance_px": round(
+                    distance,
+                    2,
+                ),
+            },
+            host_started_utc=started_utc,
+            host_utc=ended_utc,
+        )
+        self._gesture_start_point = None
+        self._gesture_started_utc = None
+        self._gesture_started_ns = 0
 
     def swipe(
         self,
@@ -183,6 +265,27 @@ class DesktopController(QObject):
         y2: int,
         duration: int,
     ) -> None:
+        timestamp = self._host_utc_now()
+        self._record_user_action(
+            "swipe",
+            {
+                "source": "wheel",
+                "start_x": int(x1),
+                "start_y": int(y1),
+                "end_x": int(x2),
+                "end_y": int(y2),
+                "duration_ms": int(duration),
+                "distance_px": round(
+                    math.hypot(
+                        int(x2) - int(x1),
+                        int(y2) - int(y1),
+                    ),
+                    2,
+                ),
+            },
+            host_started_utc=timestamp,
+            host_utc=timestamp,
+        )
         self._queue_input(
             "swipe",
             x1,
@@ -193,12 +296,45 @@ class DesktopController(QObject):
         )
 
     def keyevent(self, keycode: int) -> None:
+        timestamp = self._host_utc_now()
+        self._record_user_action(
+            "key",
+            {
+                "keycode": int(keycode),
+                "key": {
+                    3: "HOME",
+                    4: "BACK",
+                    19: "DPAD_UP",
+                    20: "DPAD_DOWN",
+                    21: "DPAD_LEFT",
+                    22: "DPAD_RIGHT",
+                    61: "TAB",
+                    66: "ENTER",
+                    67: "BACKSPACE",
+                }.get(
+                    int(keycode),
+                    f"KEYCODE_{int(keycode)}",
+                ),
+            },
+            host_started_utc=timestamp,
+            host_utc=timestamp,
+        )
         self._queue_input(
             "keyevent",
             keycode,
         )
 
     def text_input(self, value: str) -> None:
+        timestamp = self._host_utc_now()
+        self._record_user_action(
+            "text_input",
+            {
+                "text": str(value),
+                "length": len(str(value)),
+            },
+            host_started_utc=timestamp,
+            host_utc=timestamp,
+        )
         self._queue_input(
             "text",
             value,
@@ -361,6 +497,15 @@ class DesktopController(QObject):
             payload["audit"] = audit.to_dict()
         except Exception as exc:
             payload["audit_error"] = str(exc)
+        try:
+            timeline = self._read_timeline_archive(
+                Path(result.archive)
+            )
+            payload["timeline_summary"] = (
+                timeline.get("summary", {})
+            )
+        except Exception as exc:
+            payload["timeline_error"] = str(exc)
         return payload
 
     def _salvage_research(
@@ -476,6 +621,44 @@ class DesktopController(QObject):
                 str(exc)
                 or exc.__class__.__name__
             )
+
+    def _inspect_timeline_worker(
+        self,
+        archive: Path,
+    ) -> None:
+        try:
+            timeline = self._read_timeline_archive(
+                archive
+            )
+            self.timelineReady.emit(
+                {
+                    "mode": "timeline",
+                    **timeline,
+                }
+            )
+        except Exception as exc:
+            self.error.emit(
+                str(exc)
+                or exc.__class__.__name__
+            )
+
+    @staticmethod
+    def _read_timeline_archive(
+        archive: Path,
+    ) -> dict:
+        with zipfile.ZipFile(
+            archive
+        ) as handle:
+            value = json.loads(
+                handle.read(
+                    TIMELINE_ARTIFACT
+                ).decode("utf-8")
+            )
+        if not isinstance(value, dict):
+            raise ValueError(
+                "Research Timeline имеет неверный формат"
+            )
+        return value
 
     def _diagnostics_worker(self) -> None:
         try:
@@ -677,6 +860,45 @@ class DesktopController(QObject):
             daemon=True,
         )
         thread.start()
+
+    @staticmethod
+    def _host_utc_now() -> str:
+        return (
+            datetime.now(
+                timezone.utc
+            )
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
+
+    def _record_user_action(
+        self,
+        action: str,
+        details: dict[str, object],
+        *,
+        host_started_utc: str,
+        host_utc: str,
+    ) -> None:
+        orchestrator = self.orchestrator
+        if orchestrator is None:
+            return
+        try:
+            orchestrator.record_user_action(
+                action,
+                details=details,
+                host_started_utc=(
+                    host_started_utc
+                ),
+                host_utc=host_utc,
+            )
+        except Exception as exc:
+            self.log.emit(
+                "Не удалось записать user action: "
+                + (
+                    str(exc)
+                    or exc.__class__.__name__
+                )
+            )
 
     def _queue_input(
         self,

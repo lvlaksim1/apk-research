@@ -9,6 +9,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import BinaryIO
 
+from mobile_research.timeline import TIMELINE_ARTIFACT
+
 from .research_zip import ExportError, verify_research_zip
 
 _REQUIRED_COLLECTORS = (
@@ -55,6 +57,8 @@ class CompleteResearchAudit:
     screen_capture_started_utc: str
     screen_capture_stopped_utc: str
     screen_capture_span_seconds: float
+    user_actions: int
+    timeline_events: int
     max_clock_skew_seconds: float
 
     def to_dict(self) -> dict[str, object]:
@@ -486,6 +490,30 @@ def audit_complete_research_zip(
             (stop_time - last_frame).total_seconds(),
         )
 
+        user_actions = 0
+        timeline_events = 0
+        if TIMELINE_ARTIFACT in archive.namelist():
+            timeline = _read_json(
+                archive,
+                TIMELINE_ARTIFACT,
+            )
+            summary = timeline.get("summary")
+            if isinstance(summary, dict):
+                user_actions = int(
+                    summary.get("user_actions")
+                    or 0
+                )
+            timeline_values = timeline.get(
+                "events"
+            )
+            if isinstance(
+                timeline_values,
+                list,
+            ):
+                timeline_events = len(
+                    timeline_values
+                )
+
         package = manifest.get("package")
         package_name = (
             str(package.get("name") or "")
@@ -520,5 +548,7 @@ def audit_complete_research_zip(
         screen_capture_span_seconds=(
             capture_stopped - capture_started
         ).total_seconds(),
+        user_actions=user_actions,
+        timeline_events=timeline_events,
         max_clock_skew_seconds=observed_clock_skew,
     )

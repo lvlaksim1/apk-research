@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -286,6 +288,17 @@ def test_end_to_end_orchestrator_complete(tmp_path: Path) -> None:
     assert orchestrator.session is not None
     assert orchestrator.session.status == SessionStatus.ACTIVE
 
+    recorded = orchestrator.record_user_action(
+        "tap",
+        details={
+            "start_x": 10,
+            "start_y": 20,
+            "end_x": 10,
+            "end_y": 20,
+        },
+    )
+    assert recorded is True
+
     health = orchestrator.health_check()
     assert health.healthy is True
 
@@ -296,6 +309,22 @@ def test_end_to_end_orchestrator_complete(tmp_path: Path) -> None:
     verification = verify_research_zip(result.archive)
     assert verification.valid is True
     assert verification.session_status == "complete"
+
+    with zipfile.ZipFile(result.archive) as archive:
+        actions_text = archive.read(
+            "02_normalized/user-actions.jsonl"
+        ).decode("utf-8")
+        timeline = json.loads(
+            archive.read(
+                "02_normalized/research-timeline.json"
+            )
+        )
+    assert '"action": "tap"' in actions_text
+    assert timeline["summary"]["user_actions"] == 1
+    assert any(
+        event.get("kind") == "user_action"
+        for event in timeline["events"]
+    )
 
     events = (
         orchestrator.session.paths.root

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import time
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,6 +22,10 @@ from mobile_research.session import (
     TERMINAL_STATUSES,
 )
 from mobile_research.targets import AdbClient, AdbError, validate_package_name
+from mobile_research.timeline import (
+    USER_ACTIONS_ARTIFACT,
+    build_research_timeline,
+)
 
 Clock = Callable[[], datetime]
 
@@ -131,6 +136,19 @@ def _iso_utc(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _parse_user_action_utc(value: str) -> datetime:
+    parsed = datetime.fromisoformat(
+        value.replace("Z", "+00:00")
+    )
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(
+            tzinfo=timezone.utc
+        )
+    return parsed.astimezone(
+        timezone.utc
+    )
+
+
 def _launch_reused_existing_instance(output: str) -> bool:
     normalized = output.lower()
     return (
@@ -179,6 +197,7 @@ class ResearchOrchestrator:
     """Coordinates one v0.1 AVD-RESEARCH session end to end."""
 
     EVENTS_ARTIFACT = "02_normalized/session-events.jsonl"
+    USER_ACTIONS_ARTIFACT = USER_ACTIONS_ARTIFACT
     LAUNCH_ARTIFACT = "01_raw/device/package-launch.txt"
 
     def __init__(
@@ -228,7 +247,10 @@ class ResearchOrchestrator:
         self.network: NetworkCollectorLike | None = None
         self._started_collectors: list[tuple[str, CollectorLike]] = []
         self._event_registered = False
+        self._user_action_registered = False
         self._launch_registered = False
+        self._user_action_lock = threading.Lock()
+        self._user_action_sequence = 0
 
     def start(self) -> StartResult:
         if self.session is not None:
@@ -251,6 +273,7 @@ class ResearchOrchestrator:
                 package={"name": self.package_name},
             )
             self._ensure_event_log()
+            self._ensure_user_action_log()
             self._event(
                 "session_created",
                 target_utc=self._target_time_best_effort(),
@@ -382,6 +405,75 @@ class ResearchOrchestrator:
                 archive=archive,
             ) from exc
 
+    def record_user_action(
+        self,
+        action: str,
+        *,
+        details: dict[str, object] | None = None,
+        host_started_utc: str | None = None,
+        host_utc: str | None = None,
+    ) -> bool:
+        session = self.session
+        if (
+            session is None
+            or session.status != SessionStatus.ACTIVE
+        ):
+            return False
+
+        normalized_action = action.strip()
+        if not normalized_action:
+            raise ValueError(
+                "User action name cannot be empty"
+            )
+
+        ended = (
+            host_utc
+            or _iso_utc(self.clock())
+        )
+        started = (
+            host_started_utc
+            or ended
+        )
+        # Validate timestamp shape before writing it into evidence.
+        _parse_user_action_utc(started)
+        _parse_user_action_utc(ended)
+
+        with self._user_action_lock:
+            self._user_action_sequence += 1
+            value: dict[str, object] = {
+                "action_id": (
+                    f"action-"
+                    f"{self._user_action_sequence:06d}"
+                ),
+                "sequence": self._user_action_sequence,
+                "action": normalized_action,
+                "host_started_utc": started,
+                "host_utc": ended,
+            }
+            if details is not None:
+                value["details"] = details
+
+            path = (
+                session.paths.root
+                / self.USER_ACTIONS_ARTIFACT
+            )
+            with path.open(
+                "a",
+                encoding="utf-8",
+                newline="\n",
+            ) as handle:
+                handle.write(
+                    json.dumps(
+                        value,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    )
+                )
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+        return True
+
     def health_check(self) -> HealthResult:
         session = self._require_session()
         if session.status != SessionStatus.ACTIVE:
@@ -443,6 +535,7 @@ class ResearchOrchestrator:
             details={"status": session.status.value},
         )
 
+        build_research_timeline(session)
         export_result = self.exporter(
             session,
             self.output_path,
@@ -535,6 +628,7 @@ class ResearchOrchestrator:
             return None
 
         try:
+            build_research_timeline(session)
             result = self.exporter(
                 session,
                 self.output_path,
@@ -558,6 +652,29 @@ class ResearchOrchestrator:
                 raw=False,
             )
             self._event_registered = True
+
+    def _ensure_user_action_log(self) -> None:
+        session = self._require_session()
+        path = (
+            session.paths.root
+            / self.USER_ACTIONS_ARTIFACT
+        )
+        path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+        path.touch(exist_ok=True)
+
+        if not self._user_action_registered:
+            session.register_artifact(
+                kind="user_actions",
+                relative_path=(
+                    self.USER_ACTIONS_ARTIFACT
+                ),
+                source="desktop-input",
+                raw=False,
+            )
+            self._user_action_registered = True
 
     def _event(
         self,
