@@ -26,15 +26,8 @@ class EmulatorGrpcError(RuntimeError):
 
 
 FRAME_ROWS_TOP_DOWN = "top-down"
-FRAME_ROWS_BOTTOM_UP = "bottom-up"
-
-
 def is_reverse_rotation(rotation: int) -> bool:
     return int(rotation) in {2, 3}
-
-
-def frame_rows_are_bottom_up(row_order: str) -> bool:
-    return str(row_order).strip().lower() == FRAME_ROWS_BOTTOM_UP
 
 
 def map_display_ratio_to_input(
@@ -72,7 +65,7 @@ class LiveFrame:
     row_order: str = FRAME_ROWS_TOP_DOWN
     seq: int = 0
     timestamp_us: int = 0
-    transport: str = "grpc-bytes"
+    transport: str = "grpc-mmap"
     owner: object | None = None
 
 
@@ -289,22 +282,11 @@ class EmulatorGrpcClient:
             request_serializer=lambda message: message.SerializeToString(),
             response_deserializer=empty_pb2.Empty.FromString,
         )
-        self._send_touch = self.channel.unary_unary(
-            prefix + "sendTouch",
-            request_serializer=lambda message: message.SerializeToString(),
-            response_deserializer=empty_pb2.Empty.FromString,
-        )
-        self._send_key = self.channel.unary_unary(
-            prefix + "sendKey",
-            request_serializer=lambda message: message.SerializeToString(),
-            response_deserializer=empty_pb2.Empty.FromString,
-        )
-
         self._input_queue: queue.Queue[object | None] = queue.Queue()
         self._input_thread: threading.Thread | None = None
         self._input_stream_error = ""
         self._mapped_buffers: list[_MappedFrameBuffer] = []
-        self.frame_transport = "grpc-bytes"
+        self.frame_transport = "grpc-mmap"
         self.frame_transport_error = ""
 
     def wait_ready(self, timeout: float = 8.0) -> None:
@@ -323,24 +305,21 @@ class EmulatorGrpcClient:
         height: int = 720,
         timeout: float | None = None,
     ) -> Iterator[LiveFrame]:
+        """Yield frames only through the required gRPC/MMAP transport."""
+
         try:
             yield from self._stream_frames_mmap(
                 width=width,
                 height=height,
                 timeout=timeout,
             )
-            return
         except Exception as exc:
-            self.frame_transport_error = (
-                str(exc) or exc.__class__.__name__
-            )
-            self.frame_transport = "grpc-bytes"
-
-        yield from self._stream_frames_bytes(
-            width=width,
-            height=height,
-            timeout=timeout,
-        )
+            detail = str(exc) or exc.__class__.__name__
+            self.frame_transport_error = detail
+            raise EmulatorGrpcError(
+                "Emulator gRPC/MMAP framebuffer failed: "
+                + detail
+            ) from exc
 
     def touch_down(self, x: int, y: int) -> None:
         self._send_touch_state(
@@ -375,29 +354,19 @@ class EmulatorGrpcClient:
             y,
             pressure=pressure,
         )
-        if self._queue_input_event(
+        self._queue_input_event(
             self._wrap_touch(event)
-        ):
-            return
-        self._send_touch(
-            event,
-            timeout=2.0,
         )
 
     def tap(self, x: int, y: int) -> None:
         down = self._touch_event(x, y, pressure=1)
         up = self._touch_event(x, y, pressure=0)
-        if (
-            self._queue_input_event(
-                self._wrap_touch(down)
-            )
-            and self._queue_input_event(
-                self._wrap_touch(up)
-            )
-        ):
-            return
-        self._send_touch(down, timeout=2.0)
-        self._send_touch(up, timeout=2.0)
+        self._queue_input_event(
+            self._wrap_touch(down)
+        )
+        self._queue_input_event(
+            self._wrap_touch(up)
+        )
 
     def swipe(
         self,
@@ -409,7 +378,6 @@ class EmulatorGrpcClient:
     ) -> None:
         duration = max(1, int(duration_ms)) / 1000.0
         steps = max(4, min(32, int(duration / 0.012)))
-        use_stream = self._input_stream_available()
         started = time.perf_counter()
         for index in range(steps + 1):
             ratio = index / steps
@@ -420,15 +388,9 @@ class EmulatorGrpcClient:
                 y,
                 pressure=1,
             )
-            if use_stream:
-                self._queue_input_event(
-                    self._wrap_touch(event)
-                )
-            else:
-                self._send_touch(
-                    event,
-                    timeout=2.0,
-                )
+            self._queue_input_event(
+                self._wrap_touch(event)
+            )
             target = started + (duration * ratio)
             remaining = target - time.perf_counter()
             if remaining > 0:
@@ -438,41 +400,25 @@ class EmulatorGrpcClient:
             y2,
             pressure=0,
         )
-        if use_stream:
-            self._queue_input_event(
-                self._wrap_touch(up)
-            )
-        else:
-            self._send_touch(
-                up,
-                timeout=2.0,
-            )
+        self._queue_input_event(
+            self._wrap_touch(up)
+        )
 
     def send_key(self, key: str) -> None:
         key_event = KeyboardEvent(
             eventType=self.KEYPRESS,
             key=str(key),
         )
-        if self._queue_input_event(
+        self._queue_input_event(
             self._wrap_key(key_event)
-        ):
-            return
-        self._send_key(
-            key_event,
-            timeout=2.0,
         )
 
     def send_text(self, value: str) -> None:
         if not value:
             return
         key_event = KeyboardEvent(text=str(value))
-        if self._queue_input_event(
+        self._queue_input_event(
             self._wrap_key(key_event)
-        ):
-            return
-        self._send_key(
-            key_event,
-            timeout=2.0,
         )
 
     def close(self) -> None:
@@ -551,37 +497,6 @@ class EmulatorGrpcClient:
                 continue
             self.frame_transport = "grpc-mmap"
             yield frame
-
-    def _stream_frames_bytes(
-        self,
-        *,
-        width: int,
-        height: int,
-        timeout: float | None,
-    ) -> Iterator[LiveFrame]:
-        request = ImageFormat(
-            format=self.RGBA8888,
-            width=max(1, int(width)),
-            height=max(1, int(height)),
-            display=0,
-        )
-        try:
-            call = self._stream_screenshot(
-                request,
-                timeout=timeout,
-            )
-            for reply in call:
-                frame = self._frame_from_reply(
-                    reply,
-                    data=bytes(reply.image),
-                    transport="grpc-bytes",
-                )
-                if frame is not None:
-                    yield frame
-        except grpc.RpcError as exc:
-            raise EmulatorGrpcError(
-                f"Emulator screenshot stream failed: {exc.code().name}"
-            ) from exc
 
     def _frame_from_reply(
         self,
@@ -683,11 +598,25 @@ class EmulatorGrpcClient:
             and not self._input_stream_error
         )
 
-    def _queue_input_event(self, event) -> bool:
-        if not self._input_stream_available():
-            return False
+    @property
+    def input_stream_error(self) -> str:
+        return self._input_stream_error
+
+    def _require_input_stream(self) -> None:
+        if self._input_stream_available():
+            return
+        detail = (
+            self._input_stream_error
+            or "streamInputEvent is not active"
+        )
+        raise EmulatorGrpcError(
+            "Required Emulator gRPC streamInputEvent failed: "
+            + detail
+        )
+
+    def _queue_input_event(self, event) -> None:
+        self._require_input_stream()
         self._input_queue.put(event)
-        return True
 
     @staticmethod
     def _wrap_touch(event):

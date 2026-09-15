@@ -95,11 +95,7 @@ class MainWindow(QMainWindow):
             )
             event.ignore()
             return
-        # Keep the DWM thumbnail registered until the source Emulator
-        # process has stopped. Unregistering first would briefly reveal
-        # the off-screen standalone source window during shutdown.
         self.controller.close()
-        self.android_view.detach_dwm()
         event.accept()
 
     def _build_ui(self) -> None:
@@ -619,12 +615,6 @@ class MainWindow(QMainWindow):
         self.android_view.textRequested.connect(
             c.text_input
         )
-        self.android_view.dwmAttached.connect(
-            self._on_dwm_display_attached
-        )
-        self.android_view.dwmAttachFailed.connect(
-            self._on_dwm_display_failed
-        )
         c.progress.connect(
             self._on_progress
         )
@@ -656,12 +646,6 @@ class MainWindow(QMainWindow):
         )
         c.diagnosticsReady.connect(
             self._on_diagnostics
-        )
-        c.dwmDisplayAvailable.connect(
-            self._on_dwm_display_available
-        )
-        self.tabs.currentChanged.connect(
-            self._on_tab_changed
         )
 
         self.results_refresh.clicked.connect(
@@ -878,21 +862,14 @@ class MainWindow(QMainWindow):
                 gpu_mode or ""
             )
             suffix = ""
-            if self.android_view.dwm_active:
-                suffix += " • DWM live"
-            elif transport_name:
+            if transport_name:
                 suffix += f" • {transport_name}"
             if gpu_mode:
                 suffix += f" • GPU {gpu_mode}"
-            if (
-                transport_name
-                and str(transport_name).startswith("grpc")
-                and not self.android_view.dwm_active
-            ):
-                self.android_hint.setText(
-                    "Embedded gRPC/MMAP • мышь = touch • "
-                    "колесо = swipe • клавиатура = ввод"
-                )
+            self.android_hint.setText(
+                "Embedded gRPC/MMAP • мышь = touch • "
+                "колесо = swipe • клавиатура = ввод"
+            )
             self.status_android.setText(
                 "● Android готов" + suffix
             )
@@ -940,83 +917,6 @@ class MainWindow(QMainWindow):
             self.global_status.setText(
                 "Android готов"
             )
-
-    def _on_tab_changed(
-        self,
-        index: int,
-    ) -> None:
-        self.android_view.set_dwm_visible(
-            index == 0
-        )
-
-    def _on_dwm_display_available(
-        self,
-        details: dict,
-    ) -> None:
-        if (
-            str(details.get("display_mode", ""))
-            != "dwm-live"
-        ):
-            return
-        self.android_hint.setText(
-            "Подключение DWM live Android Emulator…"
-        )
-        attached = self.android_view.attach_dwm(
-            int(details.get("process_id", 0) or 0),
-            str(details.get("avd_name", "") or ""),
-        )
-        if not attached:
-            self.controller.set_dwm_display_attached(
-                False
-            )
-
-    def _on_dwm_display_attached(
-        self,
-        details: dict,
-    ) -> None:
-        self.controller.set_dwm_display_attached(
-            True
-        )
-        suffix = " • DWM live"
-        if self._last_gpu_mode:
-            suffix += (
-                f" • GPU {self._last_gpu_mode}"
-            )
-        self.status_android.setText(
-            "● Android готов" + suffix
-        )
-        self.android_hint.setText(
-            "DWM live Android Emulator • "
-            "управление через gRPC"
-        )
-        self.android_view.set_dwm_visible(
-            self.tabs.currentIndex() == 0
-        )
-        self._append_log(
-            "DWM live Android Emulator подключён "
-            "через DWM thumbnail"
-        )
-
-    def _on_dwm_display_failed(
-        self,
-        message: str,
-    ) -> None:
-        self.controller.set_dwm_display_attached(
-            False
-        )
-        suffix = " • framebuffer fallback"
-        if self._last_gpu_mode:
-            suffix += (
-                f" • GPU {self._last_gpu_mode}"
-            )
-        self.status_android.setText(
-            "● Android готов" + suffix
-        )
-        self.android_hint.setText(
-            "Framebuffer fallback • мышь = touch • "
-            "колесо = swipe • клавиатура = ввод"
-        )
-        self._append_log(message)
 
     def _on_apk_ready(
         self,

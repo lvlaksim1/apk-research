@@ -19,17 +19,13 @@ from mobile_research.desktop.components import (
 )
 from mobile_research.desktop.emulator_grpc import (
     EmulatorGrpcClient,
-    LiveFrame,
 )
 
 RuntimeProgress = Callable[
     [str, int | None, int | None],
     None,
 ]
-RuntimeDisplayReady = Callable[
-    [int, str, str],
-    None,
-]
+RuntimeDisplayReady = Callable[[], None]
 _PACKAGE_BADGING_RE = re.compile(
     r"^package:\s+name='([^']+)'",
     re.MULTILINE,
@@ -91,21 +87,11 @@ class AndroidRuntime:
         self._display_mode = "headless"
         self._startup_attempts: list[dict[str, object]] = []
         self._last_emulator_command: list[str] = []
-        self._fallback_touch_start: (
-            tuple[int, int, float] | None
-        ) = None
         self._wipe_data_next_start = False
 
     @property
     def paths(self):
         return self.components.paths
-
-    @property
-    def dwm_display_active(self) -> bool:
-        return (
-            self._is_windows()
-            and self._display_mode == "dwm-live"
-        )
 
     @property
     def emulator_pid(self) -> int:
@@ -449,7 +435,21 @@ class AndroidRuntime:
             None,
         )
         self._check_acceleration(progress)
-        if not self._device_online():
+
+        if (
+            not self._device_online()
+            or self._grpc_port is None
+        ):
+            if self._device_online():
+                self._emit(
+                    progress,
+                    "Перезапуск private AVD в обязательном "
+                    "gRPC/MMAP режиме…",
+                    None,
+                    None,
+                )
+                self.stop()
+                self.cleanup_stale_managed_runtime()
             self._boot_managed_emulator(
                 progress,
                 display_ready,
@@ -465,236 +465,130 @@ class AndroidRuntime:
                     None,
                     None,
                 )
-                self.stop()
-                self.cleanup_stale_managed_runtime()
-                (
-                    self._gpu_mode,
-                    self._display_mode,
-                    _label,
-                ) = self._startup_profiles()[0]
+                self._gpu_mode = self._preferred_gpu_mode()
+                self._display_mode = self._required_display_mode()
                 self._recover_stalled_boot(
                     progress,
                     display_ready,
                 )
+
         self._ensure_root(progress)
         self._normalize_initial_orientation(progress)
         self._ensure_live_transport(progress)
 
-    def _startup_profiles(
-        self,
-    ) -> list[tuple[str, str, str]]:
-        """Return ordered graphics/display profiles for managed boot."""
-
-        if self._software_acceleration:
-            return [
-                (
-                    "swiftshader",
-                    "headless",
-                    "software compatibility",
-                )
-            ]
-        if self._is_windows():
-            return [
-                (
-                    "host",
-                    "grpc-embedded",
-                    "embedded gRPC/MMAP GPU host",
-                ),
-                (
-                    "auto",
-                    "grpc-embedded",
-                    "embedded gRPC/MMAP GPU auto",
-                ),
-                (
-                    "swiftshader",
-                    "headless",
-                    "headless SwiftShader compatibility",
-                ),
-                (
-                    "host",
-                    "dwm-live",
-                    "DWM compatibility GPU host",
-                ),
-                (
-                    "auto",
-                    "dwm-live",
-                    "DWM compatibility GPU auto",
-                ),
-            ]
-        return [
-            (
-                "auto",
-                "headless",
-                "headless display",
-            )
-        ]
+    def _required_display_mode(self) -> str:
+        if (
+            self._is_windows()
+            and not self._software_acceleration
+        ):
+            return "grpc-mmap"
+        return "headless-grpc-mmap"
 
     def _boot_managed_emulator(
         self,
         progress: RuntimeProgress | None,
         display_ready: RuntimeDisplayReady | None = None,
     ) -> None:
-        """Boot with graphics fallback and one bounded clean-AVD recovery."""
+        """Boot the one supported display/input architecture."""
 
-        profiles = self._startup_profiles()
+        self._gpu_mode = self._preferred_gpu_mode()
+        self._display_mode = self._required_display_mode()
         self._startup_attempts = []
-        last_error: AndroidRuntimeError | None = None
+        label = (
+            "required gRPC/MMAP"
+            f" GPU {self._gpu_mode}"
+        )
+        self._emit(
+            progress,
+            f"Запуск Android: {label}",
+            None,
+            None,
+        )
+        started = time.monotonic()
+        recovery_stage = ""
 
-        for index, (
-            gpu_mode,
-            display_mode,
-            label,
-        ) in enumerate(profiles):
-            self._gpu_mode = gpu_mode
-            self._display_mode = display_mode
-            self._emit(
+        try:
+            self._start_embedded_emulator(
                 progress,
-                f"Запуск Android: {label}",
-                None,
-                None,
+                display_ready,
             )
-            started = time.monotonic()
-            failure: AndroidRuntimeError | None = None
-            recovery_stage = ""
-            abort_after_failure = False
-
             try:
-                self._start_profile_display(
+                self._wait_for_boot(progress)
+            except AndroidBootTimeout:
+                recovery_stage = self._recover_stalled_boot(
                     progress,
                     display_ready,
                 )
-                self._wait_for_boot(progress)
-            except AndroidBootTimeout:
-                try:
-                    recovery_stage = (
-                        self._recover_stalled_boot(
-                            progress,
-                            display_ready,
-                        )
-                    )
-                except AndroidRuntimeError as recovery_exc:
-                    failure = recovery_exc
-                    abort_after_failure = True
-            except AndroidRuntimeError as exc:
-                failure = exc
-
-            if failure is not None:
-                process = self.process
-                exit_code = (
-                    process.returncode
-                    if process is not None
-                    else None
-                )
-                self._startup_attempts.append(
-                    {
-                        "label": label,
-                        "gpu_mode": gpu_mode,
-                        "display_mode": display_mode,
-                        "status": "failed",
-                        "duration_seconds": round(
-                            time.monotonic() - started,
-                            3,
-                        ),
-                        "exit_code": exit_code,
-                        "error": str(failure),
-                        "command": list(
-                            self._last_emulator_command
-                        ),
-                    }
-                )
-                last_error = failure
-                self.stop()
-                if abort_after_failure:
-                    raise failure
-                if index + 1 < len(profiles):
-                    self._emit(
-                        progress,
-                        "Android Emulator завершился. "
-                        "Автоматический переход к "
-                        "совместимому режиму…",
-                        None,
-                        None,
-                    )
-                continue
-
+        except AndroidRuntimeError as exc:
+            process = self.process
+            exit_code = (
+                process.returncode
+                if process is not None
+                else None
+            )
             self._startup_attempts.append(
                 {
                     "label": label,
-                    "gpu_mode": gpu_mode,
-                    "display_mode": display_mode,
-                    "status": "completed",
+                    "gpu_mode": self._gpu_mode,
+                    "display_mode": self._display_mode,
+                    "status": "failed",
                     "duration_seconds": round(
                         time.monotonic() - started,
                         3,
                     ),
-                    "exit_code": None,
-                    "error": "",
-                    "recovery": recovery_stage,
+                    "exit_code": exit_code,
+                    "error": str(exc),
                     "command": list(
                         self._last_emulator_command
                     ),
                 }
             )
-            if self._is_windows():
-                if display_mode == "dwm-live":
-                    message = (
-                        "Android запущен: DWM live "
-                        f"(GPU {gpu_mode})"
-                    )
-                else:
-                    message = (
-                        "Android запущен: framebuffer "
-                        f"({display_mode}, GPU {gpu_mode})"
-                    )
-                if recovery_stage == "wipe-data":
-                    message += " • AVD восстановлен"
-                self._emit(
-                    progress,
-                    message,
-                    None,
-                    None,
-                )
-            return
+            self.stop()
+            raise
 
-        detail = (
-            str(last_error)
-            if last_error is not None
-            else "неизвестная ошибка запуска"
+        self._startup_attempts.append(
+            {
+                "label": label,
+                "gpu_mode": self._gpu_mode,
+                "display_mode": self._display_mode,
+                "status": "completed",
+                "duration_seconds": round(
+                    time.monotonic() - started,
+                    3,
+                ),
+                "exit_code": None,
+                "error": "",
+                "recovery": recovery_stage,
+                "command": list(
+                    self._last_emulator_command
+                ),
+            }
         )
-        raise AndroidRuntimeError(
-            "Android Emulator не удалось запустить "
-            "ни в одном совместимом режиме. "
-            "Последняя ошибка: "
-            + detail
+        message = (
+            "Android запущен: обязательный gRPC/MMAP "
+            f"(GPU {self._gpu_mode})"
+        )
+        if recovery_stage == "wipe-data":
+            message += " • AVD восстановлен"
+        self._emit(
+            progress,
+            message,
+            None,
+            None,
         )
 
-    def _start_profile_display(
+    def _start_embedded_emulator(
         self,
         progress: RuntimeProgress | None,
         display_ready: RuntimeDisplayReady | None,
     ) -> None:
         self._start_emulator(progress)
-        if self._display_mode != "dwm-live":
-            self._ensure_live_transport(
-                progress,
-                timeout=20.0,
-                emit_fallback=False,
-            )
-        self._notify_display_ready(
-            display_ready
+        self._ensure_live_transport(
+            progress,
+            timeout=20.0,
         )
-
-    def _notify_display_ready(
-        self,
-        display_ready: RuntimeDisplayReady | None,
-    ) -> None:
-        if display_ready is None:
-            return
-        display_ready(
-            self.emulator_pid,
-            AVD_NAME,
-            self._display_mode,
-        )
+        if display_ready is not None:
+            display_ready()
 
     def _recover_stalled_boot(
         self,
@@ -713,14 +607,15 @@ class AndroidRuntime:
         self.stop()
         self.cleanup_stale_managed_runtime()
 
+        self._gpu_mode = self._preferred_gpu_mode()
+        self._display_mode = self._required_display_mode()
         self._wipe_data_next_start = True
         try:
-            self._start_profile_display(
+            self._start_embedded_emulator(
                 progress,
                 display_ready,
             )
         finally:
-            # -wipe-data is a one-launch recovery flag, never a persistent mode.
             self._wipe_data_next_start = False
 
         try:
@@ -800,40 +695,6 @@ class AndroidRuntime:
         )
         return package
 
-    def screenshot_png(self) -> bytes:
-        if not self.paths.adb.is_file():
-            return b""
-        creation_flags = getattr(
-            subprocess,
-            "CREATE_NO_WINDOW",
-            0,
-        )
-        try:
-            result = subprocess.run(
-                [
-                    str(self.paths.adb),
-                    "-s",
-                    self.SERIAL,
-                    "exec-out",
-                    "screencap",
-                    "-p",
-                ],
-                capture_output=True,
-                timeout=5,
-                check=False,
-                creationflags=creation_flags,
-            )
-        except (
-            OSError,
-            subprocess.TimeoutExpired,
-        ):
-            return b""
-        return (
-            result.stdout
-            if result.returncode == 0
-            else b""
-        )
-
     def screen_frames(
         self,
         stop_event: threading.Event,
@@ -841,107 +702,74 @@ class AndroidRuntime:
         width: int = 405,
         height: int = 720,
     ):
-        while not stop_event.is_set():
-            client = self._get_grpc_client()
-            if client is not None:
-                try:
-                    for frame in client.stream_frames(
-                        width=width,
-                        height=height,
-                    ):
-                        if stop_event.is_set():
-                            return
-                        yield frame
+        client = self._require_grpc_client()
+        try:
+            for frame in client.stream_frames(
+                width=width,
+                height=height,
+            ):
+                if stop_event.is_set():
                     return
-                except Exception:
-                    self._drop_grpc_client()
-                    continue
+                if frame.transport != "grpc-mmap":
+                    raise AndroidRuntimeError(
+                        "Получен неподдерживаемый framebuffer "
+                        f"transport: {frame.transport}"
+                    )
+                yield frame
+        except Exception as exc:
+            if stop_event.is_set():
+                return
+            self._drop_grpc_client()
+            if isinstance(exc, AndroidRuntimeError):
+                raise
+            raise AndroidRuntimeError(
+                "Обязательный gRPC/MMAP framebuffer "
+                "stream остановлен: "
+                + (str(exc) or exc.__class__.__name__)
+            ) from exc
 
-            png = self.screenshot_png()
-            if png:
-                yield LiveFrame(
-                    encoding="png",
-                    data=png,
-                    width=0,
-                    height=0,
-                    input_width=0,
-                    input_height=0,
-                    transport="adb-screencap",
-                )
-            stop_event.wait(0.12)
+    def _run_required_input(
+        self,
+        method: str,
+        *args,
+    ) -> None:
+        client = self._require_grpc_client()
+        try:
+            getattr(client, method)(*args)
+        except Exception as exc:
+            self._grpc_input_failures += 1
+            raise AndroidRuntimeError(
+                "Обязательный Emulator gRPC "
+                "streamInputEvent недоступен: "
+                + (str(exc) or exc.__class__.__name__)
+            ) from exc
 
     def touch_down(self, x: int, y: int) -> None:
-        self._fallback_touch_start = (
-            int(x),
-            int(y),
-            time.perf_counter(),
+        self._run_required_input(
+            "touch_down",
+            x,
+            y,
         )
-        client = self._get_grpc_client()
-        if client is not None:
-            try:
-                client.touch_down(x, y)
-                return
-            except Exception:
-                self._grpc_input_failures += 1
 
     def touch_move(self, x: int, y: int) -> None:
-        client = self._get_grpc_client()
-        if client is not None:
-            try:
-                client.touch_move(x, y)
-                return
-            except Exception:
-                self._grpc_input_failures += 1
+        self._run_required_input(
+            "touch_move",
+            x,
+            y,
+        )
 
     def touch_up(self, x: int, y: int) -> None:
-        start = self._fallback_touch_start
-        self._fallback_touch_start = None
-        client = self._get_grpc_client()
-        if client is not None:
-            try:
-                client.touch_up(x, y)
-                return
-            except Exception:
-                self._grpc_input_failures += 1
-        if start is None:
-            self.tap(x, y)
-            return
-        x1, y1, started = start
-        duration_ms = max(
-            1,
-            int(
-                (time.perf_counter() - started)
-                * 1000
-            ),
-        )
-        dx = abs(int(x) - x1)
-        dy = abs(int(y) - y1)
-        if dx < 12 and dy < 12:
-            self.tap(x, y)
-            return
-        self._adb_shell(
-            "input",
-            "swipe",
-            str(max(0, x1)),
-            str(max(0, y1)),
-            str(max(0, x)),
-            str(max(0, y)),
-            str(duration_ms),
+        self._run_required_input(
+            "touch_up",
+            x,
+            y,
         )
 
     def tap(self, x: int, y: int) -> None:
-        client = self._get_grpc_client()
-        if client is not None:
-            try:
-                client.tap(x, y)
-                return
-            except Exception:
-                self._grpc_input_failures += 1
-        self._adb_shell(
-            "input",
+        self._run_required_input(
             "tap",
-            str(max(0, x)),
-            str(max(0, y)),
+            x,
+            y,
         )
 
     def swipe(
@@ -952,27 +780,13 @@ class AndroidRuntime:
         y2: int,
         duration_ms: int = 250,
     ) -> None:
-        client = self._get_grpc_client()
-        if client is not None:
-            try:
-                client.swipe(
-                    x1,
-                    y1,
-                    x2,
-                    y2,
-                    duration_ms,
-                )
-                return
-            except Exception:
-                self._grpc_input_failures += 1
-        self._adb_shell(
-            "input",
+        self._run_required_input(
             "swipe",
-            str(max(0, x1)),
-            str(max(0, y1)),
-            str(max(0, x2)),
-            str(max(0, y2)),
-            str(max(1, duration_ms)),
+            x1,
+            y1,
+            x2,
+            y2,
+            duration_ms,
         )
 
     def keyevent(self, keycode: int) -> None:
@@ -987,36 +801,20 @@ class AndroidRuntime:
             66: "Enter",
             67: "Backspace",
         }
-        client = self._get_grpc_client()
         key = key_map.get(int(keycode))
-        if client is not None and key:
-            try:
-                client.send_key(key)
-                return
-            except Exception:
-                self._grpc_input_failures += 1
-        self._adb_shell(
-            "input",
-            "keyevent",
-            str(keycode),
+        if not key:
+            raise AndroidRuntimeError(
+                f"Неподдерживаемый Android keycode: {keycode}"
+            )
+        self._run_required_input(
+            "send_key",
+            key,
         )
 
     def text(self, value: str) -> None:
-        client = self._get_grpc_client()
-        if client is not None:
-            try:
-                client.send_text(value)
-                return
-            except Exception:
-                self._grpc_input_failures += 1
-        escaped = (
-            value.replace("%", "%25")
-            .replace(" ", "%s")
-        )
-        self._adb_shell(
-            "input",
-            "text",
-            escaped,
+        self._run_required_input(
+            "send_text",
+            value,
         )
 
     def stop(self) -> None:
@@ -1065,8 +863,10 @@ class AndroidRuntime:
                 "active": (
                     self._get_grpc_client().frame_transport
                     if self._get_grpc_client() is not None
-                    else "adb-screencap"
+                    else "unavailable"
                 ),
+                "required": "grpc-mmap",
+                "input_required": "streamInputEvent",
                 "grpc_port": self._grpc_port,
                 "gpu_mode": self._gpu_mode,
                 "display_mode": self._display_mode,
@@ -1076,17 +876,17 @@ class AndroidRuntime:
                     if self._get_grpc_client() is not None
                     else ""
                 ),
+                "input_stream_error": (
+                    self._get_grpc_client().input_stream_error
+                    if self._get_grpc_client() is not None
+                    else ""
+                ),
                 "startup_attempts": list(
                     self._startup_attempts
                 ),
                 "emulator_command": list(
                     self._last_emulator_command
                 ),
-            },
-            "dwm_display": {
-                "active": self.dwm_display_active,
-                "process_id": self.emulator_pid,
-                "avd_name": AVD_NAME,
             },
         }
 
@@ -1277,16 +1077,11 @@ class AndroidRuntime:
             self._is_windows()
             and not self._software_acceleration
         ):
-            if self._display_mode == "dwm-live":
-                pass
-            elif self._display_mode == "grpc-embedded":
-                command.append("-qt-hide-window")
-            else:
-                command.append("-no-window")
-                self._display_mode = "headless"
+            command.append("-qt-hide-window")
+            self._display_mode = "grpc-mmap"
         else:
             command.append("-no-window")
-            self._display_mode = "headless"
+            self._display_mode = "headless-grpc-mmap"
 
         if self._software_acceleration:
             command.extend(
@@ -1461,7 +1256,7 @@ class AndroidRuntime:
                     self._emit(
                         progress,
                         "Аппаратное ускорение: AEHD "
-                        "(совместимый fallback)",
+                        "(совместимый provider)",
                         None,
                         None,
                     )
@@ -1657,21 +1452,16 @@ class AndroidRuntime:
         progress: RuntimeProgress | None,
         *,
         timeout: float = 8.0,
-        emit_fallback: bool = True,
-    ) -> bool:
+    ) -> None:
         existing = self._get_grpc_client()
         if existing is not None:
-            return True
+            return
 
         if self._grpc_port is None:
-            if emit_fallback:
-                self._emit(
-                    progress,
-                    "Интерактивный экран: ADB fallback",
-                    None,
-                    None,
-                )
-            return False
+            raise AndroidRuntimeError(
+                "Обязательный Emulator gRPC endpoint "
+                "не был создан"
+            )
 
         client: EmulatorGrpcClient | None = None
         try:
@@ -1679,20 +1469,17 @@ class AndroidRuntime:
             client.wait_ready(
                 timeout=max(0.5, float(timeout))
             )
-        except Exception:
+        except Exception as exc:
             if client is not None:
                 try:
                     client.close()
                 except Exception:
                     pass
-            if emit_fallback:
-                self._emit(
-                    progress,
-                    "Интерактивный экран: ADB fallback",
-                    None,
-                    None,
-                )
-            return False
+            raise AndroidRuntimeError(
+                "Обязательный Emulator gRPC transport "
+                "недоступен: "
+                + (str(exc) or exc.__class__.__name__)
+            ) from exc
 
         with self._grpc_lock:
             previous = self._grpc_client
@@ -1704,11 +1491,22 @@ class AndroidRuntime:
                 pass
         self._emit(
             progress,
-            "Интерактивный экран: Emulator gRPC/MMAP",
+            "Интерактивный transport: обязательный "
+            "Emulator gRPC/MMAP",
             None,
             None,
         )
-        return True
+
+    def _require_grpc_client(
+        self,
+    ) -> EmulatorGrpcClient:
+        client = self._get_grpc_client()
+        if client is None:
+            raise AndroidRuntimeError(
+                "Обязательный Emulator gRPC/MMAP "
+                "transport не активен"
+            )
+        return client
 
     def _get_grpc_client(
         self,

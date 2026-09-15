@@ -343,7 +343,7 @@ def test_software_mode_keeps_swiftshader(
 
 
 
-def test_windows_grpc_embedded_uses_qt_hidden_window(
+def test_windows_required_runtime_uses_qt_hidden_window(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -352,33 +352,6 @@ def test_windows_grpc_embedded_uses_qt_hidden_window(
     runtime = AndroidRuntime(manager)
     runtime._grpc_port = 8554
     runtime._software_acceleration = False
-    monkeypatch.setattr(
-        runtime,
-        "_is_windows",
-        lambda: True,
-    )
-
-    runtime._display_mode = "grpc-embedded"
-    command = runtime._emulator_command()
-
-    assert "-qt-hide-window" in command
-    assert "-no-window" not in command
-    assert "-crash-report-mode" in command
-    crash_index = command.index("-crash-report-mode")
-    assert command[crash_index + 1] == "disabled"
-    assert runtime._display_mode == "grpc-embedded"
-
-
-def test_windows_dwm_live_has_real_window(
-    tmp_path,
-    monkeypatch,
-) -> None:
-    manager = ComponentManager(tmp_path)
-    _make_components_ready(manager)
-    runtime = AndroidRuntime(manager)
-    runtime._grpc_port = 8554
-    runtime._software_acceleration = False
-    runtime._display_mode = "dwm-live"
     runtime._gpu_mode = "host"
     monkeypatch.setattr(
         runtime,
@@ -388,14 +361,17 @@ def test_windows_dwm_live_has_real_window(
 
     command = runtime._emulator_command()
 
-    assert "-qt-hide-window" not in command
+    assert "-qt-hide-window" in command
     assert "-no-window" not in command
-    assert runtime.dwm_display_active is True
+    assert "-crash-report-mode" in command
+    crash_index = command.index("-crash-report-mode")
+    assert command[crash_index + 1] == "disabled"
     gpu_index = command.index("-gpu")
     assert command[gpu_index + 1] == "host"
+    assert runtime._display_mode == "grpc-mmap"
 
 
-def test_non_windows_emulator_remains_headless(
+def test_non_windows_required_runtime_remains_headless(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -413,53 +389,10 @@ def test_non_windows_emulator_remains_headless(
 
     assert "-no-window" in command
     assert "-qt-hide-window" not in command
+    assert runtime._display_mode == "headless-grpc-mmap"
 
 
-
-def test_windows_primary_mode_uses_framebuffer_not_dwm(
-    tmp_path,
-    monkeypatch,
-) -> None:
-    manager = ComponentManager(tmp_path)
-    _make_components_ready(manager)
-    runtime = AndroidRuntime(manager)
-    monkeypatch.setattr(
-        runtime,
-        "_is_windows",
-        lambda: True,
-    )
-    runtime._display_mode = "grpc-embedded"
-
-    assert runtime.dwm_display_active is False
-    assert runtime.emulator_pid == 0
-
-
-def test_windows_headless_mode_disables_dwm_presentation(
-    tmp_path,
-    monkeypatch,
-) -> None:
-    manager = ComponentManager(tmp_path)
-    _make_components_ready(manager)
-    runtime = AndroidRuntime(manager)
-    runtime._grpc_port = 8554
-    runtime._gpu_mode = "swiftshader"
-    runtime._display_mode = "headless"
-    monkeypatch.setattr(
-        runtime,
-        "_is_windows",
-        lambda: True,
-    )
-
-    command = runtime._emulator_command()
-
-    assert runtime.dwm_display_active is False
-    assert "-no-window" in command
-    assert "-qt-hide-window" not in command
-    gpu_index = command.index("-gpu")
-    assert command[gpu_index + 1] == "swiftshader"
-
-
-def test_windows_boot_falls_back_across_embedded_gpu_modes(
+def test_windows_boot_failure_is_not_retried_in_another_mode(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -474,7 +407,7 @@ def test_windows_boot_falls_back_across_embedded_gpu_modes(
         lambda: True,
     )
 
-    def fake_start(progress):
+    def fail_start(progress, display_ready):
         attempts.append(
             (
                 runtime._gpu_mode,
@@ -486,27 +419,14 @@ def test_windows_boot_falls_back_across_embedded_gpu_modes(
             "-gpu",
             runtime._gpu_mode,
         ]
-
-    def fake_wait(progress):
-        if len(attempts) < 5:
-            raise AndroidRuntimeError(
-                "synthetic graphics startup failure"
-            )
+        raise AndroidRuntimeError(
+            "synthetic required-path failure"
+        )
 
     monkeypatch.setattr(
         runtime,
-        "_start_emulator",
-        fake_start,
-    )
-    monkeypatch.setattr(
-        runtime,
-        "_wait_for_boot",
-        fake_wait,
-    )
-    monkeypatch.setattr(
-        runtime,
-        "_ensure_live_transport",
-        lambda progress, **kwargs: True,
+        "_start_embedded_emulator",
+        fail_start,
     )
     monkeypatch.setattr(
         runtime,
@@ -514,27 +434,17 @@ def test_windows_boot_falls_back_across_embedded_gpu_modes(
         lambda: None,
     )
 
-    runtime._boot_managed_emulator(None)
+    with pytest.raises(
+        AndroidRuntimeError,
+        match="required-path failure",
+    ):
+        runtime._boot_managed_emulator(None)
 
     assert attempts == [
-        ("host", "grpc-embedded"),
-        ("auto", "grpc-embedded"),
-        ("swiftshader", "headless"),
-        ("host", "dwm-live"),
-        ("auto", "dwm-live"),
+        ("host", "grpc-mmap"),
     ]
-    assert [
-        item["status"]
-        for item in runtime._startup_attempts
-    ] == [
-        "failed",
-        "failed",
-        "failed",
-        "failed",
-        "completed",
-    ]
-    assert runtime.dwm_display_active is True
-
+    assert len(runtime._startup_attempts) == 1
+    assert runtime._startup_attempts[0]["status"] == "failed"
 
 
 def test_startup_cleanup_removes_only_avd_lock_entries(
@@ -721,7 +631,7 @@ def test_stalled_boot_recovery_wipes_once(
     )
     monkeypatch.setattr(
         runtime,
-        "_start_profile_display",
+        "_start_embedded_emulator",
         lambda progress, display_ready: starts.append(
             runtime._wipe_data_next_start
         ),
@@ -742,7 +652,7 @@ def test_stalled_boot_recovery_wipes_once(
     assert runtime._wipe_data_next_start is False
 
 
-def test_boot_timeout_does_not_fall_through_to_graphics_profiles(
+def test_boot_timeout_does_not_switch_runtime_architecture(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -767,7 +677,7 @@ def test_boot_timeout_does_not_fall_through_to_graphics_profiles(
 
     monkeypatch.setattr(
         runtime,
-        "_start_profile_display",
+        "_start_embedded_emulator",
         fake_start,
     )
     monkeypatch.setattr(
@@ -801,45 +711,19 @@ def test_boot_timeout_does_not_fall_through_to_graphics_profiles(
         runtime._boot_managed_emulator(None)
 
     assert starts == [
-        ("host", "grpc-embedded"),
+        ("host", "grpc-mmap"),
     ]
     assert len(runtime._startup_attempts) == 1
     assert runtime._startup_attempts[0]["status"] == "failed"
 
 
-def test_windows_startup_profiles_are_embedded_first(
+def test_display_ready_callback_starts_required_framebuffer(
     tmp_path,
     monkeypatch,
 ) -> None:
     manager = ComponentManager(tmp_path)
     runtime = AndroidRuntime(manager)
-    runtime._software_acceleration = False
-    monkeypatch.setattr(
-        runtime,
-        "_is_windows",
-        lambda: True,
-    )
-
-    profiles = runtime._startup_profiles()
-
-    assert profiles[0][:2] == (
-        "host",
-        "grpc-embedded",
-    )
-    assert profiles[1][:2] == (
-        "auto",
-        "grpc-embedded",
-    )
-    assert profiles[-1][1] == "dwm-live"
-
-
-def test_display_ready_callback_is_emitted_for_embedded_mode(
-    tmp_path,
-    monkeypatch,
-) -> None:
-    manager = ComponentManager(tmp_path)
-    runtime = AndroidRuntime(manager)
-    runtime._display_mode = "grpc-embedded"
+    runtime._display_mode = "grpc-mmap"
     seen = []
 
     monkeypatch.setattr(
@@ -850,22 +734,18 @@ def test_display_ready_callback_is_emitted_for_embedded_mode(
     monkeypatch.setattr(
         runtime,
         "_ensure_live_transport",
-        lambda progress, **kwargs: True,
+        lambda progress, **kwargs: None,
     )
 
-    runtime._start_profile_display(
+    runtime._start_embedded_emulator(
         None,
-        lambda pid, avd, mode: seen.append(
-            (pid, avd, mode)
-        ),
+        lambda: seen.append("ready"),
     )
 
-    assert len(seen) == 1
-    assert seen[0][1] == "mobile_research_api35"
-    assert seen[0][2] == "grpc-embedded"
+    assert seen == ["ready"]
 
 
-def test_screen_frames_upgrades_to_grpc_after_early_fallback(
+def test_screen_frames_requires_grpc_mmap(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -874,9 +754,6 @@ def test_screen_frames_upgrades_to_grpc_after_early_fallback(
 
     class FakeStop:
         def is_set(self):
-            return False
-
-        def wait(self, _seconds):
             return False
 
     class FakeClient:
@@ -892,19 +769,10 @@ def test_screen_frames_upgrades_to_grpc_after_early_fallback(
             )
 
     client = FakeClient()
-    sequence = [None, client]
-
     monkeypatch.setattr(
         runtime,
         "_get_grpc_client",
-        lambda: sequence.pop(0)
-        if sequence
-        else client,
-    )
-    monkeypatch.setattr(
-        runtime,
-        "screenshot_png",
-        lambda: b"",
+        lambda: client,
     )
 
     frame = next(
@@ -916,3 +784,59 @@ def test_screen_frames_upgrades_to_grpc_after_early_fallback(
     )
 
     assert frame.transport == "grpc-mmap"
+
+
+def test_screen_frames_fail_without_required_grpc_client(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    runtime = AndroidRuntime(manager)
+
+    class FakeStop:
+        def is_set(self):
+            return False
+
+    monkeypatch.setattr(
+        runtime,
+        "_get_grpc_client",
+        lambda: None,
+    )
+
+    with pytest.raises(
+        AndroidRuntimeError,
+        match="gRPC/MMAP",
+    ):
+        next(runtime.screen_frames(FakeStop()))
+
+
+def test_touch_input_never_falls_back_to_adb(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    runtime = AndroidRuntime(manager)
+
+    class FailingClient:
+        def touch_down(self, x, y):
+            raise RuntimeError("stream down")
+
+    monkeypatch.setattr(
+        runtime,
+        "_get_grpc_client",
+        lambda: FailingClient(),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "_adb_shell",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("ADB input fallback must not run")
+        ),
+    )
+
+    with pytest.raises(
+        AndroidRuntimeError,
+        match="streamInputEvent",
+    ):
+        runtime.touch_down(10, 20)
+

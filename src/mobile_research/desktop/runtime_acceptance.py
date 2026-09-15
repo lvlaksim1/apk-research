@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import sys
+import threading
 import time
 import traceback
 from datetime import datetime, timezone
@@ -62,7 +63,7 @@ def run_runtime_acceptance() -> int:
     ).resolve()
     sessions_root = root / "sessions"
     archive = root / "windows-runtime.research.zip"
-    screenshot = root / "android.png"
+    framebuffer = root / "framebuffer.rgba"
     log_path = root / "acceptance.log"
     acceptance_apk_value = os.environ.get(
         "MOBILE_RESEARCH_ACCEPTANCE_APK"
@@ -228,13 +229,37 @@ def run_runtime_acceptance() -> int:
                 "Managed Android does not expose tcpdump"
             )
 
-        frame = runtime.screenshot_png()
-        if not frame.startswith(b"\x89PNG\r\n\x1a\n"):
+        stop_frame = threading.Event()
+        frames = runtime.screen_frames(
+            stop_frame,
+            width=405,
+            height=720,
+        )
+        try:
+            frame = next(frames)
+        finally:
+            stop_frame.set()
+            try:
+                frames.close()
+            except Exception:
+                pass
+        if (
+            frame.transport != "grpc-mmap"
+            or frame.width <= 0
+            or frame.height <= 0
+            or not frame.data
+        ):
             raise RuntimeError(
-                "Embedded Android framebuffer smoke-test failed"
+                "Required gRPC/MMAP framebuffer smoke-test failed"
             )
-        screenshot.write_bytes(frame)
-        payload["screenshot_bytes"] = len(frame)
+        frame_bytes = bytes(frame.data)
+        framebuffer.write_bytes(frame_bytes)
+        payload["framebuffer"] = {
+            "transport": frame.transport,
+            "width": frame.width,
+            "height": frame.height,
+            "bytes": len(frame_bytes),
+        }
 
         client = AdbClient(runtime.paths.adb)
         package = "com.android.settings"

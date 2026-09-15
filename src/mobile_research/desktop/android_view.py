@@ -14,13 +14,7 @@ from PySide6.QtWidgets import QLabel
 
 from mobile_research.desktop.emulator_grpc import (
     FRAME_ROWS_TOP_DOWN,
-    frame_rows_are_bottom_up,
-    is_reverse_rotation,
     map_display_ratio_to_input,
-)
-from mobile_research.desktop.dwm_emulator import (
-    DwmEmulatorPresenter,
-    windows_dwm_available,
 )
 
 
@@ -39,8 +33,6 @@ class AndroidView(QLabel):
     touchUpRequested = Signal(int, int)
     keyRequested = Signal(int)
     textRequested = Signal(str)
-    dwmAttached = Signal(dict)
-    dwmAttachFailed = Signal(str)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -60,18 +52,6 @@ class AndroidView(QLabel):
         self.setFocusPolicy(
             Qt.FocusPolicy.StrongFocus
         )
-        self._dwm_presenter = (
-            DwmEmulatorPresenter(self)
-            if windows_dwm_available()
-            else None
-        )
-        if self._dwm_presenter is not None:
-            self._dwm_presenter.attached.connect(
-                self._on_dwm_attached
-            )
-            self._dwm_presenter.failed.connect(
-                self._on_dwm_failed
-            )
         self._source_image: QImage | None = None
         self._frame_owner = None
         self._display_rect = QRect()
@@ -84,124 +64,51 @@ class AndroidView(QLabel):
         self._input_width = 0
         self._input_height = 0
         self._rotation = 0
-        self._bottom_up = False
-
-    @property
-    def dwm_active(self) -> bool:
-        return bool(
-            self._dwm_presenter is not None
-            and self._dwm_presenter.active
-        )
-
-    def attach_dwm(
-        self,
-        process_id: int,
-        avd_name: str,
-    ) -> bool:
-        if self._dwm_presenter is None:
-            return False
-        self._source_image = None
-        self._frame_owner = None
-        self.setText(
-            "Подключение DWM live Android Emulator…"
-        )
-        self.update()
-        self._dwm_presenter.attach(
-            process_id,
-            avd_name,
-        )
-        return True
-
-    def detach_dwm(self) -> None:
-        if self._dwm_presenter is not None:
-            self._dwm_presenter.detach()
-
-    def set_dwm_visible(
-        self,
-        visible: bool,
-    ) -> None:
-        if self._dwm_presenter is not None:
-            self._dwm_presenter.set_presentation_visible(
-                visible
-            )
 
     def set_frame(self, frame) -> None:
-        if self.dwm_active:
+        encoding = getattr(frame, "encoding", "")
+        row_order = getattr(
+            frame,
+            "row_order",
+            FRAME_ROWS_TOP_DOWN,
+        )
+        if (
+            encoding != "rgba8888"
+            or row_order != FRAME_ROWS_TOP_DOWN
+        ):
             return
-        encoding = getattr(
-            frame,
-            "encoding",
-            "png",
-        )
-        data = getattr(
-            frame,
-            "data",
-            frame if isinstance(frame, bytes) else b"",
-        )
 
-        if encoding in {"rgba8888", "rgb888"}:
-            width = int(getattr(frame, "width", 0))
-            height = int(getattr(frame, "height", 0))
-            bytes_per_pixel = (
-                4
-                if encoding == "rgba8888"
-                else 3
-            )
-            expected = width * height * bytes_per_pixel
-            if (
-                width <= 0
-                or height <= 0
-                or len(data) < expected
-            ):
-                return
-            image_format = (
-                QImage.Format.Format_RGBA8888
-                if encoding == "rgba8888"
-                else QImage.Format.Format_RGB888
-            )
-            image = QImage(
-                data,
-                width,
-                height,
-                width * bytes_per_pixel,
-                image_format,
-            )
-            self._frame_owner = frame
-            self._bottom_up = frame_rows_are_bottom_up(
-                getattr(
-                    frame,
-                    "row_order",
-                    FRAME_ROWS_TOP_DOWN,
-                )
-            )
-            self._rotation = int(
-                getattr(frame, "rotation", 0)
-                or 0
-            )
-            self._input_width = int(
-                getattr(frame, "input_width", width)
-                or width
-            )
-            self._input_height = int(
-                getattr(frame, "input_height", height)
-                or height
-            )
-        else:
-            image = QImage()
-            if (
-                not data
-                or not image.loadFromData(
-                    data,
-                    "PNG",
-                )
-            ):
-                return
-            self._frame_owner = frame
-            self._bottom_up = False
-            self._rotation = 0
-            self._input_width = image.width()
-            self._input_height = image.height()
+        data = getattr(frame, "data", b"")
+        width = int(getattr(frame, "width", 0))
+        height = int(getattr(frame, "height", 0))
+        expected = width * height * 4
+        if (
+            width <= 0
+            or height <= 0
+            or len(data) < expected
+        ):
+            return
 
+        image = QImage(
+            data,
+            width,
+            height,
+            width * 4,
+            QImage.Format.Format_RGBA8888,
+        )
+        self._frame_owner = frame
+        self._rotation = int(
+            getattr(frame, "rotation", 0)
+            or 0
+        )
+        self._input_width = int(
+            getattr(frame, "input_width", width)
+            or width
+        )
+        self._input_height = int(
+            getattr(frame, "input_height", height)
+            or height
+        )
         self._source_image = image
         self._source_width = image.width()
         self._source_height = image.height()
@@ -237,22 +144,6 @@ class AndroidView(QLabel):
             target.height() / self._source_height,
         )
 
-        if self._bottom_up:
-            if is_reverse_rotation(
-                self._rotation
-            ):
-                painter.translate(
-                    self._source_width,
-                    0,
-                )
-                painter.scale(-1.0, 1.0)
-            else:
-                painter.translate(
-                    0,
-                    self._source_height,
-                )
-                painter.scale(1.0, -1.0)
-
         painter.drawImage(
             0,
             0,
@@ -263,13 +154,6 @@ class AndroidView(QLabel):
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
         self._update_display_rect()
-        if self._dwm_presenter is not None:
-            self._dwm_presenter.refresh_presentation()
-
-    def moveEvent(self, event) -> None:  # noqa: N802
-        super().moveEvent(event)
-        if self._dwm_presenter is not None:
-            self._dwm_presenter.refresh_presentation()
 
     def mousePressEvent(
         self,
@@ -423,41 +307,6 @@ class AndroidView(QLabel):
             event.accept()
             return
         super().keyPressEvent(event)
-
-    def _on_dwm_attached(
-        self,
-        details: dict,
-    ) -> None:
-        self._source_image = None
-        self._frame_owner = None
-        self._source_width = int(
-            details.get("source_width", 9) or 9
-        )
-        self._source_height = int(
-            details.get("source_height", 16) or 16
-        )
-        self._input_width = int(
-            details.get("input_width", 1080) or 1080
-        )
-        self._input_height = int(
-            details.get("input_height", 1920) or 1920
-        )
-        self._rotation = 0
-        self._bottom_up = False
-        self._update_display_rect()
-        self.setText("")
-        self.dwmAttached.emit(details)
-
-    def _on_dwm_failed(
-        self,
-        message: str,
-    ) -> None:
-        self.dwmAttachFailed.emit(message)
-        if self._source_image is None:
-            self.setText(
-                "DWM live недоступен\n"
-                "Переход на framebuffer fallback…"
-            )
 
     def _update_display_rect(self) -> None:
         if (

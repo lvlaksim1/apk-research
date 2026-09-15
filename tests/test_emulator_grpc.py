@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import pytest
+
 from mobile_research.desktop.emulator_grpc import (
-    FRAME_ROWS_BOTTOM_UP,
     FRAME_ROWS_TOP_DOWN,
     EmulatorGrpcClient,
+    EmulatorGrpcError,
     Image,
     ImageFormat,
     ImageTransport,
@@ -12,7 +14,6 @@ from mobile_research.desktop.emulator_grpc import (
     Rotation,
     Touch,
     TouchEvent,
-    frame_rows_are_bottom_up,
     is_reverse_rotation,
     map_display_ratio_to_input,
 )
@@ -78,7 +79,6 @@ def test_touch_and_keyboard_wire_messages() -> None:
     assert restored_key.eventType == 2
 
 
-
 def test_mmap_transport_wire_format() -> None:
     request = ImageFormat(
         format=1,
@@ -120,7 +120,6 @@ def test_stream_input_event_wire_format() -> None:
     assert restored.touch_event.touches[0].y == 34
 
 
-
 def test_reverse_rotation_mapping_is_normalized() -> None:
     assert is_reverse_rotation(2)
     assert is_reverse_rotation(3)
@@ -132,8 +131,6 @@ def test_reverse_rotation_mapping_is_normalized() -> None:
     assert map_display_ratio_to_input(
         0.25, 0.20, 1000, 2000, 2
     ) == (750, 1600)
-
-
 
 
 def test_stream_screenshot_rows_are_top_down() -> None:
@@ -153,28 +150,24 @@ def test_stream_screenshot_rows_are_top_down() -> None:
     frame = client._frame_from_reply(
         reply,
         data=reply.image,
-        transport="grpc-bytes",
+        transport="grpc-mmap",
     )
     assert frame is not None
     assert frame.row_order == FRAME_ROWS_TOP_DOWN
-    assert not frame_rows_are_bottom_up(
-        frame.row_order
-    )
-    assert frame_rows_are_bottom_up(
-        FRAME_ROWS_BOTTOM_UP
-    )
+    assert frame.transport == "grpc-mmap"
     client.close()
 
-def test_continuous_touch_states_use_stream_queue(monkeypatch) -> None:
-    from mobile_research.desktop.emulator_grpc import EmulatorGrpcClient
 
+def test_continuous_touch_states_use_stream_queue(
+    monkeypatch,
+) -> None:
     client = EmulatorGrpcClient(8554)
     queued = []
 
     monkeypatch.setattr(
         client,
         "_queue_input_event",
-        lambda event: queued.append(event) or True,
+        lambda event: queued.append(event),
     )
 
     client.touch_down(10, 20)
@@ -198,4 +191,50 @@ def test_continuous_touch_states_use_stream_queue(monkeypatch) -> None:
         (30, 40),
         (50, 60),
     ]
+    client.close()
+
+
+def test_frame_stream_fails_when_mmap_fails(
+    monkeypatch,
+) -> None:
+    client = EmulatorGrpcClient(8554)
+
+    def fail_mmap(**kwargs):
+        raise RuntimeError("mmap unavailable")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(
+        client,
+        "_stream_frames_mmap",
+        fail_mmap,
+    )
+
+    with pytest.raises(
+        EmulatorGrpcError,
+        match="gRPC/MMAP framebuffer failed",
+    ):
+        next(client.stream_frames())
+
+    assert client.frame_transport == "grpc-mmap"
+    assert "mmap unavailable" in client.frame_transport_error
+    client.close()
+
+
+def test_input_fails_when_stream_input_event_is_unavailable(
+    monkeypatch,
+) -> None:
+    client = EmulatorGrpcClient(8554)
+    client._input_stream_error = "UNAVAILABLE"
+    monkeypatch.setattr(
+        client,
+        "_input_stream_available",
+        lambda: False,
+    )
+
+    with pytest.raises(
+        EmulatorGrpcError,
+        match="streamInputEvent",
+    ):
+        client.touch_down(10, 20)
+
     client.close()

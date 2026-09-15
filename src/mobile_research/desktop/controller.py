@@ -37,7 +37,6 @@ class DesktopController(QObject):
     operationBusy = Signal(bool)
     archiveInspection = Signal(dict)
     diagnosticsReady = Signal(dict)
-    dwmDisplayAvailable = Signal(dict)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -56,7 +55,6 @@ class DesktopController(QObject):
             threading.Thread | None
         ) = None
         self._clean_launch = True
-        self._dwm_display_attached = False
         self._input_queue: queue.Queue[
             tuple[str, tuple] | None
         ] = queue.Queue()
@@ -66,6 +64,9 @@ class DesktopController(QObject):
         )
         self._input_thread.start()
         self._frame_lock = threading.Lock()
+        self._screen_ready = threading.Event()
+        self._screen_error = ""
+        self._input_error_reported = False
         self._latest_frame = None
         self._latest_frame_id = 0
         self._published_frame_id = 0
@@ -210,16 +211,6 @@ class DesktopController(QObject):
             value,
         )
 
-    def set_dwm_display_attached(
-        self,
-        attached: bool,
-    ) -> None:
-        self._dwm_display_attached = bool(attached)
-        if attached:
-            self._stop_screen.set()
-            return
-        self._start_screen_stream()
-
     def close(self) -> None:
         self._stop_research.set()
         self._stop_screen.set()
@@ -229,11 +220,14 @@ class DesktopController(QObject):
     def _prepare_environment_worker(self) -> None:
         try:
             self._set_busy(True)
+            self._input_error_reported = False
             self.runtime.ensure_ready(
                 self._progress_callback,
                 self._display_ready_callback,
             )
-            self._prepare_display_transport()
+            self._start_screen_stream(
+                wait_for_first_frame=True,
+            )
             self.environmentReady.emit(
                 self.runtime.diagnostics()
             )
@@ -256,11 +250,14 @@ class DesktopController(QObject):
             self._set_busy(True)
             self.apk_path = path
             self.package_name = None
+            self._input_error_reported = False
             self.runtime.ensure_ready(
                 self._progress_callback,
                 self._display_ready_callback,
             )
-            self._prepare_display_transport()
+            self._start_screen_stream(
+                wait_for_first_frame=True,
+            )
             package = self.runtime.install_apk(
                 path,
                 self._progress_callback,
@@ -561,27 +558,44 @@ class DesktopController(QObject):
         finally:
             self._set_busy(False)
 
-    def _prepare_display_transport(self) -> None:
-        if self._dwm_display_attached:
-            self._stop_screen.set()
-            return
-        self._start_screen_stream()
-
-    def _start_screen_stream(self) -> None:
+    def _start_screen_stream(
+        self,
+        *,
+        wait_for_first_frame: bool = False,
+    ) -> None:
         if (
             self._screen_thread is not None
             and self._screen_thread.is_alive()
         ):
+            if wait_for_first_frame:
+                self._wait_for_first_frame()
             return
+
         self._stop_screen.clear()
+        self._screen_ready.clear()
+        self._screen_error = ""
         self._screen_thread = threading.Thread(
             target=self._screen_worker,
             daemon=True,
             name="mobile-research-screen",
         )
         self._screen_thread.start()
+        if wait_for_first_frame:
+            self._wait_for_first_frame()
+
+    def _wait_for_first_frame(self) -> None:
+        if not self._screen_ready.wait(15.0):
+            raise RuntimeError(
+                "Обязательный gRPC/MMAP framebuffer "
+                "не выдал первый кадр за 15 секунд"
+            )
+        if self._screen_error:
+            raise RuntimeError(
+                self._screen_error
+            )
 
     def _screen_worker(self) -> None:
+        first_frame = False
         try:
             for frame in self.runtime.screen_frames(
                 self._stop_screen,
@@ -593,8 +607,32 @@ class DesktopController(QObject):
                 with self._frame_lock:
                     self._latest_frame = frame
                     self._latest_frame_id += 1
-        except Exception:
-            pass
+                if not first_frame:
+                    first_frame = True
+                    self._screen_ready.set()
+        except Exception as exc:
+            if self._stop_screen.is_set():
+                return
+            message = (
+                "Обязательный gRPC/MMAP framebuffer "
+                "остановлен: "
+                + (str(exc) or exc.__class__.__name__)
+            )
+            self._screen_error = message
+            self._screen_ready.set()
+            if first_frame:
+                self.error.emit(message)
+        finally:
+            if (
+                not first_frame
+                and not self._stop_screen.is_set()
+                and not self._screen_error
+            ):
+                self._screen_error = (
+                    "Обязательный gRPC/MMAP framebuffer "
+                    "завершился до первого кадра"
+                )
+                self._screen_ready.set()
 
     def _publish_latest_frame(self) -> None:
         with self._frame_lock:
@@ -610,25 +648,10 @@ class DesktopController(QObject):
             )
         self.screenFrame.emit(frame)
 
-    def _display_ready_callback(
-        self,
-        process_id: int,
-        avd_name: str,
-        display_mode: str,
-    ) -> None:
-        mode = str(display_mode or "")
-        if mode == "dwm-live":
-            self.dwmDisplayAvailable.emit(
-                {
-                    "process_id": int(process_id or 0),
-                    "avd_name": str(avd_name or ""),
-                    "display_mode": mode,
-                }
-            )
-            return
-
-        self._dwm_display_attached = False
-        self._start_screen_stream()
+    def _display_ready_callback(self) -> None:
+        self._start_screen_stream(
+            wait_for_first_frame=True,
+        )
 
     def _progress_callback(
         self,
@@ -680,8 +703,15 @@ class DesktopController(QObject):
                     method,
                 )
                 function(*args)
-            except Exception:
-                pass
+            except Exception as exc:
+                if self._input_error_reported:
+                    continue
+                self._input_error_reported = True
+                self.error.emit(
+                    "Обязательный gRPC input transport "
+                    "остановлен: "
+                    + (str(exc) or exc.__class__.__name__)
+                )
 
     def _thread_quiet(
         self,
