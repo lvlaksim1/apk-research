@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.9.0 — User Actions + unified Research Timeline on the validated single-path runtime.
+**Этап:** v0.9.1 — Timeline accuracy and GUI on the validated single-path runtime.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
