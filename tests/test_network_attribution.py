@@ -277,3 +277,16 @@ def test_refined_timeline_exposes_exact_package_flow_owner(
     assert inventory["summary"]["flow_count"] == 1
     assert inventory["summary"]["attributed_flow_count"] == 1
     assert inventory["flows"][0]["owner"]["confidence"] == "EXACT"
+
+
+
+def test_exact_tuple_outside_observed_interval_is_high_not_exact() -> None:
+    snapshots, summary = _raw_snapshot()
+    index = SocketAttributionIndex(summary, snapshots)
+    packet = _packet()
+    packet["epoch"] = EPOCH_NS / 1_000_000_000 - 0.10
+
+    owner = index.attribute_packet(packet)
+
+    assert owner["confidence"] == "HIGH"
+    assert "packet-matched-within-snapshot-margin" in owner["ambiguity"]
