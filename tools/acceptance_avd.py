@@ -4,6 +4,7 @@ import json
 import sys
 import time
 import zipfile
+from datetime import datetime
 from pathlib import Path
 
 from mobile_research.export import (
@@ -166,6 +167,45 @@ def main() -> int:
                 archive.read(
                     "02_normalized/research-timeline.json"
                 )
+            )
+            lifecycle_events = [
+                json.loads(line)
+                for line in archive.read(
+                    "02_normalized/session-events.jsonl"
+                ).decode("utf-8").splitlines()
+                if line.strip()
+            ]
+        lifecycle_by_name = {
+            str(item.get("event") or ""): item
+            for item in lifecycle_events
+        }
+        created_at = lifecycle_by_name.get(
+            "session_created", {}
+        ).get("host_utc")
+        restart_at = lifecycle_by_name.get(
+            "package_clean_restart_requested", {}
+        ).get("host_utc")
+        if not created_at or not restart_at:
+            raise RuntimeError(
+                "Clean-launch latency evidence is incomplete"
+            )
+        created_dt = datetime.fromisoformat(
+            str(created_at).replace("Z", "+00:00")
+        )
+        restart_dt = datetime.fromisoformat(
+            str(restart_at).replace("Z", "+00:00")
+        )
+        restart_delay = (
+            restart_dt - created_dt
+        ).total_seconds()
+        print(json.dumps({
+            "event": "clean_restart_latency",
+            "seconds": restart_delay,
+        }, ensure_ascii=False))
+        if restart_delay > 4.0:
+            raise RuntimeError(
+                "Clean restart was requested too late: "
+                f"{restart_delay:.3f}s > 4.000s"
             )
         if "LaunchState: COLD" not in launch_evidence:
             raise RuntimeError(
