@@ -2,5 +2,5 @@
 
 __version__ = "0.10.2"
 
-# v0.10.2 uses a single Android clean-restart transaction.
+# v0.10.2 release: verified single Android clean-restart transaction.
 __all__ = ["__version__"]
