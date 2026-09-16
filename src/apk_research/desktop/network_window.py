@@ -440,10 +440,28 @@ class ResearchMainWindow(TimelineMainWindow):
         values = [
             str(group.get("host") or "unknown-host"),
             str(summary.get("owner_text") or "Unknown"),
-            " + ".join(
-                summary.get("protocols") or []
+            (
+                " + ".join(
+                    summary.get(
+                        "protocols"
+                    )
+                    or []
+                )
+                or "—"
             )
-            or "—",
+            + (
+                " • "
+                + " + ".join(
+                    summary.get(
+                        "application_protocols"
+                    )
+                    or []
+                )
+                if summary.get(
+                    "application_protocols"
+                )
+                else ""
+            ),
             _count_text(
                 summary.get("flow_count") or 0,
                 "соединений",
@@ -504,9 +522,30 @@ class ResearchMainWindow(TimelineMainWindow):
         values = [
             label,
             flow_owner(flow),
-            str(
-                flow.get("protocol") or ""
-            ).upper(),
+            (
+                str(
+                    flow.get(
+                        "protocol"
+                    )
+                    or ""
+                ).upper()
+                + (
+                    " • "
+                    + " + ".join(
+                        str(value)
+                        for value in (
+                            flow.get(
+                                "application_protocols"
+                            )
+                            or []
+                        )
+                    )
+                    if flow.get(
+                        "application_protocols"
+                    )
+                    else ""
+                )
+            ),
             endpoint_text(
                 flow.get("local_ip"),
                 flow.get("local_port"),
