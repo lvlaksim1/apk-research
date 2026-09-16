@@ -2,6 +2,25 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.11.0] - 2026-09-16
+
+### Bidirectional flow normalization
+
+- Upgrades `02_normalized/network-flows.json` to schema 0.2.
+- Uses a direction-independent TCP/UDP 5-tuple key so inbound and outbound packets of one connection are represented by one flow.
+- Merges early `UNKNOWN` packets into the same flow when later packets gain package ownership evidence.
+- Keeps the strongest owner evidence for the flow while preserving per-packet confidence counts.
+- Adds outbound/inbound/other packet and captured-byte counters, duration, local/remote endpoint orientation, DNS and TLS SNI lists.
+- Real AVD acceptance validates schema 0.2, the new method identifier and direction-count consistency.
+
+### Network Analyzer GUI
+
+- Adds a dedicated `Network` tab and `Network Analyzer` action for selected Research ZIP files.
+- Shows time, owner, host, protocol, local/remote endpoints, upload/download bytes and attribution confidence.
+- Adds owner filters (all / researched app / unknown), protocol filters (TCP / UDP) and free-text search across host, IP, process, DNS and SNI evidence.
+- Shows the complete normalized JSON for the selected flow.
+- Desktop GUI smoke testing now instantiates the actual composite Research window that includes Timeline and Network Analyzer.
+
 ## [0.10.5] - 2026-09-16
 
 ### Roll back startup sequencing; defer only optional package dump

@@ -1,5 +1,13 @@
 # Mobile Research
 
+## v0.11.0 — Bidirectional Network Flows + Network Analyzer
+
+v0.11.0 переводит `network-flows.json` на schema 0.2 и добавляет первый рабочий Network Analyzer в GUI.
+
+Главное изменение модели: один TCP/UDP bidirectional 5-tuple теперь является одним normalized flow независимо от направления пакета и от того, в какой момент socket sampler впервые смог доказать владельца. Ранние `UNKNOWN` пакеты больше не создают отдельный raw-flow рядом с позднее подтверждённым package-owned flow. В каждом flow сохраняются packet/byte counters отдельно для outbound/inbound, confidence breakdown, лучший owner, DNS и TLS SNI.
+
+В GUI появляется вкладка `Network` и кнопка `Network Analyzer` для выбранного Research ZIP. Доступны фильтры по owner и protocol, поиск по host/IP/process/DNS/SNI, таблица local/remote endpoint, трафик ↑/↓ и confidence, а также полный JSON выбранного flow.
+
 ## v0.10.5 — v0.10.3 startup baseline + deferred optional package dump
 
 Реальный Windows-тест v0.10.4 показал регрессию: изменение порядка startup привело к `LaunchState=None` на `com.evrasia`. v0.10.5 откатывает clean-launch path, collector ordering, clock calibration и `LaunchState: COLD` invariant к подтверждённой v0.10.3.

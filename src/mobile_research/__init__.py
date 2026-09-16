@@ -1,6 +1,6 @@
 """Mobile Research core package."""
 
-__version__ = "0.10.5"
+__version__ = "0.11.0"
 
-# v0.10.5 restores v0.10.3 startup and defers only the optional package dump.
+# v0.11.0 adds bidirectional flow normalization and Network Analyzer.
 __all__ = ["__version__"]

@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.10.5 — v0.10.3 startup baseline with deferred optional package dump.
+**Этап:** v0.11.0 — Bidirectional Network Flow normalization and Network Analyzer GUI.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -385,4 +385,10 @@ A real v0.10.3 Windows archive measured about 7.15 seconds from `session_created
 
 ### ADR-104 — v0.10.4 startup reordering is rejected; optimize only the optional dump
 Real Windows testing of v0.10.4 on `com.evrasia` produced `Clean launch invariant failed: LaunchState=None`. The release changed too much of the already validated startup sequence in order to remove a UX delay. v0.10.5 therefore restores the v0.10.3 clean-launch ordering and strict COLD-start contract. Measurement of the successful v0.10.3 archive showed that Device Metadata consumed about 5.25 seconds before preflight completed, with the full Package Manager dump being optional evidence under ADR-086. The narrow fix is to defer only that full dump until session stop. Lightweight metadata remains pre-launch; continuous collectors and clean restart follow the same path as v0.10.3. The deferred dump is written before ZIP export, so evidence is preserved without placing the expensive operation on the launch critical path.
+
+### ADR-105 — A normalized network flow is a bidirectional 5-tuple, not an attribution state
+The v0.10.x inventory used different keys for attributed and unattributed packets and also included packet direction in the raw key. Real Research ZIPs therefore split one TCP connection into multiple records: early UNKNOWN outbound/inbound fragments and a later package-owned flow. v0.11.0 defines the normalized identity as a direction-independent `protocol + endpoint A + endpoint B` 5-tuple. Attribution is mutable evidence attached to that identity, not part of the identity itself. The strongest observed owner is retained and per-packet confidence counts preserve how the conclusion evolved. This keeps raw PCAP immutable while producing a stable connection-level model for analysis.
+
+### ADR-106 — Network Analyzer reads normalized evidence, never live-mutates capture
+The desktop Network Analyzer is a post-capture reader of `02_normalized/network-flows.json` inside a Research ZIP. It does not alter collectors, PCAP, attribution, Timeline or the Android runtime. The GUI is therefore downstream of evidence production and can evolve independently without risking capture regressions. The first version intentionally exposes filters/search and complete flow JSON before adding higher-level protocol decoding or causal navigation.
 
