@@ -1,5 +1,32 @@
 # Refactoring and Architecture Log
 
+## v0.16.0 — QUIC / HTTP/3 protocol-aware analysis
+
+### Scope
+
+Расширение только post-capture network analysis. Raw PCAP, socket attribution, Android runtime, emulator startup, clean-launch sequencing и input/display transport не меняются.
+
+### Protocol model
+
+- UDP/443 сам по себе не считается QUIC.
+- QUIC фиксируется только при распознанном long header.
+- Поддерживаются QUIC v1 и v2 Initial cryptography.
+- Используются только публично выводимые Initial secrets; 1-RTT application payload остаётся зашифрованным.
+- Client Initial CRYPTO fragments собираются между пакетами по QUIC version + Destination Connection ID.
+- TLS ClientHello SNI и ALPN становятся derived evidence; ALPN `h3` / `h3-*` даёт application protocol `HTTP/3`.
+- QUIC SNI разрешено использовать для host grouping, потому что это непосредственно разобранный ClientHello, а не DNS inference.
+
+### Schema boundary
+
+- `network-flows.json`: schema 0.3.
+- Research Timeline: schema 0.5.
+- canonical `flow_id` и bidirectional 5-tuple identity не меняются.
+- raw packet bytes никогда не переписываются.
+
+### Regression boundary
+
+Запрещено превращать UDP/443 heuristic в доказательство QUIC, расшифровывать/подменять 1-RTT трафик через MITM без отдельного архитектурного решения или менять v0.10.5 runtime/startup baseline ради protocol analysis.
+
 ## v0.15.0 — Product identity: apk-research
 
 ### Scope
@@ -58,7 +85,7 @@ Network inspection теперь одновременно читает `research-
 
 ## Текущее состояние
 
-**Этап:** v0.14.0 — Host Intelligence: Service vs DNS.
+**Этап:** v0.16.0 — QUIC / HTTP/3 Network Intelligence.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
