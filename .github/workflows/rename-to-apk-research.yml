@@ -20,3 +20,5 @@ jobs:
 
       - name: Run complete product rename
         run: python tools/one_shot_rename_to_apk_research.py
+
+# split migration: workflows are updated separately via connector
