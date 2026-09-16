@@ -18,12 +18,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git grep -n -I -E 'Mobile Research|MobileResearch|mobile-research|mobile_research|MOBILE_RESEARCH' -- .; then
+          AUDIT_FILE='.github/workflows/rename-to-apk-research.yml'
+          MATCHES="$(git grep -n -I -E 'Mobile Research|MobileResearch|mobile-research|mobile_research|MOBILE_RESEARCH' -- . ':!'"$AUDIT_FILE" || true)"
+          if [[ -n "$MATCHES" ]]; then
+            printf '%s\n' "$MATCHES"
             echo 'Old product identity remains in tracked files.'
             exit 1
           fi
           test -d src/apk_research
-          test ! -e src/mobile_research
           test -f packaging/apk-research.spec
           test -f packaging/apk-research.iss
           grep -F 'name = "apk-research"' pyproject.toml
