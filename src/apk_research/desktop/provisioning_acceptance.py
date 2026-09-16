@@ -59,19 +59,19 @@ def _run(
 def run_provisioning_acceptance() -> int:
     root = Path(
         os.environ.get(
-            "MOBILE_RESEARCH_ACCEPTANCE_ROOT",
+            "APK_RESEARCH_ACCEPTANCE_ROOT",
             Path.cwd() / "windows-provisioning-acceptance",
         )
     ).resolve()
     component_root = Path(
         os.environ.get(
-            "MOBILE_RESEARCH_COMPONENT_ROOT",
+            "APK_RESEARCH_COMPONENT_ROOT",
             root / "components",
         )
     ).resolve()
     result_path = Path(
         os.environ.get(
-            "MOBILE_RESEARCH_ACCEPTANCE_RESULT",
+            "APK_RESEARCH_ACCEPTANCE_RESULT",
             root / "result.json",
         )
     ).resolve()

@@ -40,12 +40,12 @@ def _env_flag(name: str) -> bool:
 def run_runtime_acceptance() -> int:
     root = Path(
         os.environ.get(
-            "MOBILE_RESEARCH_ACCEPTANCE_ROOT",
+            "APK_RESEARCH_ACCEPTANCE_ROOT",
             Path.cwd() / "windows-runtime-acceptance",
         )
     ).resolve()
     component_override = os.environ.get(
-        "MOBILE_RESEARCH_COMPONENT_ROOT"
+        "APK_RESEARCH_COMPONENT_ROOT"
     )
     manager = (
         ComponentManager(
@@ -57,7 +57,7 @@ def run_runtime_acceptance() -> int:
     component_root = manager.paths.root.resolve()
     result_path = Path(
         os.environ.get(
-            "MOBILE_RESEARCH_ACCEPTANCE_RESULT",
+            "APK_RESEARCH_ACCEPTANCE_RESULT",
             root / "result.json",
         )
     ).resolve()
@@ -66,7 +66,7 @@ def run_runtime_acceptance() -> int:
     framebuffer = root / "framebuffer.rgba"
     log_path = root / "acceptance.log"
     acceptance_apk_value = os.environ.get(
-        "MOBILE_RESEARCH_ACCEPTANCE_APK"
+        "APK_RESEARCH_ACCEPTANCE_APK"
     )
     acceptance_apk = (
         Path(acceptance_apk_value).expanduser().resolve()
@@ -74,7 +74,7 @@ def run_runtime_acceptance() -> int:
         else None
     )
     expected_package = os.environ.get(
-        "MOBILE_RESEARCH_ACCEPTANCE_EXPECT_PACKAGE"
+        "APK_RESEARCH_ACCEPTANCE_EXPECT_PACKAGE"
     )
 
     root.mkdir(parents=True, exist_ok=True)
@@ -89,16 +89,16 @@ def run_runtime_acceptance() -> int:
     )
     requirements = {
         "windows": _env_flag(
-            "MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_WINDOWS"
+            "APK_RESEARCH_ACCEPTANCE_REQUIRE_WINDOWS"
         ),
         "frozen_executable": _env_flag(
-            "MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_FROZEN"
+            "APK_RESEARCH_ACCEPTANCE_REQUIRE_FROZEN"
         ),
         "whpx": _env_flag(
-            "MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_WHPX"
+            "APK_RESEARCH_ACCEPTANCE_REQUIRE_WHPX"
         ),
         "clean_components": _env_flag(
-            "MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_CLEAN_COMPONENTS"
+            "APK_RESEARCH_ACCEPTANCE_REQUIRE_CLEAN_COMPONENTS"
         ),
     }
 
@@ -161,7 +161,7 @@ def run_runtime_acceptance() -> int:
             )
 
         expected_executable = os.environ.get(
-            "MOBILE_RESEARCH_ACCEPTANCE_EXPECT_EXECUTABLE"
+            "APK_RESEARCH_ACCEPTANCE_EXPECT_EXECUTABLE"
         )
         if expected_executable:
             actual = os.path.normcase(
@@ -188,7 +188,7 @@ def run_runtime_acceptance() -> int:
         if (
             requirements["whpx"]
             and os.environ.get(
-                "MOBILE_RESEARCH_SOFTWARE_EMULATOR"
+                "APK_RESEARCH_SOFTWARE_EMULATOR"
             )
             == "1"
         ):

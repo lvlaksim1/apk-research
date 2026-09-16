@@ -1221,7 +1221,7 @@ class AndroidRuntime:
     ) -> None:
         if (
             os.environ.get(
-                "MOBILE_RESEARCH_SOFTWARE_EMULATOR"
+                "APK_RESEARCH_SOFTWARE_EMULATOR"
             )
             == "1"
         ):
