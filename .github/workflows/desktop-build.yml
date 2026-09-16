@@ -10,7 +10,7 @@ on:
         default: false
   pull_request:
     paths:
-      - "src/mobile_research/**"
+      - "src/apk_research/**"
       - "packaging/**"
       - "pyproject.toml"
       - "tests/**"
@@ -46,12 +46,12 @@ jobs:
         run: python tools/check_desktop_android_components.py
 
       - name: Build standalone desktop application
-        run: python -m PyInstaller --noconfirm --clean packaging/MobileResearch.spec
+        run: python -m PyInstaller --noconfirm --clean packaging/apk-research.spec
 
       - name: Standalone self-test
         shell: pwsh
         run: |
-          $exe = "dist\MobileResearch\MobileResearch.exe"
+          $exe = "dist\apk-research\apk-research.exe"
           $process = Start-Process -FilePath $exe -ArgumentList "--self-test" -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Standalone self-test failed: $($process.ExitCode)" }
 
@@ -59,7 +59,7 @@ jobs:
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
-          $exe = "dist\MobileResearch\MobileResearch.exe"
+          $exe = "dist\apk-research\apk-research.exe"
           $process = Start-Process -FilePath $exe -ArgumentList "--gui-smoke-test" -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Standalone GUI smoke-test failed: $($process.ExitCode)" }
 
@@ -74,17 +74,17 @@ jobs:
           $text = Get-Content pyproject.toml -Raw
           if ($text -notmatch '(?m)^version\s*=\s*"([^"]+)"') { throw "Version not found" }
           $version = $Matches[1]
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" packaging\mobile-research.iss
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" packaging\apk-research.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install built package and smoke-test installed app
         shell: pwsh
         run: |
-          $installDir = Join-Path $env:RUNNER_TEMP "MobileResearchInstalled"
+          $installDir = Join-Path $env:RUNNER_TEMP "apk-research-installed"
           $text = Get-Content pyproject.toml -Raw
           if ($text -notmatch '(?m)^version\s*=\s*"([^"]+)"') { throw "Version not found" }
           $version = $Matches[1]
-          $installer = (Resolve-Path "installer\MobileResearchSetup_v$version.exe").Path
+          $installer = (Resolve-Path "installer\apk-research-setup_v$version.exe").Path
           $process = Start-Process -FilePath $installer -ArgumentList @(
             "/VERYSILENT",
             "/SUPPRESSMSGBOXES",
@@ -94,7 +94,7 @@ jobs:
           ) -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
 
-          $installedExe = Join-Path $installDir "MobileResearch.exe"
+          $installedExe = Join-Path $installDir "apk-research.exe"
           if (-not (Test-Path $installedExe)) { throw "Installed executable not found" }
 
           $process = Start-Process -FilePath $installedExe -ArgumentList "--self-test" -Wait -PassThru
@@ -110,7 +110,7 @@ jobs:
           $text = Get-Content pyproject.toml -Raw
           if ($text -notmatch '(?m)^version\s*=\s*"([^"]+)"') { throw "Version not found" }
           $version = $Matches[1]
-          $installerName = "MobileResearchSetup_v$version.exe"
+          $installerName = "apk-research-setup_v$version.exe"
           $installer = Join-Path "installer" $installerName
           $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
           "$hash  $installerName" | Set-Content installer\SHA256SUMS.txt -Encoding ascii
@@ -120,10 +120,10 @@ jobs:
         if: inputs.release_candidate == true
         uses: actions/upload-artifact@v4
         with:
-          name: mobile-research-windows-desktop
+          name: apk-research-windows-desktop
           retention-days: 1
           path: |
-            installer/MobileResearchSetup_v*.exe
+            installer/apk-research-setup_v*.exe
             installer/SHA256SUMS.txt
 
   windows-provisioning-acceptance:
@@ -141,7 +141,7 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install Mobile Research core
+      - name: Install apk-research core
         run: python -m pip install -e .
 
       - name: Show free disk space
@@ -151,17 +151,17 @@ jobs:
       - name: Provision managed Android on clean Windows
         shell: pwsh
         run: |
-          $acceptanceRoot = Join-Path $env:RUNNER_TEMP "MobileResearchProvisioning"
+          $acceptanceRoot = Join-Path $env:RUNNER_TEMP "apk-research-provisioning"
           $componentRoot = Join-Path $acceptanceRoot "components"
           $resultPath = Join-Path $acceptanceRoot "result.json"
 
           New-Item -ItemType Directory -Force $acceptanceRoot | Out-Null
 
-          $env:MOBILE_RESEARCH_COMPONENT_ROOT = $componentRoot
-          $env:MOBILE_RESEARCH_ACCEPTANCE_ROOT = $acceptanceRoot
-          $env:MOBILE_RESEARCH_ACCEPTANCE_RESULT = $resultPath
+          $env:APK_RESEARCH_COMPONENT_ROOT = $componentRoot
+          $env:APK_RESEARCH_ACCEPTANCE_ROOT = $acceptanceRoot
+          $env:APK_RESEARCH_ACCEPTANCE_RESULT = $resultPath
 
-          python -c "from mobile_research.desktop.provisioning_acceptance import run_provisioning_acceptance; raise SystemExit(run_provisioning_acceptance())"
+          python -c "from apk_research.desktop.provisioning_acceptance import run_provisioning_acceptance; raise SystemExit(run_provisioning_acceptance())"
           if (Test-Path $resultPath) {
             Get-Content $resultPath
           }
@@ -170,9 +170,9 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: mobile-research-windows-provisioning-failure
+          name: apk-research-windows-provisioning-failure
           retention-days: 3
           if-no-files-found: warn
           path: |
-            ${{ runner.temp }}/MobileResearchProvisioning/result.json
-            ${{ runner.temp }}/MobileResearchProvisioning/components/components.json
+            ${{ runner.temp }}/apk-research-provisioning/result.json
+            ${{ runner.temp }}/apk-research-provisioning/components/components.json
