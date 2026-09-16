@@ -352,7 +352,7 @@ def test_flow_inventory_merges_bidirectional_packets() -> None:
         index,
     )
 
-    assert inventory["schema_version"] == "0.3"
+    assert inventory["schema_version"] == "0.4"
     assert inventory["summary"]["flow_count"] == 1
     flow = inventory["flows"][0]
     assert flow["direction"] == "bidirectional"
