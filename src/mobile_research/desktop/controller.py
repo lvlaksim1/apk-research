@@ -678,12 +678,42 @@ class DesktopController(QObject):
         archive: Path,
     ) -> None:
         try:
+            timeline_actions: list[dict] = []
+            timeline_schema = ""
             with zipfile.ZipFile(archive) as handle:
                 value = json.loads(
                     handle.read(
                         "02_normalized/network-flows.json"
                     ).decode("utf-8")
                 )
+                try:
+                    timeline = json.loads(
+                        handle.read(
+                            TIMELINE_ARTIFACT
+                        ).decode("utf-8")
+                    )
+                except KeyError:
+                    timeline = {}
+                if isinstance(timeline, dict):
+                    timeline_schema = str(
+                        timeline.get(
+                            "schema_version"
+                        )
+                        or ""
+                    )
+                    timeline_actions = [
+                        item
+                        for item in (
+                            timeline.get(
+                                "user_actions"
+                            )
+                            or []
+                        )
+                        if isinstance(
+                            item,
+                            dict,
+                        )
+                    ]
             if not isinstance(value, dict):
                 raise ValueError(
                     "Network inventory имеет неверный формат"
@@ -692,6 +722,12 @@ class DesktopController(QObject):
                 {
                     "mode": "network",
                     "archive": str(archive),
+                    "timeline_schema_version": (
+                        timeline_schema
+                    ),
+                    "timeline_actions": (
+                        timeline_actions
+                    ),
                     **value,
                 }
             )
