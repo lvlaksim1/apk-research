@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from apk_research.quic import QuicFlowInspector
 from apk_research.session import SessionManager
 
 USER_ACTIONS_ARTIFACT = "02_normalized/user-actions.jsonl"
@@ -731,6 +732,7 @@ def _read_pcap(
 
     packets: list[dict[str, Any]] = []
     captured_bytes = 0
+    quic_contexts: dict[tuple[Any, ...], QuicFlowInspector] = {}
     with handle:
         endian, scale, linktype = _pcap_header(
             handle
@@ -795,6 +797,12 @@ def _read_pcap(
                 "dst_port": None,
                 "dns_query": None,
                 "tls_sni": None,
+                "application_protocol": None,
+                "quic_version": None,
+                "quic_packet_type": None,
+                "quic_initial_decrypted": False,
+                "quic_sni": None,
+                "quic_alpn": [],
             }
             if decoded is not None:
                 value.update(
@@ -841,6 +849,66 @@ def _read_pcap(
                             transport_payload
                         )
                     )
+                if protocol == "udp":
+                    endpoints = sorted(
+                        (
+                            (
+                                str(decoded["src"]),
+                                int(src_port or 0),
+                            ),
+                            (
+                                str(decoded["dst"]),
+                                int(dst_port or 0),
+                            ),
+                        )
+                    )
+                    quic_key = (
+                        "udp",
+                        endpoints[0],
+                        endpoints[1],
+                    )
+                    inspector = quic_contexts.setdefault(
+                        quic_key,
+                        QuicFlowInspector(),
+                    )
+                    quic = inspector.inspect(
+                        transport_payload,
+                        direction=direction,
+                    )
+                    if quic is not None:
+                        alpn = [
+                            str(item)
+                            for item in quic.get("alpn") or []
+                            if item
+                        ]
+                        value["application_protocol"] = (
+                            "http3"
+                            if any(
+                                item == "h3"
+                                or item.startswith("h3-")
+                                for item in alpn
+                            )
+                            else "quic"
+                        )
+                        value["quic_version"] = (
+                            quic.get("version")
+                        )
+                        value["quic_packet_type"] = (
+                            quic.get("packet_type")
+                        )
+                        value["quic_initial_decrypted"] = bool(
+                            quic.get(
+                                "initial_decrypted"
+                            )
+                        )
+                        value["quic_sni"] = (
+                            quic.get("sni")
+                        )
+                        value["quic_alpn"] = alpn
+                        if quic.get("sni"):
+                            value["tls_sni"] = (
+                                quic["sni"]
+                            )
             packets.append(value)
 
     return packets, {

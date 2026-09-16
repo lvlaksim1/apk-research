@@ -39,7 +39,7 @@ def endpoint_text(
 
 
 def flow_host(flow: dict[str, Any]) -> str:
-    for key in ("tls_sni", "dns_queries"):
+    for key in ("quic_sni", "tls_sni", "dns_queries"):
         for value in flow.get(key) or []:
             text = str(value or "").strip().rstrip(".")
             if text:
@@ -117,6 +117,7 @@ def summarize_flows(
 ) -> dict[str, Any]:
     confidence_counts: Counter[str] = Counter()
     protocols: set[str] = set()
+    application_protocols: set[str] = set()
     owners: list[str] = []
     action_ids: list[str] = []
     remote_ips: list[str] = []
@@ -133,6 +134,12 @@ def summarize_flows(
         ).upper()
         if protocol:
             protocols.add(protocol)
+        for application_protocol in (
+            flow.get("application_protocols") or []
+        ):
+            text = str(application_protocol or "").upper()
+            if text:
+                application_protocols.add(text)
         owners.append(flow_owner(flow))
         action_ids.extend(
             flow.get("correlated_action_ids")
@@ -202,6 +209,9 @@ def summarize_flows(
         "outbound_bytes": outbound_bytes,
         "inbound_bytes": inbound_bytes,
         "protocols": sorted(protocols),
+        "application_protocols": sorted(
+            application_protocols
+        ),
         "owner_text": owner_text,
         "best_confidence": best_confidence,
         "confidence_counts": dict(
@@ -372,6 +382,22 @@ def flow_matches(
             ),
             " ".join(
                 str(value)
+                for value in flow.get("quic_sni") or []
+            ),
+            " ".join(
+                str(value)
+                for value in flow.get("quic_alpn") or []
+            ),
+            " ".join(
+                str(value)
+                for value in flow.get("quic_versions") or []
+            ),
+            " ".join(
+                str(value)
+                for value in flow.get("application_protocols") or []
+            ),
+            " ".join(
+                str(value)
                 for value in flow.get("dns_queries") or []
             ),
             " ".join(
@@ -485,6 +511,10 @@ def format_host_details(
         (
             f"  Протоколы: "
             f"{' + '.join(summary.get('protocols') or []) or '—'}"
+        ),
+        (
+            f"  Application: "
+            f"{' + '.join(summary.get('application_protocols') or []) or '—'}"
         ),
         (
             f"  Трафик: "
@@ -664,11 +694,73 @@ def format_flow_details(
             + ", ".join(ambiguity)
         )
 
+    quic_sni = [
+        str(value)
+        for value in flow.get("quic_sni") or []
+        if value
+    ]
+    quic_sni_set = set(quic_sni)
     sni = [
         str(value)
         for value in flow.get("tls_sni") or []
+        if value and str(value) not in quic_sni_set
+    ]
+    quic_alpn = [
+        str(value)
+        for value in flow.get("quic_alpn") or []
         if value
     ]
+    quic_versions = [
+        str(value)
+        for value in flow.get("quic_versions") or []
+        if value
+    ]
+    quic_packet_types = [
+        str(value)
+        for value in flow.get("quic_packet_types") or []
+        if value
+    ]
+    application_protocols = [
+        str(value)
+        for value in flow.get("application_protocols") or []
+        if value
+    ]
+    if (
+        application_protocols
+        or quic_versions
+        or quic_sni
+        or quic_alpn
+    ):
+        lines.extend(["", "QUIC / HTTP/3"])
+        lines.append(
+            "  Application: "
+            + (", ".join(application_protocols) or "QUIC")
+        )
+        lines.append(
+            "  Version: "
+            + (", ".join(quic_versions) or "—")
+        )
+        lines.append(
+            "  Packet types: "
+            + (", ".join(quic_packet_types) or "—")
+        )
+        lines.append(
+            "  Initial decrypted: "
+            + (
+                "yes"
+                if flow.get("quic_initial_decrypted")
+                else "no"
+            )
+        )
+        if quic_sni:
+            lines.append(
+                "  SNI: " + ", ".join(quic_sni)
+            )
+        if quic_alpn:
+            lines.append(
+                "  ALPN: " + ", ".join(quic_alpn)
+            )
+
     dns = [
         str(value)
         for value in flow.get("dns_queries") or []

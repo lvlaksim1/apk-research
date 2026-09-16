@@ -8,7 +8,9 @@ version = "0.15.0"
 description = "Self-contained Windows desktop environment for reproducible Android application research"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "cryptography>=43,<47",
+]
 
 [project.scripts]
 apk-research = "apk_research.cli:main"

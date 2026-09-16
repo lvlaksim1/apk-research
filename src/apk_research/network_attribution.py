@@ -873,8 +873,19 @@ def build_flow_inventory(
                 "owner": owner,
                 "dns_queries": [],
                 "tls_sni": [],
+                "application_protocols": [],
+                "quic_versions": [],
+                "quic_packet_types": [],
+                "quic_sni": [],
+                "quic_alpn": [],
+                "quic_initial_decrypted": False,
                 "_dns": set(),
                 "_sni": set(),
+                "_application_protocols": set(),
+                "_quic_versions": set(),
+                "_quic_packet_types": set(),
+                "_quic_sni": set(),
+                "_quic_alpn": set(),
             }
             flows[key] = current
         else:
@@ -937,6 +948,34 @@ def build_flow_inventory(
             current["_sni"],
             packet.get("tls_sni"),
         )
+        _add_unique(
+            current["application_protocols"],
+            current["_application_protocols"],
+            packet.get("application_protocol"),
+        )
+        _add_unique(
+            current["quic_versions"],
+            current["_quic_versions"],
+            packet.get("quic_version"),
+        )
+        _add_unique(
+            current["quic_packet_types"],
+            current["_quic_packet_types"],
+            packet.get("quic_packet_type"),
+        )
+        _add_unique(
+            current["quic_sni"],
+            current["_quic_sni"],
+            packet.get("quic_sni"),
+        )
+        for alpn in packet.get("quic_alpn") or []:
+            _add_unique(
+                current["quic_alpn"],
+                current["_quic_alpn"],
+                alpn,
+            )
+        if packet.get("quic_initial_decrypted"):
+            current["quic_initial_decrypted"] = True
 
     values: list[dict[str, Any]] = []
     confidence_counts = {
@@ -956,6 +995,11 @@ def build_flow_inventory(
     ):
         current.pop("_dns", None)
         current.pop("_sni", None)
+        current.pop("_application_protocols", None)
+        current.pop("_quic_versions", None)
+        current.pop("_quic_packet_types", None)
+        current.pop("_quic_sni", None)
+        current.pop("_quic_alpn", None)
         first_epoch = float(
             current.pop("first_epoch")
         )
@@ -1013,8 +1057,30 @@ def build_flow_inventory(
         + confidence_counts["HIGH"]
         + confidence_counts["MEDIUM"]
     )
+    quic_flow_count = sum(
+        1
+        for item in values
+        if any(
+            protocol in {"quic", "http3"}
+            for protocol in (
+                item.get("application_protocols")
+                or []
+            )
+        )
+    )
+    http3_flow_count = sum(
+        1
+        for item in values
+        if "http3"
+        in (item.get("application_protocols") or [])
+    )
+    quic_initial_decrypted_flow_count = sum(
+        1
+        for item in values
+        if item.get("quic_initial_decrypted")
+    )
     return {
-        "schema_version": "0.2",
+        "schema_version": "0.3",
         "method": (
             "bidirectional-5tuple+"
             "android-proc-socket-attribution"
@@ -1038,6 +1104,11 @@ def build_flow_inventory(
                 total_inbound_bytes
             ),
             "source_packet_count": len(packets),
+            "quic_flow_count": quic_flow_count,
+            "http3_flow_count": http3_flow_count,
+            "quic_initial_decrypted_flow_count": (
+                quic_initial_decrypted_flow_count
+            ),
             "flow_packet_count": sum(
                 int(item.get("packet_count") or 0)
                 for item in values
