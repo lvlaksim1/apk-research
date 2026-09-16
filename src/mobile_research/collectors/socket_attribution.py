@@ -363,7 +363,7 @@ class SocketAttributionCollector:
             "for P in /proc/[0-9]*; do "
             '[ -r "$P/status" ] || continue; '
             'U=""; '
-            'while IFS=" \\t" read -r K V REST; do '
+            'while read -r K V REST; do '
             'case "$K" in Uid:) U="$V"; break;; esac; '
             'done < "$P/status"; '
             '[ "$U" = "$APP_UID" ] || continue; '

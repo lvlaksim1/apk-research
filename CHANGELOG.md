@@ -2,6 +2,16 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.10.1] - 2026-09-16
+
+### Process attribution hardening
+
+- Fixes Android `/proc/<pid>/status` UID parsing in the persistent socket sampler: the shell loop now uses the default whitespace IFS, which correctly treats the real TAB separators emitted by procfs.
+- Restores target package PID/process observations and therefore the full `package → UID → PID/process → FD → socket inode → 5-tuple → PCAP` evidence chain.
+- Adds a regression assertion for the generated sampler shell contract.
+- Strengthens real AVD release acceptance: a stable release must contain process observations and must explicitly observe the launched target package process in `socket-attribution.jsonl`.
+- Leaves the validated hidden Emulator + gRPC/MMAP display/input runtime and RAW-first PCAP contract unchanged.
+
 ## [0.10.0] - 2026-09-16
 
 ### Package-aware Network Attribution

@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.10.0 — Package-aware Network Attribution on the validated single-path runtime.
+**Этап:** v0.10.1 — Package process/socket attribution hardening on the validated single-path runtime.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -370,3 +370,7 @@ Action windows are not sufficient for network research because an app can commun
 
 ### ADR-099 — Network ownership and user-action causality are separate claims
 Socket attribution may prove that a flow belongs to the target package, but it does not by itself prove that a particular user action caused that flow. Research Timeline keeps `causal_claim=false` and `attribution=temporal-only` for action correlation even when the enclosed network flow has `owner.confidence=EXACT`. This separation is mandatory forensic semantics.
+
+### ADR-100 — Real release acceptance must prove target process attribution
+A real Windows v0.10.0 Research ZIP showed valid target-UID socket observations but zero `process_observations` and zero `pid_socket_links`. The cause was shell tokenization, not Android permissions: procfs emits `Uid:` values separated by actual TAB characters, while `IFS=" \\t"` supplies literal backslash/`t` characters rather than a TAB. v0.10.1 returns the sampler to the shell default whitespace IFS. Real AVD acceptance must now prove that normalized socket snapshots contain the launched target package process, so a release cannot pass with a silently broken PID/process layer. Unique-UID socket evidence remains valid independently, but shared-UID `EXACT` attribution requires the restored direct process → FD → inode link.
+

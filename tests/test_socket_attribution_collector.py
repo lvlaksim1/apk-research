@@ -157,6 +157,8 @@ def test_socket_attribution_collector_normalizes_snapshots(
     assert "APP_UID=10234" in factory.command[-1]
     assert 'echo $$ > "$PID_FILE"' in factory.command[-1]
     assert 'echo $ > "$PID_FILE"' not in factory.command[-1]
+    assert "while read -r K V REST; do" in factory.command[-1]
+    assert 'IFS=" \\t"' not in factory.command[-1]
     assert "/proc/net/$T" in factory.command[-1]
 
     session.mark_active()

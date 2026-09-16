@@ -1,5 +1,11 @@
 # Mobile Research
 
+## v0.10.1 — Process attribution hardening
+
+Реальный Windows Research ZIP v0.10.0 выявил, что socket sampler корректно собирал target-UID sockets, но не фиксировал процессы/PID: в Android `/proc/<pid>/status` поле `Uid:` разделено TAB, а sampler задавал строковый `IFS=" \\t"`, который не содержит настоящий TAB. v0.10.1 использует штатный shell IFS, поэтому снова работает цепочка `package → UID → PID/process → FD → socket inode → 5-tuple → PCAP`.
+
+Real AVD release gate теперь требует не только socket snapshots, но и фактически наблюдавшийся process исследуемого package. Это предотвращает публикацию релиза, если PID/process-слой attribution снова перестанет работать. Raw PCAP и validated hidden Emulator + gRPC/MMAP runtime не меняются.
+
 ## v0.10.0 — Package-aware Network Attribution
 
 Mobile Research теперь сопоставляет сетевой трафик с исследуемым Android package по цепочке `package → UID → PID/process → socket inode → 5-tuple → PCAP flow`. Во время исследования отдельный collector снимает временные snapshots `/proc/net/tcp*` / `/proc/net/udp*` и socket-FD процессов целевого UID. Производные evidence сохраняются в `02_normalized/socket-attribution.jsonl`, `02_normalized/socket-attribution.json` и `02_normalized/network-flows.json`.

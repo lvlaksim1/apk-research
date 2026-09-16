@@ -201,6 +201,36 @@ def main() -> int:
             raise RuntimeError(
                 "Socket attribution evidence is empty"
             )
+        if int(
+            attribution_summary.get("process_observations") or 0
+        ) <= 0:
+            raise RuntimeError(
+                "Socket attribution captured no target-UID processes"
+            )
+        target_process_seen = False
+        for line in attribution_lines:
+            if not line.strip():
+                continue
+            try:
+                snapshot = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            for process in snapshot.get("processes") or []:
+                if not isinstance(process, dict):
+                    continue
+                process_name = str(process.get("name") or "")
+                if (
+                    process_name == package_name
+                    or process_name.startswith(package_name + ":")
+                ):
+                    target_process_seen = True
+                    break
+            if target_process_seen:
+                break
+        if not target_process_seen:
+            raise RuntimeError(
+                "Socket attribution did not observe the target package process"
+            )
         if (
             flow_inventory.get("method")
             != "pcap+android-proc-socket-attribution"
