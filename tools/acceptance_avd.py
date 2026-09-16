@@ -263,9 +263,9 @@ def main() -> int:
             raise RuntimeError(
                 "Socket attribution did not observe the target package process"
             )
-        if flow_inventory.get("schema_version") != "0.3":
+        if flow_inventory.get("schema_version") != "0.4":
             raise RuntimeError(
-                "Network flow inventory is not schema 0.3"
+                "Network flow inventory is not schema 0.4"
             )
         if (
             flow_inventory.get("method")
@@ -305,6 +305,42 @@ def main() -> int:
             raise RuntimeError(
                 "Network flow inventory does not report non-TCP/UDP packets"
             )
+        if int(
+            flow_summary.get(
+                "raw_provenance_flow_count"
+            )
+            or 0
+        ) != int(
+            flow_summary.get("flow_count")
+            or 0
+        ):
+            raise RuntimeError(
+                "Not every normalized flow has raw PCAP provenance"
+            )
+        for flow in flow_inventory.get("flows") or []:
+            raw_evidence = (
+                flow.get("raw_evidence")
+                if isinstance(
+                    flow.get("raw_evidence"),
+                    dict,
+                )
+                else {}
+            )
+            if (
+                raw_evidence.get(
+                    "pcap_artifact"
+                )
+                != "01_raw/network/traffic.pcap"
+            ):
+                raise RuntimeError(
+                    "Normalized flow has invalid PCAP artifact provenance"
+                )
+            if not raw_evidence.get(
+                "pcap_packet_ranges"
+            ):
+                raise RuntimeError(
+                    "Normalized flow has no PCAP packet ranges"
+                )
         timeline_summary = archived_timeline.get("summary") or {}
         if int(
             timeline_summary.get("network_markers") or 0
