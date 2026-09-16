@@ -1,15 +1,16 @@
-# Mobile Research v0.10.4
+# Mobile Research v0.10.5
 
-v0.10.4 fixes the remaining delayed clean-start effect observed on real Windows hardware.
+v0.10.5 is based on the proven v0.10.3 startup mechanism. The v0.10.4 startup reordering is rolled back after a real Windows test produced `LaunchState=None` on `com.evrasia`.
 
-## What changed
+## Changes
 
-- The true clean restart still occurs only after logcat, raw screen recording, PCAP and socket attribution are armed.
-- The expensive full Device/Package Metadata snapshot no longer runs before that restart.
-- Clean restart is now requested immediately after the capture collectors become active, instead of several seconds later.
-- Full metadata and clock calibration are collected after the package has been cold-started; they remain part of the same Research ZIP and remain mandatory for a complete session.
-- The operator preview hold introduced in v0.10.3 is unchanged.
-- A real AVD release gate now rejects builds where the clean-restart request is delayed by more than 4 seconds from session creation.
-- Installer asset: `MobileResearchSetup_v0.10.4.exe`.
+- Restores the complete v0.10.3 clean-launch path.
+- Keeps the verified `LaunchState: COLD` check unchanged.
+- Keeps the v0.10.3 live-preview hold that removed the visible minimize/reopen transition.
+- Keeps logcat, raw screen recording, PCAP and socket attribution ordering unchanged.
+- The only startup optimization is that the optional full Package Manager dump is deferred until research stop.
+- Lightweight device/package metadata remains captured before the research collectors are armed.
+- At stop, the full package dump is captured and written into `01_raw/device/package.txt`; `02_normalized/target.json` is enriched before export.
+- Installer asset: `MobileResearchSetup_v0.10.5.exe`.
 
-A clean launch still necessarily restarts the target process once; v0.10.4 makes that restart part of the immediate start action instead of a delayed surprise.
+The goal of this release is deliberately narrow: preserve the working v0.10.3 behavior and remove the several-second pre-launch delay without redesigning startup.

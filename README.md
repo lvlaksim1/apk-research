@@ -1,5 +1,11 @@
 # Mobile Research
 
+## v0.10.5 — v0.10.3 startup baseline + deferred optional package dump
+
+Реальный Windows-тест v0.10.4 показал регрессию: изменение порядка startup привело к `LaunchState=None` на `com.evrasia`. v0.10.5 откатывает clean-launch path, collector ordering, clock calibration и `LaunchState: COLD` invariant к подтверждённой v0.10.3.
+
+Исправление исходной задержки сделано локально. Device Metadata по-прежнему собирается до arm collectors, но тяжёлый и необязательный full Package Manager dump больше не блокирует старт. До запуска сохраняются getprop, lightweight package summary, package paths, system metadata и clock markers. Полный `cmd package dump` выполняется при завершении исследования, после остановки continuous collectors, и затем обновляет `package.txt` и `target.json` перед экспортом ZIP.
+
 ## v0.10.4 — Immediate clean-start boundary
 
 Реальный v0.10.3 архив показал, что визуальный task transition уже скрыт корректно, но сам verified clean restart начинался слишком поздно: примерно через 7 секунд после создания сессии. Из них около 5.3 секунды занимал полный Device/Package Metadata snapshot до arm collectors. Из-за этого пользователь видел неожиданную «перезагрузку» уже через несколько секунд после нажатия «Начать исследование».

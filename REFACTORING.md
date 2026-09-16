@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.10.4 — Immediate verified clean-start boundary.
+**Этап:** v0.10.5 — v0.10.3 startup baseline with deferred optional package dump.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -382,4 +382,7 @@ A real Windows v0.10.2 Research ZIP proved both facts at once: the launch was a 
 
 ### ADR-103 — Slow metadata enrichment must not delay the clean-start boundary
 A real v0.10.3 Windows archive measured about 7.15 seconds from `session_created` to `package_clean_restart_requested`; about 5.26 seconds were spent in the full Device/Package Metadata snapshot before collectors were armed. The clean restart itself is semantically required, but delaying it makes the application appear to reload unexpectedly several seconds after the user presses Start. v0.10.4 keeps the forensic invariant that logcat/screen/PCAP/socket attribution are armed before the cold start, but moves the expensive metadata snapshot and clock calibration after `package_launched`. Metadata remains required and is still captured in the same session. Real AVD release acceptance enforces a maximum 4-second session-created → clean-restart-requested latency so this UX regression cannot silently return.
+
+### ADR-104 — v0.10.4 startup reordering is rejected; optimize only the optional dump
+Real Windows testing of v0.10.4 on `com.evrasia` produced `Clean launch invariant failed: LaunchState=None`. The release changed too much of the already validated startup sequence in order to remove a UX delay. v0.10.5 therefore restores the v0.10.3 clean-launch ordering and strict COLD-start contract. Measurement of the successful v0.10.3 archive showed that Device Metadata consumed about 5.25 seconds before preflight completed, with the full Package Manager dump being optional evidence under ADR-086. The narrow fix is to defer only that full dump until session stop. Lightweight metadata remains pre-launch; continuous collectors and clean restart follow the same path as v0.10.3. The deferred dump is written before ZIP export, so evidence is preserved without placing the expensive operation on the launch critical path.
 

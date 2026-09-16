@@ -2,6 +2,18 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.10.5] - 2026-09-16
+
+### Roll back startup sequencing; defer only optional package dump
+
+- Restores the proven v0.10.3 clean-launch sequencing after the v0.10.4 real-PC regression that produced `LaunchState=None` for `com.evrasia`.
+- Keeps the v0.10.3 collector order, clock calibration timing, single Android stop/start transaction and strict `LaunchState: COLD` invariant unchanged.
+- Removes only the expensive optional full Package Manager dump from the pre-launch critical path.
+- Lightweight device/package metadata is still captured before collectors are armed.
+- The full package dump is captured after continuous collectors stop and before the final Research ZIP is built.
+- The deferred dump remains optional: failure to obtain it is recorded in normalized metadata but does not degrade otherwise complete evidence.
+- Adds regression tests for deferred capture and stop-time enrichment.
+
 ## [0.10.4] - 2026-09-16
 
 ### Immediate clean-start boundary
