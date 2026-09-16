@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from mobile_research.network_attribution import (
     FLOW_INVENTORY_ARTIFACT,
     SocketAttributionIndex,
+    build_flow_inventory,
     parse_socket_snapshot_stream,
     summarize_snapshots,
     write_normalized_attribution,
@@ -308,3 +309,87 @@ def test_exact_tuple_outside_observed_interval_is_high_not_exact() -> None:
 
     assert owner["confidence"] == "HIGH"
     assert "packet-matched-within-snapshot-margin" in owner["ambiguity"]
+
+
+def test_flow_inventory_merges_bidirectional_packets() -> None:
+    snapshots, summary = _raw_snapshot()
+    index = SocketAttributionIndex(summary, snapshots)
+    outbound = _packet()
+    outbound["direction"] = "outbound"
+    outbound["captured_length"] = 120
+
+    inbound = {
+        **outbound,
+        "epoch": outbound["epoch"] + 0.01,
+        "direction": "inbound",
+        "src": outbound["dst"],
+        "src_port": outbound["dst_port"],
+        "dst": outbound["src"],
+        "dst_port": outbound["src_port"],
+        "captured_length": 240,
+    }
+
+    inventory = build_flow_inventory(
+        [outbound, inbound],
+        index,
+    )
+
+    assert inventory["schema_version"] == "0.2"
+    assert inventory["summary"]["flow_count"] == 1
+    flow = inventory["flows"][0]
+    assert flow["direction"] == "bidirectional"
+    assert flow["packet_count"] == 2
+    assert flow["outbound_packet_count"] == 1
+    assert flow["inbound_packet_count"] == 1
+    assert flow["outbound_bytes"] == 120
+    assert flow["inbound_bytes"] == 240
+    assert flow["local_ip"] == "10.0.2.15"
+    assert flow["remote_ip"] == "93.184.216.34"
+
+
+def test_flow_inventory_absorbs_early_unknown_into_owned_flow() -> None:
+    snapshots, summary = _raw_snapshot()
+    index = SocketAttributionIndex(summary, snapshots)
+
+    early = _packet()
+    early["epoch"] = (
+        EPOCH_NS / 1_000_000_000 - 1.0
+    )
+    early["direction"] = "outbound"
+    early["captured_length"] = 100
+
+    attributed = _packet()
+    attributed["direction"] = "outbound"
+    attributed["captured_length"] = 200
+
+    assert (
+        index.attribute_packet(early)["confidence"]
+        == "UNKNOWN"
+    )
+    assert (
+        index.attribute_packet(attributed)["confidence"]
+        == "EXACT"
+    )
+
+    inventory = build_flow_inventory(
+        [early, attributed],
+        index,
+    )
+
+    assert inventory["summary"]["flow_count"] == 1
+    assert (
+        inventory["summary"]["attributed_flow_count"]
+        == 1
+    )
+    flow = inventory["flows"][0]
+    assert flow["packet_count"] == 2
+    assert flow["unknown_packet_count"] == 1
+    assert flow["attributed_packet_count"] == 1
+    assert flow["owner"]["confidence"] == "EXACT"
+    assert flow["packet_confidence_counts"] == {
+        "EXACT": 1,
+        "HIGH": 0,
+        "MEDIUM": 0,
+        "UNKNOWN": 1,
+    }
+
