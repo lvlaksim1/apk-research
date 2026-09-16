@@ -175,9 +175,9 @@ def main() -> int:
             raise RuntimeError(
                 "Clean launch reused an existing activity instance"
             )
-        if archived_timeline.get("schema_version") != "0.4":
+        if archived_timeline.get("schema_version") != "0.5":
             raise RuntimeError(
-                "Exported Research Timeline is not schema 0.4"
+                "Exported Research Timeline is not schema 0.5"
             )
         archived_alignment = (
             archived_timeline.get("clock_alignment") or {}
@@ -263,9 +263,9 @@ def main() -> int:
             raise RuntimeError(
                 "Socket attribution did not observe the target package process"
             )
-        if flow_inventory.get("schema_version") != "0.2":
+        if flow_inventory.get("schema_version") != "0.3":
             raise RuntimeError(
-                "Network flow inventory is not schema 0.2"
+                "Network flow inventory is not schema 0.3"
             )
         if (
             flow_inventory.get("method")
@@ -373,9 +373,9 @@ def main() -> int:
         refined = read_refined_timeline_archive(
             result.archive
         )
-        if refined.get("schema_version") != "0.4":
+        if refined.get("schema_version") != "0.5":
             raise RuntimeError(
-                "Refined Research Timeline is not schema 0.4"
+                "Refined Research Timeline is not schema 0.5"
             )
         refined_actions = refined.get(
             "user_actions"
