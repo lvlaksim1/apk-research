@@ -287,11 +287,16 @@ def _skip_ack(
     return cursor
 
 
-def _crypto_stream(plaintext: bytes) -> bytes:
+def _crypto_fragments(
+    plaintext: bytes,
+) -> list[tuple[int, bytes]]:
     cursor = 0
     fragments: list[tuple[int, bytes]] = []
     while cursor < len(plaintext):
-        frame_value = _decode_varint(plaintext, cursor)
+        frame_value = _decode_varint(
+            plaintext,
+            cursor,
+        )
         if frame_value is None:
             break
         frame_type, cursor = frame_value
@@ -308,54 +313,93 @@ def _crypto_stream(plaintext: bytes) -> bytes:
             cursor = next_cursor
             continue
         if frame_type == 0x06:
-            offset_value = _decode_varint(plaintext, cursor)
+            offset_value = _decode_varint(
+                plaintext,
+                cursor,
+            )
             if offset_value is None:
                 break
-            crypto_offset, cursor = offset_value
-            length_value = _decode_varint(plaintext, cursor)
+            crypto_offset, cursor = (
+                offset_value
+            )
+            length_value = _decode_varint(
+                plaintext,
+                cursor,
+            )
             if length_value is None:
                 break
-            crypto_length, cursor = length_value
+            crypto_length, cursor = (
+                length_value
+            )
             end = cursor + crypto_length
             if end > len(plaintext):
                 break
             fragments.append(
-                (crypto_offset, plaintext[cursor:end])
+                (
+                    crypto_offset,
+                    plaintext[cursor:end],
+                )
             )
             cursor = end
             continue
         if frame_type in {0x1C, 0x1D}:
-            error_value = _decode_varint(plaintext, cursor)
+            error_value = _decode_varint(
+                plaintext,
+                cursor,
+            )
             if error_value is None:
                 break
             _, cursor = error_value
             if frame_type == 0x1C:
-                frame_value = _decode_varint(plaintext, cursor)
+                frame_value = _decode_varint(
+                    plaintext,
+                    cursor,
+                )
                 if frame_value is None:
                     break
                 _, cursor = frame_value
-            reason_value = _decode_varint(plaintext, cursor)
+            reason_value = _decode_varint(
+                plaintext,
+                cursor,
+            )
             if reason_value is None:
                 break
-            reason_length, cursor = reason_value
+            reason_length, cursor = (
+                reason_value
+            )
             cursor += reason_length
             if cursor > len(plaintext):
                 break
             continue
         break
+    return fragments
 
+
+def _reassemble_crypto(
+    fragments: list[tuple[int, bytes]],
+) -> bytes:
     if not fragments:
         return b""
-    fragments.sort(key=lambda item: item[0])
+    fragments = sorted(
+        fragments,
+        key=lambda item: item[0],
+    )
     stream = bytearray()
     expected = 0
     for offset, fragment in fragments:
         if offset > expected:
             break
-        overlap = max(0, expected - offset)
+        overlap = max(
+            0,
+            expected - offset,
+        )
         if overlap < len(fragment):
-            stream.extend(fragment[overlap:])
-            expected += len(fragment) - overlap
+            stream.extend(
+                fragment[overlap:]
+            )
+            expected += (
+                len(fragment) - overlap
+            )
     return bytes(stream)
 
 
@@ -544,8 +588,14 @@ def inspect_quic_datagram(
     plaintext, packet_number = decrypted
     result["initial_decrypted"] = True
     result["packet_number"] = packet_number
+    fragments = _crypto_fragments(
+        plaintext
+    )
+    result["_crypto_fragments"] = (
+        fragments
+    )
     hello = parse_tls_client_hello(
-        _crypto_stream(plaintext)
+        _reassemble_crypto(fragments)
     )
     if hello is None:
         return result
@@ -559,3 +609,102 @@ def inspect_quic_datagram(
     ):
         result["application_protocol"] = "HTTP/3"
     return result
+
+
+class QuicInitialTracker:
+    """Stateful client-Initial CRYPTO reassembly for one PCAP read."""
+
+    def __init__(self) -> None:
+        self._largest_packet_number: dict[
+            tuple[int, str],
+            int,
+        ] = {}
+        self._fragments: dict[
+            tuple[int, str],
+            dict[int, bytes],
+        ] = {}
+
+    def inspect(
+        self,
+        payload: bytes,
+    ) -> dict[str, Any] | None:
+        header = _parse_long_header(
+            payload,
+            0,
+        )
+        if header is None:
+            return None
+        key = (
+            int(header["version"]),
+            bytes(header["dcid"]).hex(),
+        )
+        result = inspect_quic_datagram(
+            payload,
+            largest_packet_number=(
+                self._largest_packet_number.get(
+                    key
+                )
+            ),
+        )
+        if result is None:
+            return None
+
+        packet_number = result.get(
+            "packet_number"
+        )
+        if isinstance(packet_number, int):
+            previous = (
+                self._largest_packet_number.get(
+                    key
+                )
+            )
+            if (
+                previous is None
+                or packet_number > previous
+            ):
+                self._largest_packet_number[
+                    key
+                ] = packet_number
+
+        fragments = result.pop(
+            "_crypto_fragments",
+            [],
+        )
+        if fragments:
+            stored = self._fragments.setdefault(
+                key,
+                {},
+            )
+            for offset, fragment in fragments:
+                existing = stored.get(offset)
+                if (
+                    existing is None
+                    or len(fragment)
+                    > len(existing)
+                ):
+                    stored[offset] = fragment
+            stream = _reassemble_crypto(
+                list(stored.items())
+            )
+            hello = parse_tls_client_hello(
+                stream
+            )
+            if hello is not None:
+                result["sni"] = (
+                    hello.get("sni")
+                )
+                result["alpn"] = list(
+                    hello.get("alpn")
+                    or []
+                )
+                if any(
+                    value == "h3"
+                    or value.startswith("h3-")
+                    for value in result[
+                        "alpn"
+                    ]
+                ):
+                    result[
+                        "application_protocol"
+                    ] = "HTTP/3"
+        return result
