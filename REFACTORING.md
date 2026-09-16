@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.10.3 — Operator-preview isolation during verified clean launch.
+**Этап:** v0.10.4 — Immediate verified clean-start boundary.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -379,4 +379,7 @@ A real v0.10.1 Windows archive showed that clean mode was forensically correct b
 
 ### ADR-102 — Operator preview may hold a frame; forensic screen evidence may not
 A real Windows v0.10.2 Research ZIP proved both facts at once: the launch was a valid `COLD` start, and Android still rendered the outgoing task transition produced by destroying the old package window. Those requirements cannot both be removed inside Android: a force-stopped process has no live surface to keep displaying. v0.10.3 therefore separates presentation from evidence. The canonical raw `screenrecord` collector remains continuous and records the actual stop/splash/cold-start sequence. Only the desktop gRPC/MMAP operator preview holds its last already-published frame from `package_clean_restart_requested` until `package_launched`, while the underlying framebuffer stream continues collecting fresh frames. No Android animation scale, task policy or application setting is changed. Presentation callbacks are best-effort observers and are forbidden from affecting orchestrator/evidence lifecycle.
+
+### ADR-103 — Slow metadata enrichment must not delay the clean-start boundary
+A real v0.10.3 Windows archive measured about 7.15 seconds from `session_created` to `package_clean_restart_requested`; about 5.26 seconds were spent in the full Device/Package Metadata snapshot before collectors were armed. The clean restart itself is semantically required, but delaying it makes the application appear to reload unexpectedly several seconds after the user presses Start. v0.10.4 keeps the forensic invariant that logcat/screen/PCAP/socket attribution are armed before the cold start, but moves the expensive metadata snapshot and clock calibration after `package_launched`. Metadata remains required and is still captured in the same session. Real AVD release acceptance enforces a maximum 4-second session-created → clean-restart-requested latency so this UX regression cannot silently return.
 
