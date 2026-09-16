@@ -112,7 +112,11 @@ class FakeMetadata:
     ) -> None:
         self.session = session
 
-    def collect(self) -> None:
+    def collect(
+        self,
+        *,
+        defer_package_dump: bool = False,
+    ) -> None:
         self.session.register_collector(
             "device_metadata",
             required=True,
@@ -140,6 +144,17 @@ class FakeMetadata:
             "device_metadata",
             "completed",
         )
+
+    def capture_deferred_package_dump(self) -> bool:
+        path = (
+            self.session.paths.raw_device
+            / "package.txt"
+        )
+        path.write_text(
+            "deferred package dump\n",
+            encoding="utf-8",
+        )
+        return True
 
 
 class FakePreflight:
@@ -371,7 +386,14 @@ def test_end_to_end_orchestrator_complete(tmp_path: Path) -> None:
     ).read_text(encoding="utf-8")
     assert "capture_active" in events
     assert "package_launched" in events
+    assert "package_dump_deferred_completed" in events
     assert "capture_finished" in events
+    assert events.index("logcat_stopped") < events.index(
+        "package_dump_deferred_completed"
+    )
+    assert events.index("package_dump_deferred_completed") < events.index(
+        "capture_finished"
+    )
 
 
 def test_health_failure_finishes_partial_and_exports(
