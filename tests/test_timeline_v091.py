@@ -210,7 +210,7 @@ def test_refined_timeline_uses_calibration_and_exclusive_windows(
 
     timeline = build_research_timeline(session)
 
-    assert timeline["schema_version"] == "0.3"
+    assert timeline["schema_version"] == "0.4"
     assert (
         timeline["clock_alignment"]["method"]
         == "adb-ntp-midpoint"
