@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from apk_research.quic import inspect_quic_datagram
 from apk_research.session import SessionManager
 
 USER_ACTIONS_ARTIFACT = "02_normalized/user-actions.jsonl"
@@ -795,6 +796,12 @@ def _read_pcap(
                 "dst_port": None,
                 "dns_query": None,
                 "tls_sni": None,
+                "quic_version": None,
+                "quic_packet_type": None,
+                "quic_initial_decrypted": False,
+                "quic_sni": None,
+                "quic_alpn": [],
+                "application_protocol": None,
             }
             if decoded is not None:
                 value.update(
@@ -841,6 +848,46 @@ def _read_pcap(
                             transport_payload
                         )
                     )
+                if (
+                    protocol == "udp"
+                    and 443
+                    in {src_port, dst_port}
+                ):
+                    quic = inspect_quic_datagram(
+                        transport_payload
+                    )
+                    if quic is not None:
+                        value["quic_version"] = (
+                            quic.get("version")
+                        )
+                        value[
+                            "quic_packet_type"
+                        ] = quic.get(
+                            "packet_type"
+                        )
+                        value[
+                            "quic_initial_decrypted"
+                        ] = bool(
+                            quic.get(
+                                "initial_decrypted"
+                            )
+                        )
+                        value["quic_sni"] = (
+                            quic.get("sni")
+                        )
+                        value["quic_alpn"] = list(
+                            quic.get("alpn")
+                            or []
+                        )
+                        value[
+                            "application_protocol"
+                        ] = quic.get(
+                            "application_protocol"
+                        )
+                        if quic.get("sni"):
+                            value["tls_sni"] = (
+                                quic.get("sni")
+                            )
             packets.append(value)
 
     return packets, {
