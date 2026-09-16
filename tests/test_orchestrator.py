@@ -368,7 +368,7 @@ def test_end_to_end_orchestrator_complete(tmp_path: Path) -> None:
             )
         )
     assert '"action": "tap"' in actions_text
-    assert timeline["schema_version"] == "0.3"
+    assert timeline["schema_version"] == "0.4"
     assert timeline["summary"]["user_actions"] == 1
     assert timeline["correlation_window"]["non_overlapping"] is True
     assert any(
