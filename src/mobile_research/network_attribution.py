@@ -655,10 +655,115 @@ def best_owner(
 
 
 
+def _endpoint(
+    ip_value: Any,
+    port_value: Any,
+) -> tuple[str, int | None]:
+    ip_text = str(ip_value or "")
+    try:
+        port = (
+            int(port_value)
+            if port_value is not None
+            else None
+        )
+    except (TypeError, ValueError):
+        port = None
+    return ip_text, port
+
+
+def _canonical_connection_key(
+    packet: dict[str, Any],
+) -> tuple[Any, ...] | None:
+    protocol = str(packet.get("protocol") or "")
+    if protocol not in {"tcp", "udp"}:
+        return None
+    src = _endpoint(
+        packet.get("src"),
+        packet.get("src_port"),
+    )
+    dst = _endpoint(
+        packet.get("dst"),
+        packet.get("dst_port"),
+    )
+    if not src[0] or not dst[0]:
+        return None
+    left, right = sorted(
+        (src, dst),
+        key=lambda value: (
+            value[0],
+            -1 if value[1] is None else value[1],
+        ),
+    )
+    return protocol, left, right
+
+
+def _packet_orientation(
+    packet: dict[str, Any],
+    owner: dict[str, Any],
+) -> tuple[
+    tuple[str, int | None] | None,
+    tuple[str, int | None] | None,
+]:
+    socket = owner.get("socket")
+    if (
+        str(owner.get("confidence") or "UNKNOWN")
+        != "UNKNOWN"
+        and isinstance(socket, dict)
+        and socket.get("local_ip")
+        and socket.get("remote_ip")
+    ):
+        return (
+            _endpoint(
+                socket.get("local_ip"),
+                socket.get("local_port"),
+            ),
+            _endpoint(
+                socket.get("remote_ip"),
+                socket.get("remote_port"),
+            ),
+        )
+
+    direction = str(packet.get("direction") or "")
+    src = _endpoint(
+        packet.get("src"),
+        packet.get("src_port"),
+    )
+    dst = _endpoint(
+        packet.get("dst"),
+        packet.get("dst_port"),
+    )
+    if direction == "outbound":
+        return src, dst
+    if direction == "inbound":
+        return dst, src
+    return None, None
+
+
+def _add_unique(
+    values: list[str],
+    seen: set[str],
+    candidate: Any,
+) -> None:
+    if not isinstance(candidate, str):
+        return
+    normalized = candidate.strip()
+    if not normalized or normalized in seen:
+        return
+    seen.add(normalized)
+    values.append(normalized)
+
+
 def build_flow_inventory(
     packets: list[dict[str, Any]],
     index: SocketAttributionIndex,
 ) -> dict[str, Any]:
+    """Build one bidirectional record for each observed 5-tuple.
+
+    Packet ownership can improve over time.  Early UNKNOWN packets and later
+    package-attributed packets therefore remain in the same normalized flow
+    instead of being split into unrelated raw/owned records.
+    """
+
     flows: dict[tuple[Any, ...], dict[str, Any]] = {}
 
     for packet in packets:
@@ -666,57 +771,74 @@ def build_flow_inventory(
             epoch = float(packet["epoch"])
         except (KeyError, TypeError, ValueError):
             continue
-        owner = index.attribute_packet(packet)
-        confidence = str(owner.get("confidence") or "UNKNOWN")
-        socket = owner.get("socket")
-        if (
-            confidence != "UNKNOWN"
-            and isinstance(socket, dict)
-            and socket.get("protocol")
-        ):
-            key = (
-                "owned",
-                socket.get("protocol"),
-                socket.get("local_ip"),
-                socket.get("local_port"),
-                socket.get("remote_ip"),
-                socket.get("remote_port"),
-                owner.get("inode"),
-            )
-            flow_value = {
-                "protocol": socket.get("protocol"),
-                "local_ip": socket.get("local_ip"),
-                "local_port": socket.get("local_port"),
-                "remote_ip": socket.get("remote_ip"),
-                "remote_port": socket.get("remote_port"),
-            }
-        else:
-            key = (
-                "raw",
-                packet.get("direction"),
-                packet.get("protocol"),
-                packet.get("src"),
-                packet.get("src_port"),
-                packet.get("dst"),
-                packet.get("dst_port"),
-            )
-            flow_value = {
-                "direction": packet.get("direction"),
-                "protocol": packet.get("protocol"),
-                "src": packet.get("src"),
-                "src_port": packet.get("src_port"),
-                "dst": packet.get("dst"),
-                "dst_port": packet.get("dst_port"),
-            }
 
+        key = _canonical_connection_key(packet)
+        if key is None:
+            continue
+
+        owner = index.attribute_packet(packet)
+        confidence = str(
+            owner.get("confidence") or "UNKNOWN"
+        )
+        if confidence not in _CONFIDENCE_ORDER:
+            confidence = "UNKNOWN"
+
+        local_endpoint, remote_endpoint = (
+            _packet_orientation(
+                packet,
+                owner,
+            )
+        )
         current = flows.get(key)
         if current is None:
             current = {
-                **flow_value,
+                "protocol": key[0],
+                "endpoint_a": {
+                    "ip": key[1][0],
+                    "port": key[1][1],
+                },
+                "endpoint_b": {
+                    "ip": key[2][0],
+                    "port": key[2][1],
+                },
+                "local_ip": (
+                    local_endpoint[0]
+                    if local_endpoint
+                    else None
+                ),
+                "local_port": (
+                    local_endpoint[1]
+                    if local_endpoint
+                    else None
+                ),
+                "remote_ip": (
+                    remote_endpoint[0]
+                    if remote_endpoint
+                    else None
+                ),
+                "remote_port": (
+                    remote_endpoint[1]
+                    if remote_endpoint
+                    else None
+                ),
                 "first_epoch": epoch,
                 "last_epoch": epoch,
                 "packet_count": 0,
                 "captured_bytes": 0,
+                "outbound_packet_count": 0,
+                "outbound_bytes": 0,
+                "inbound_packet_count": 0,
+                "inbound_bytes": 0,
+                "other_packet_count": 0,
+                "other_bytes": 0,
+                "attributed_packet_count": 0,
+                "unknown_packet_count": 0,
+                "packet_confidence_counts": {
+                    "EXACT": 0,
+                    "HIGH": 0,
+                    "MEDIUM": 0,
+                    "UNKNOWN": 0,
+                },
                 "owner": owner,
                 "dns_queries": [],
                 "tls_sni": [],
@@ -730,27 +852,63 @@ def build_flow_inventory(
                 current.get("owner"),
                 owner,
             )
+            if (
+                local_endpoint is not None
+                and confidence != "UNKNOWN"
+            ):
+                current["local_ip"] = (
+                    local_endpoint[0]
+                )
+                current["local_port"] = (
+                    local_endpoint[1]
+                )
+                current["remote_ip"] = (
+                    remote_endpoint[0]
+                    if remote_endpoint
+                    else None
+                )
+                current["remote_port"] = (
+                    remote_endpoint[1]
+                    if remote_endpoint
+                    else None
+                )
 
-        current["packet_count"] += 1
-        current["captured_bytes"] += int(
+        length = int(
             packet.get("captured_length") or 0
         )
-        dns = packet.get("dns_query")
-        if (
-            isinstance(dns, str)
-            and dns
-            and dns not in current["_dns"]
-        ):
-            current["_dns"].add(dns)
-            current["dns_queries"].append(dns)
-        sni = packet.get("tls_sni")
-        if (
-            isinstance(sni, str)
-            and sni
-            and sni not in current["_sni"]
-        ):
-            current["_sni"].add(sni)
-            current["tls_sni"].append(sni)
+        current["packet_count"] += 1
+        current["captured_bytes"] += length
+        current[
+            "packet_confidence_counts"
+        ][confidence] += 1
+        if confidence == "UNKNOWN":
+            current["unknown_packet_count"] += 1
+        else:
+            current["attributed_packet_count"] += 1
+
+        direction = str(
+            packet.get("direction") or ""
+        )
+        if direction == "outbound":
+            current["outbound_packet_count"] += 1
+            current["outbound_bytes"] += length
+        elif direction == "inbound":
+            current["inbound_packet_count"] += 1
+            current["inbound_bytes"] += length
+        else:
+            current["other_packet_count"] += 1
+            current["other_bytes"] += length
+
+        _add_unique(
+            current["dns_queries"],
+            current["_dns"],
+            packet.get("dns_query"),
+        )
+        _add_unique(
+            current["tls_sni"],
+            current["_sni"],
+            packet.get("tls_sni"),
+        )
 
     values: list[dict[str, Any]] = []
     confidence_counts = {
@@ -759,24 +917,67 @@ def build_flow_inventory(
         "MEDIUM": 0,
         "UNKNOWN": 0,
     }
+    total_outbound_bytes = 0
+    total_inbound_bytes = 0
+
     for current in sorted(
         flows.values(),
-        key=lambda value: float(value["first_epoch"]),
+        key=lambda value: float(
+            value["first_epoch"]
+        ),
     ):
         current.pop("_dns", None)
         current.pop("_sni", None)
-        first_epoch = float(current.pop("first_epoch"))
-        last_epoch = float(current.pop("last_epoch"))
-        current["first_target_utc"] = _iso_epoch(first_epoch)
-        current["last_target_utc"] = _iso_epoch(last_epoch)
+        first_epoch = float(
+            current.pop("first_epoch")
+        )
+        last_epoch = float(
+            current.pop("last_epoch")
+        )
+        current["first_target_utc"] = (
+            _iso_epoch(first_epoch)
+        )
+        current["last_target_utc"] = (
+            _iso_epoch(last_epoch)
+        )
+        current["duration_seconds"] = max(
+            0.0,
+            round(last_epoch - first_epoch, 6),
+        )
+
+        outbound = int(
+            current["outbound_packet_count"]
+        )
+        inbound = int(
+            current["inbound_packet_count"]
+        )
+        if outbound and inbound:
+            current["direction"] = "bidirectional"
+        elif outbound:
+            current["direction"] = "outbound"
+        elif inbound:
+            current["direction"] = "inbound"
+        else:
+            current["direction"] = "unknown"
+
         confidence = str(
-            (current.get("owner") or {}).get("confidence")
+            (current.get("owner") or {}).get(
+                "confidence"
+            )
             or "UNKNOWN"
         )
         if confidence not in confidence_counts:
             confidence = "UNKNOWN"
         confidence_counts[confidence] += 1
-        current["flow_id"] = f"flow-{len(values) + 1:06d}"
+        total_outbound_bytes += int(
+            current["outbound_bytes"]
+        )
+        total_inbound_bytes += int(
+            current["inbound_bytes"]
+        )
+        current["flow_id"] = (
+            f"flow-{len(values) + 1:06d}"
+        )
         values.append(current)
 
     attributed = (
@@ -785,15 +986,29 @@ def build_flow_inventory(
         + confidence_counts["MEDIUM"]
     )
     return {
-        "schema_version": "0.1",
-        "method": "pcap+android-proc-socket-attribution",
+        "schema_version": "0.2",
+        "method": (
+            "bidirectional-5tuple+"
+            "android-proc-socket-attribution"
+        ),
         "package": index.package,
         "package_uid": index.package_uid,
         "uid_packages": index.uid_packages,
         "summary": {
             "flow_count": len(values),
             "attributed_flow_count": attributed,
-            "confidence_counts": confidence_counts,
+            "unknown_flow_count": (
+                confidence_counts["UNKNOWN"]
+            ),
+            "confidence_counts": (
+                confidence_counts
+            ),
+            "outbound_bytes": (
+                total_outbound_bytes
+            ),
+            "inbound_bytes": (
+                total_inbound_bytes
+            ),
         },
         "flows": values,
     }
