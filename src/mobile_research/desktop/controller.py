@@ -40,6 +40,7 @@ class DesktopController(QObject):
     operationBusy = Signal(bool)
     archiveInspection = Signal(dict)
     timelineReady = Signal(dict)
+    networkReady = Signal(dict)
     diagnosticsReady = Signal(dict)
 
     def __init__(self, parent=None) -> None:
@@ -158,6 +159,15 @@ class DesktopController(QObject):
     ) -> None:
         self._thread(
             self._inspect_timeline_worker,
+            Path(archive_path),
+        )
+
+    def inspect_network(
+        self,
+        archive_path: str,
+    ) -> None:
+        self._thread(
+            self._inspect_network_worker,
             Path(archive_path),
         )
 
@@ -662,6 +672,38 @@ class DesktopController(QObject):
                 "Research Timeline имеет неверный формат"
             )
         return value
+
+    def _inspect_network_worker(
+        self,
+        archive: Path,
+    ) -> None:
+        try:
+            with zipfile.ZipFile(archive) as handle:
+                value = json.loads(
+                    handle.read(
+                        "02_normalized/network-flows.json"
+                    ).decode("utf-8")
+                )
+            if not isinstance(value, dict):
+                raise ValueError(
+                    "Network inventory имеет неверный формат"
+                )
+            self.networkReady.emit(
+                {
+                    "mode": "network",
+                    "archive": str(archive),
+                    **value,
+                }
+            )
+        except KeyError:
+            self.error.emit(
+                "В Research ZIP нет network-flows.json"
+            )
+        except Exception as exc:
+            self.error.emit(
+                str(exc)
+                or exc.__class__.__name__
+            )
 
     def _diagnostics_worker(self) -> None:
         try:

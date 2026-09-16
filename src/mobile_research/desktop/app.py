@@ -7,8 +7,8 @@ from PySide6.QtWidgets import QApplication
 from mobile_research.desktop.android_runtime import (
     AndroidRuntime,
 )
-from mobile_research.desktop.timeline_window import (
-    TimelineMainWindow,
+from mobile_research.desktop.network_window import (
+    ResearchMainWindow,
 )
 
 
@@ -30,6 +30,6 @@ def main() -> int:
     )
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    window = TimelineMainWindow()
+    window = ResearchMainWindow()
     window.show()
     return app.exec()

@@ -9,10 +9,10 @@ def _gui_smoke_test() -> int:
 
     from PySide6.QtWidgets import QApplication
 
-    from mobile_research.desktop.main_window import MainWindow
+    from mobile_research.desktop.network_window import ResearchMainWindow
 
     app = QApplication.instance() or QApplication([])
-    window = MainWindow()
+    window = ResearchMainWindow()
     window.show()
     app.processEvents()
     window.close()
