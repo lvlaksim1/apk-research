@@ -2,6 +2,17 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.10.4] - 2026-09-16
+
+### Immediate clean-start boundary
+
+- Moves the expensive Device/Package Metadata snapshot out of the pre-launch critical path.
+- Arms logcat, screenrecord, PCAP and socket attribution first, then requests the verified clean restart immediately.
+- Collects full device/package metadata only after `package_launched`; metadata remains required for a complete Research ZIP.
+- Moves clock calibration after launch as well; user actions remain host-timestamped and are normalized later using the saved calibration.
+- Updates the semantic audit lifecycle contract to reflect post-launch metadata enrichment.
+- Adds a real AVD release gate requiring `package_clean_restart_requested` within 4 seconds of `session_created`, preventing a return of the delayed-restart UX.
+
 ## [0.10.3] - 2026-09-16
 
 ### Clean-start operator preview isolation
