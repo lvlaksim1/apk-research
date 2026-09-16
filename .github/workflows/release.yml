@@ -50,7 +50,7 @@ jobs:
           grep -F "v$VERSION" REFACTORING.md
           grep -F "[$VERSION]" CHANGELOG.md
           grep -F "v$VERSION" RELEASE_NOTES.md
-          grep -F "__version__ = \"$VERSION\"" src/mobile_research/__init__.py
+          grep -F "__version__ = \"$VERSION\"" src/apk_research/__init__.py
 
       - name: Ensure tag is not already published
         if: steps.version.outputs.stable == 'true'
@@ -65,7 +65,7 @@ jobs:
         if: steps.version.outputs.stable == 'true'
         uses: actions/download-artifact@v4
         with:
-          name: mobile-research-windows-desktop
+          name: apk-research-windows-desktop
           path: release-assets
 
       - name: Verify installer checksum
@@ -75,7 +75,7 @@ jobs:
           set -euo pipefail
           cd release-assets
           VERSION="${{ steps.version.outputs.version }}"
-          test -f "MobileResearchSetup_v${VERSION}.exe"
+          test -f "apk-research-setup_v${VERSION}.exe"
           sha256sum -c SHA256SUMS.txt
       - name: Publish GitHub Release
         if: steps.version.outputs.stable == 'true'
@@ -84,15 +84,15 @@ jobs:
           set -euo pipefail
           TAG="${{ steps.version.outputs.tag }}"
           VERSION="${{ steps.version.outputs.version }}"
-          INSTALLER="MobileResearchSetup_v${VERSION}.exe"
-          gh release create "$TAG" "release-assets/$INSTALLER" release-assets/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Mobile Research $TAG" --notes-file RELEASE_NOTES.md
+          INSTALLER="apk-research-setup_v${VERSION}.exe"
+          gh release create "$TAG" "release-assets/$INSTALLER" release-assets/SHA256SUMS.txt --target "$GITHUB_SHA" --title "apk-research $TAG" --notes-file RELEASE_NOTES.md
 
       - name: Delete temporary installer artifact
         if: steps.version.outputs.stable == 'true' && success()
         shell: bash
         run: |
           set -euo pipefail
-          ARTIFACT_ID="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --jq '.artifacts[] | select(.name == "mobile-research-windows-desktop") | .id' | head -n 1)"
+          ARTIFACT_ID="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" --jq '.artifacts[] | select(.name == "apk-research-windows-desktop") | .id' | head -n 1)"
           if [[ -n "$ARTIFACT_ID" ]]; then
             gh api --method DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID"
             echo "Deleted temporary installer artifact $ARTIFACT_ID"
