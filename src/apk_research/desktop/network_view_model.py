@@ -117,6 +117,9 @@ def summarize_flows(
 ) -> dict[str, Any]:
     confidence_counts: Counter[str] = Counter()
     protocols: set[str] = set()
+    application_protocols: set[str] = set()
+    quic_versions: set[str] = set()
+    quic_alpn: set[str] = set()
     owners: list[str] = []
     action_ids: list[str] = []
     remote_ips: list[str] = []
@@ -133,6 +136,30 @@ def summarize_flows(
         ).upper()
         if protocol:
             protocols.add(protocol)
+        application_protocols.update(
+            str(value)
+            for value in flow.get(
+                "application_protocols"
+            )
+            or []
+            if value
+        )
+        quic_versions.update(
+            str(value)
+            for value in flow.get(
+                "quic_versions"
+            )
+            or []
+            if value
+        )
+        quic_alpn.update(
+            str(value)
+            for value in flow.get(
+                "quic_alpn"
+            )
+            or []
+            if value
+        )
         owners.append(flow_owner(flow))
         action_ids.extend(
             flow.get("correlated_action_ids")
@@ -202,6 +229,15 @@ def summarize_flows(
         "outbound_bytes": outbound_bytes,
         "inbound_bytes": inbound_bytes,
         "protocols": sorted(protocols),
+        "application_protocols": sorted(
+            application_protocols
+        ),
+        "quic_versions": sorted(
+            quic_versions
+        ),
+        "quic_alpn": sorted(
+            quic_alpn
+        ),
         "owner_text": owner_text,
         "best_confidence": best_confidence,
         "confidence_counts": dict(
@@ -376,6 +412,27 @@ def flow_matches(
             ),
             " ".join(
                 str(value)
+                for value in flow.get(
+                    "application_protocols"
+                )
+                or []
+            ),
+            " ".join(
+                str(value)
+                for value in flow.get(
+                    "quic_versions"
+                )
+                or []
+            ),
+            " ".join(
+                str(value)
+                for value in flow.get(
+                    "quic_alpn"
+                )
+                or []
+            ),
+            " ".join(
+                str(value)
                 for value in owner_value.get("processes") or []
             ),
             " ".join(
@@ -483,8 +540,12 @@ def format_host_details(
             f", DNS {summary.get('resolution_flow_count') or 0})"
         ),
         (
-            f"  Протоколы: "
+            f"  Транспорт: "
             f"{' + '.join(summary.get('protocols') or []) or '—'}"
+        ),
+        (
+            f"  Приложение: "
+            f"{' + '.join(summary.get('application_protocols') or []) or '—'}"
         ),
         (
             f"  Трафик: "
@@ -626,12 +687,85 @@ def format_flow_details(
             f"  ↓ {size_text(int(flow.get('inbound_bytes') or 0))}"
             f" / {int(flow.get('inbound_packet_count') or 0)} pkt"
         ),
-        "",
-        "Владелец",
+    ]
+
+    application_protocols = [
+        str(value)
+        for value in (
+            flow.get(
+                "application_protocols"
+            )
+            or []
+        )
+        if value
+    ]
+    quic_versions = [
+        str(value)
+        for value in (
+            flow.get("quic_versions")
+            or []
+        )
+        if value
+    ]
+    quic_alpn = [
+        str(value)
+        for value in (
+            flow.get("quic_alpn")
+            or []
+        )
+        if value
+    ]
+    if (
+        application_protocols
+        or quic_versions
+        or quic_alpn
+    ):
+        lines.extend(
+            [
+                "",
+                "Протокол приложения",
+                (
+                    "  Application: "
+                    + (
+                        ", ".join(
+                            application_protocols
+                        )
+                        or "QUIC"
+                    )
+                ),
+            ]
+        )
+        if quic_versions:
+            lines.append(
+                "  QUIC version: "
+                + ", ".join(quic_versions)
+            )
+        if quic_alpn:
+            lines.append(
+                "  ALPN: "
+                + ", ".join(quic_alpn)
+            )
+        lines.append(
+            "  QUIC Initial decrypted: "
+            + str(
+                int(
+                    flow.get(
+                        "quic_initial_decrypted_packet_count"
+                    )
+                    or 0
+                )
+            )
+        )
+
+    lines.extend(
+        [
+            "",
+            "Владелец",
         f"  Package: {flow_owner(flow)}",
         f"  Confidence: {flow_confidence(flow)}",
         f"  Evidence: {owner.get('evidence') or '—'}",
-    ]
+        ]
+    )
 
     if processes:
         lines.append(
