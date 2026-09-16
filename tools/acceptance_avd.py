@@ -263,9 +263,9 @@ def main() -> int:
             raise RuntimeError(
                 "Socket attribution did not observe the target package process"
             )
-        if flow_inventory.get("schema_version") != "0.2":
+        if flow_inventory.get("schema_version") != "0.3":
             raise RuntimeError(
-                "Network flow inventory is not schema 0.2"
+                "Network flow inventory is not schema 0.3"
             )
         if (
             flow_inventory.get("method")
