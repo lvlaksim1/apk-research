@@ -263,13 +263,43 @@ def main() -> int:
             raise RuntimeError(
                 "Socket attribution did not observe the target package process"
             )
+        if flow_inventory.get("schema_version") != "0.2":
+            raise RuntimeError(
+                "Network flow inventory is not schema 0.2"
+            )
         if (
             flow_inventory.get("method")
-            != "pcap+android-proc-socket-attribution"
+            != (
+                "bidirectional-5tuple+"
+                "android-proc-socket-attribution"
+            )
         ):
             raise RuntimeError(
-                "Attributed network flow inventory is missing"
+                "Bidirectional attributed network flow inventory is missing"
             )
+        flow_summary = flow_inventory.get("summary") or {}
+        if int(flow_summary.get("flow_count") or 0) <= 0:
+            raise RuntimeError(
+                "Normalized network flow inventory is empty"
+            )
+        for flow in flow_inventory.get("flows") or []:
+            if not isinstance(flow, dict):
+                raise RuntimeError(
+                    "Network flow inventory contains an invalid item"
+                )
+            if int(flow.get("packet_count") or 0) <= 0:
+                raise RuntimeError(
+                    "Normalized network flow has no packets"
+                )
+            if (
+                int(flow.get("outbound_packet_count") or 0)
+                + int(flow.get("inbound_packet_count") or 0)
+                + int(flow.get("other_packet_count") or 0)
+                != int(flow.get("packet_count") or 0)
+            ):
+                raise RuntimeError(
+                    "Normalized network flow direction counts are inconsistent"
+                )
 
         archived_actions = (
             archived_timeline.get("user_actions") or []
