@@ -175,9 +175,9 @@ def main() -> int:
             raise RuntimeError(
                 "Clean launch reused an existing activity instance"
             )
-        if archived_timeline.get("schema_version") != "0.3":
+        if archived_timeline.get("schema_version") != "0.4":
             raise RuntimeError(
-                "Exported Research Timeline is not schema 0.3"
+                "Exported Research Timeline is not schema 0.4"
             )
         archived_alignment = (
             archived_timeline.get("clock_alignment") or {}
@@ -301,6 +301,37 @@ def main() -> int:
                     "Normalized network flow direction counts are inconsistent"
                 )
 
+        if "non_tcp_udp_packet_count" not in flow_summary:
+            raise RuntimeError(
+                "Network flow inventory does not report non-TCP/UDP packets"
+            )
+        timeline_summary = archived_timeline.get("summary") or {}
+        if int(
+            timeline_summary.get("network_markers") or 0
+        ) != int(flow_summary.get("flow_count") or 0):
+            raise RuntimeError(
+                "Timeline network markers are not normalized flow markers"
+            )
+        flow_events = [
+            item
+            for item in archived_timeline.get("events") or []
+            if isinstance(item, dict)
+            and item.get("kind") == "network_flow"
+        ]
+        if len(flow_events) != int(
+            flow_summary.get("flow_count") or 0
+        ):
+            raise RuntimeError(
+                "Timeline network flow event count does not match inventory"
+            )
+        if any(
+            not str(item.get("flow_id") or "")
+            for item in flow_events
+        ):
+            raise RuntimeError(
+                "Timeline network flow event is missing flow_id"
+            )
+
         archived_actions = (
             archived_timeline.get("user_actions") or []
         )
@@ -342,6 +373,10 @@ def main() -> int:
         refined = read_refined_timeline_archive(
             result.archive
         )
+        if refined.get("schema_version") != "0.4":
+            raise RuntimeError(
+                "Refined Research Timeline is not schema 0.4"
+            )
         refined_actions = refined.get(
             "user_actions"
         ) or []
