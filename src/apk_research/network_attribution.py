@@ -873,8 +873,18 @@ def build_flow_inventory(
                 "owner": owner,
                 "dns_queries": [],
                 "tls_sni": [],
+                "quic_versions": [],
+                "quic_packet_types": [],
+                "quic_alpn": [],
+                "application_protocols": [],
+                "quic_detected_packet_count": 0,
+                "quic_initial_decrypted_packet_count": 0,
                 "_dns": set(),
                 "_sni": set(),
+                "_quic_versions": set(),
+                "_quic_packet_types": set(),
+                "_quic_alpn": set(),
+                "_application_protocols": set(),
             }
             flows[key] = current
         else:
@@ -937,6 +947,50 @@ def build_flow_inventory(
             current["_sni"],
             packet.get("tls_sni"),
         )
+        quic_version = packet.get(
+            "quic_version"
+        )
+        if quic_version:
+            current[
+                "quic_detected_packet_count"
+            ] += 1
+            _add_unique(
+                current["quic_versions"],
+                current["_quic_versions"],
+                quic_version,
+            )
+            _add_unique(
+                current["quic_packet_types"],
+                current["_quic_packet_types"],
+                packet.get(
+                    "quic_packet_type"
+                ),
+            )
+            _add_unique(
+                current[
+                    "application_protocols"
+                ],
+                current[
+                    "_application_protocols"
+                ],
+                packet.get(
+                    "application_protocol"
+                ),
+            )
+            if packet.get(
+                "quic_initial_decrypted"
+            ):
+                current[
+                    "quic_initial_decrypted_packet_count"
+                ] += 1
+        for alpn in (
+            packet.get("quic_alpn") or []
+        ):
+            _add_unique(
+                current["quic_alpn"],
+                current["_quic_alpn"],
+                alpn,
+            )
 
     values: list[dict[str, Any]] = []
     confidence_counts = {
@@ -947,6 +1001,11 @@ def build_flow_inventory(
     }
     total_outbound_bytes = 0
     total_inbound_bytes = 0
+    quic_flow_count = 0
+    http3_flow_count = 0
+    quic_detected_packet_count = 0
+    quic_initial_decrypted_packet_count = 0
+    quic_versions: set[str] = set()
 
     for current in sorted(
         flows.values(),
@@ -956,6 +1015,22 @@ def build_flow_inventory(
     ):
         current.pop("_dns", None)
         current.pop("_sni", None)
+        current.pop(
+            "_quic_versions",
+            None,
+        )
+        current.pop(
+            "_quic_packet_types",
+            None,
+        )
+        current.pop(
+            "_quic_alpn",
+            None,
+        )
+        current.pop(
+            "_application_protocols",
+            None,
+        )
         first_epoch = float(
             current.pop("first_epoch")
         )
@@ -1003,6 +1078,37 @@ def build_flow_inventory(
         total_inbound_bytes += int(
             current["inbound_bytes"]
         )
+        if current.get(
+            "quic_versions"
+        ):
+            quic_flow_count += 1
+            quic_versions.update(
+                str(value)
+                for value in current.get(
+                    "quic_versions"
+                )
+                or []
+                if value
+            )
+        if "HTTP/3" in (
+            current.get(
+                "application_protocols"
+            )
+            or []
+        ):
+            http3_flow_count += 1
+        quic_detected_packet_count += int(
+            current.get(
+                "quic_detected_packet_count"
+            )
+            or 0
+        )
+        quic_initial_decrypted_packet_count += int(
+            current.get(
+                "quic_initial_decrypted_packet_count"
+            )
+            or 0
+        )
         current["flow_id"] = (
             f"flow-{len(values) + 1:06d}"
         )
@@ -1014,7 +1120,7 @@ def build_flow_inventory(
         + confidence_counts["MEDIUM"]
     )
     return {
-        "schema_version": "0.2",
+        "schema_version": "0.3",
         "method": (
             "bidirectional-5tuple+"
             "android-proc-socket-attribution"
@@ -1036,6 +1142,21 @@ def build_flow_inventory(
             ),
             "inbound_bytes": (
                 total_inbound_bytes
+            ),
+            "quic_flow_count": (
+                quic_flow_count
+            ),
+            "http3_flow_count": (
+                http3_flow_count
+            ),
+            "quic_detected_packet_count": (
+                quic_detected_packet_count
+            ),
+            "quic_initial_decrypted_packet_count": (
+                quic_initial_decrypted_packet_count
+            ),
+            "quic_versions": sorted(
+                quic_versions
             ),
             "source_packet_count": len(packets),
             "flow_packet_count": sum(
