@@ -12,8 +12,8 @@ from mobile_research import timeline as legacy
 from mobile_research.network_attribution import (
     FLOW_INVENTORY_ARTIFACT,
     SocketAttributionIndex,
-    best_owner,
     build_flow_inventory,
+    canonical_connection_key,
     load_socket_attribution,
     write_flow_inventory,
 )
@@ -50,16 +50,105 @@ def _alignment(root: Path, fallback: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _flow_key_from_inventory(
+    flow: dict[str, Any],
+) -> tuple[Any, ...] | None:
+    protocol = str(flow.get("protocol") or "").lower()
+    endpoint_a = flow.get("endpoint_a")
+    endpoint_b = flow.get("endpoint_b")
+    if (
+        protocol not in {"tcp", "udp"}
+        or not isinstance(endpoint_a, dict)
+        or not isinstance(endpoint_b, dict)
+    ):
+        return None
+
+    def endpoint(value: dict[str, Any]) -> tuple[str, int | None]:
+        ip_value = str(value.get("ip") or "")
+        port_value = value.get("port")
+        try:
+            port = int(port_value) if port_value is not None else None
+        except (TypeError, ValueError):
+            port = None
+        return ip_value, port
+
+    left = endpoint(endpoint_a)
+    right = endpoint(endpoint_b)
+    if not left[0] or not right[0]:
+        return None
+    return protocol, left, right
+
+
+def _flow_lookup(
+    inventory: dict[str, Any],
+) -> dict[tuple[Any, ...], dict[str, Any]]:
+    result: dict[tuple[Any, ...], dict[str, Any]] = {}
+    for flow in inventory.get("flows") or []:
+        if not isinstance(flow, dict):
+            continue
+        key = _flow_key_from_inventory(flow)
+        if key is not None:
+            result[key] = flow
+    return result
+
+
+def _normalized_flow_markers(
+    inventory: dict[str, Any],
+    offset_seconds: float,
+) -> list[dict[str, Any]]:
+    markers: list[dict[str, Any]] = []
+    for flow in inventory.get("flows") or []:
+        if not isinstance(flow, dict):
+            continue
+        target_text = str(
+            flow.get("first_target_utc") or ""
+        )
+        if not target_text:
+            continue
+        try:
+            target_time = legacy._parse_utc(target_text)
+        except ValueError:
+            continue
+        host_time = target_time - timedelta(
+            seconds=offset_seconds
+        )
+        markers.append(
+            {
+                "kind": "network_flow",
+                "host_utc": legacy._iso_utc(host_time),
+                "target_utc": target_text,
+                "name": "network_flow_started",
+                "flow_id": flow.get("flow_id"),
+                "details": {
+                    "protocol": flow.get("protocol"),
+                    "local_ip": flow.get("local_ip"),
+                    "local_port": flow.get("local_port"),
+                    "remote_ip": flow.get("remote_ip"),
+                    "remote_port": flow.get("remote_port"),
+                    "owner": flow.get("owner"),
+                    "direction": flow.get("direction"),
+                },
+            }
+        )
+    return markers
+
+
 def _flow_summary(
     packets: list[dict[str, Any]],
-    first_flow: dict[tuple[Any, ...], float],
     window_start: float,
     window_end: float,
     attribution_index: SocketAttributionIndex,
+    flow_by_key: dict[
+        tuple[Any, ...],
+        dict[str, Any],
+    ],
 ) -> dict[str, Any]:
-    counts: Counter[tuple[Any, ...]] = Counter()
-    owners: dict[tuple[Any, ...], dict[str, Any]] = {}
-    new_flows: list[dict[str, Any]] = []
+    flow_counts: Counter[str] = Counter()
+    flow_objects: dict[str, dict[str, Any]] = {}
+    flow_ids: list[str] = []
+    flow_ids_seen: set[str] = set()
+    new_flow_ids: list[str] = []
+    new_flow_ids_seen: set[str] = set()
     dns: list[str] = []
     sni: list[str] = []
     package_dns: list[str] = []
@@ -77,33 +166,56 @@ def _flow_summary(
     }
 
     for packet in packets:
-        total_bytes += int(packet.get("captured_length") or 0)
-        owner = attribution_index.attribute_packet(packet)
-        confidence = str(owner.get("confidence") or "UNKNOWN")
+        total_bytes += int(
+            packet.get("captured_length") or 0
+        )
+        owner = attribution_index.attribute_packet(
+            packet
+        )
+        confidence = str(
+            owner.get("confidence") or "UNKNOWN"
+        )
         if confidence not in attribution_counts:
             confidence = "UNKNOWN"
         attribution_counts[confidence] += 1
 
-        key = legacy._flow_key(packet)
-        if key is not None:
-            counts[key] += 1
-            owners[key] = best_owner(owners.get(key), owner)
-            first_epoch = first_flow.get(key)
-            if (
-                first_epoch is not None
-                and window_start <= first_epoch <= window_end
-                and not any(
-                    item["flow"] == legacy._flow_value(key)
-                    for item in new_flows
-                )
-            ):
-                new_flows.append(
-                    {
-                        "target_utc": legacy._iso_epoch(first_epoch),
-                        "flow": legacy._flow_value(key),
-                        "owner": owners[key],
-                    }
-                )
+        key = canonical_connection_key(packet)
+        flow = (
+            flow_by_key.get(key)
+            if key is not None
+            else None
+        )
+        if isinstance(flow, dict):
+            flow_id = str(
+                flow.get("flow_id") or ""
+            )
+            if flow_id:
+                flow_counts[flow_id] += 1
+                flow_objects[flow_id] = flow
+                if flow_id not in flow_ids_seen:
+                    flow_ids_seen.add(flow_id)
+                    flow_ids.append(flow_id)
+                try:
+                    first_epoch = legacy._parse_utc(
+                        str(
+                            flow.get(
+                                "first_target_utc"
+                            )
+                            or ""
+                        )
+                    ).timestamp()
+                except ValueError:
+                    first_epoch = None
+                if (
+                    first_epoch is not None
+                    and window_start
+                    <= first_epoch
+                    <= window_end
+                    and flow_id
+                    not in new_flow_ids_seen
+                ):
+                    new_flow_ids_seen.add(flow_id)
+                    new_flow_ids.append(flow_id)
 
         query = packet.get("dns_query")
         if isinstance(query, str) and query:
@@ -118,31 +230,45 @@ def _flow_summary(
                 package_dns.append(query)
 
         server_name = packet.get("tls_sni")
-        if isinstance(server_name, str) and server_name:
+        if (
+            isinstance(server_name, str)
+            and server_name
+        ):
             if server_name not in sni_seen:
                 sni_seen.add(server_name)
                 sni.append(server_name)
             if (
                 confidence != "UNKNOWN"
-                and server_name not in package_sni_seen
+                and server_name
+                not in package_sni_seen
             ):
                 package_sni_seen.add(server_name)
                 package_sni.append(server_name)
 
-    flows = [
-        {
-            **legacy._flow_value(key),
-            "packet_count": count,
-            "owner": owners.get(
-                key,
-                {
-                    "confidence": "UNKNOWN",
-                    "evidence": "no-matching-socket-observation",
-                },
-            ),
-        }
-        for key, count in counts.most_common(MAX_FLOW_SAMPLE)
-    ]
+    flows: list[dict[str, Any]] = []
+    for flow_id, count in flow_counts.most_common(
+        MAX_FLOW_SAMPLE
+    ):
+        flow = flow_objects[flow_id]
+        flows.append(
+            {
+                "flow_id": flow_id,
+                "protocol": flow.get("protocol"),
+                "local_ip": flow.get("local_ip"),
+                "local_port": flow.get("local_port"),
+                "remote_ip": flow.get("remote_ip"),
+                "remote_port": flow.get("remote_port"),
+                "packet_count": count,
+                "owner": flow.get("owner"),
+                "dns_queries": flow.get(
+                    "dns_queries"
+                )
+                or [],
+                "tls_sni": flow.get("tls_sni")
+                or [],
+            }
+        )
+
     attributed_packets = (
         attribution_counts["EXACT"]
         + attribution_counts["HIGH"]
@@ -151,15 +277,25 @@ def _flow_summary(
     return {
         "packet_count": len(packets),
         "captured_bytes": total_bytes,
+        "flow_ids": flow_ids,
+        "new_flow_ids": new_flow_ids,
         "flows": flows,
-        "new_flows": new_flows[:MAX_FLOW_SAMPLE],
+        "new_flows": [
+            flow_objects[flow_id]
+            for flow_id in new_flow_ids[
+                :MAX_FLOW_SAMPLE
+            ]
+            if flow_id in flow_objects
+        ],
         "dns_queries": dns,
         "tls_sni": sni,
         "package_dns_queries": package_dns,
         "package_tls_sni": package_sni,
         "package_attribution": {
             "packet_counts": attribution_counts,
-            "attributed_packet_count": attributed_packets,
+            "attributed_packet_count": (
+                attributed_packets
+            ),
             "total_packet_count": len(packets),
         },
     }
@@ -227,7 +363,10 @@ def _correlate(
     packet_epochs: list[float],
     logcat: list[dict[str, Any]],
     log_epochs: list[float],
-    first_flow: dict[tuple[Any, ...], float],
+    flow_by_key: dict[
+        tuple[Any, ...],
+        dict[str, Any],
+    ],
     attribution_index: SocketAttributionIndex,
 ) -> dict[str, Any]:
     host_start = legacy._parse_utc(
@@ -255,10 +394,10 @@ def _correlate(
     selected_packets = packets[p0:p1]
     network = _flow_summary(
         selected_packets,
-        first_flow,
         window_start,
         window_end,
         attribution_index,
+        flow_by_key,
     )
 
     l0 = bisect.bisect_left(log_epochs, window_start)
@@ -342,10 +481,6 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
     )
     packets.sort(key=lambda item: float(item["epoch"]))
     packet_epochs = [float(item["epoch"]) for item in packets]
-    network_markers, first_flow = legacy._network_markers(
-        packets,
-        offset,
-    )
     attribution_summary, attribution_snapshots = (
         load_socket_attribution(root)
     )
@@ -357,9 +492,12 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
         packets,
         attribution_index,
     )
-    write_flow_inventory(
-        root,
+    flow_by_key = _flow_lookup(
+        flow_inventory
+    )
+    network_markers = _normalized_flow_markers(
         flow_inventory,
+        offset,
     )
     if not any(
         artifact.get("path") == FLOW_INVENTORY_ARTIFACT
@@ -409,13 +547,58 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
                 packet_epochs=packet_epochs,
                 logcat=logcat,
                 log_epochs=log_epochs,
-                first_flow=first_flow,
+                flow_by_key=flow_by_key,
                 attribution_index=attribution_index,
             )
         except (KeyError, TypeError, ValueError) as exc:
             action["correlation"] = {
                 "error": str(exc) or exc.__class__.__name__
             }
+
+    flow_actions: dict[str, list[str]] = {}
+    for action in actions:
+        action_id = str(
+            action.get("action_id") or ""
+        )
+        correlation = action.get("correlation")
+        if (
+            not action_id
+            or not isinstance(correlation, dict)
+        ):
+            continue
+        network = correlation.get("network")
+        if not isinstance(network, dict):
+            continue
+        for flow_id in network.get(
+            "flow_ids"
+        ) or []:
+            flow_id = str(flow_id)
+            if not flow_id:
+                continue
+            flow_actions.setdefault(
+                flow_id,
+                [],
+            ).append(action_id)
+
+    for flow in flow_inventory.get("flows") or []:
+        if not isinstance(flow, dict):
+            continue
+        flow_id = str(
+            flow.get("flow_id") or ""
+        )
+        flow["correlated_action_ids"] = list(
+            dict.fromkeys(
+                flow_actions.get(
+                    flow_id,
+                    [],
+                )
+            )
+        )
+
+    write_flow_inventory(
+        root,
+        flow_inventory,
+    )
 
     events: list[dict[str, Any]] = []
     for event in lifecycle:
@@ -450,7 +633,7 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
     events.extend(network_markers)
     events.sort(key=lambda item: str(item.get("host_utc") or ""))
 
-    timeline["schema_version"] = "0.3"
+    timeline["schema_version"] = "0.4"
     timeline["clock_alignment"] = alignment
     timeline["network_attribution"] = (
         attribution_index.summarize_packets(packets)
@@ -472,7 +655,21 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
     summary = timeline.setdefault("summary", {})
     summary["user_actions"] = len(actions)
     summary["network_packets"] = network_summary["packet_count"]
-    summary["network_markers"] = len(network_markers)
+    summary["network_markers"] = len(
+        network_markers
+    )
+    flow_summary = (
+        flow_inventory.get("summary") or {}
+    )
+    summary["network_flows"] = int(
+        flow_summary.get("flow_count") or 0
+    )
+    summary["network_non_tcp_udp_packets"] = int(
+        flow_summary.get(
+            "non_tcp_udp_packet_count"
+        )
+        or 0
+    )
     summary["timeline_events"] = len(events)
 
     path = root / legacy.TIMELINE_ARTIFACT
