@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -10,42 +10,70 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
+from mobile_research.desktop.network_view_model import (
+    action_label,
+    build_action_index,
+    endpoint_text,
+    flow_confidence,
+    flow_host,
+    flow_matches,
+    flow_owner,
+    format_flow_details,
+    group_flows_by_host,
+    size_text,
+    summarize_flows,
+    time_text,
+)
 from mobile_research.desktop.timeline_window import (
     TimelineMainWindow,
 )
 
 
-def _size_text(value: int) -> str:
-    number = float(max(0, value))
-    for unit in ("B", "KB", "MB", "GB"):
-        if number < 1024 or unit == "GB":
-            return f"{number:.1f} {unit}"
-        number /= 1024
-    return f"{value} B"
+_ROLE_KIND = int(Qt.ItemDataRole.UserRole)
+_ROLE_DATA = _ROLE_KIND + 1
+_KIND_HOST = "host"
+_KIND_FLOW = "flow"
 
 
-def _time_text(value: object) -> str:
-    text = str(value or "")
-    if "T" in text:
-        text = text.split("T", 1)[1]
-    return text.replace("Z", "")[:12]
+def _count_text(
+    value: int,
+    noun: str,
+) -> str:
+    return f"{int(value)} {noun}"
 
 
-def _endpoint(ip_value: object, port_value: object) -> str:
-    ip_text = str(ip_value or "—")
-    if port_value in {None, ""}:
-        return ip_text
-    return f"{ip_text}:{port_value}"
+def _confidence_text(
+    summary: dict[str, Any],
+) -> str:
+    counts = (
+        summary.get("confidence_counts")
+        if isinstance(
+            summary.get("confidence_counts"),
+            dict,
+        )
+        else {}
+    )
+    parts = [
+        f"{key} {int(counts.get(key) or 0)}"
+        for key in (
+            "EXACT",
+            "HIGH",
+            "MEDIUM",
+            "UNKNOWN",
+        )
+        if int(counts.get(key) or 0) > 0
+    ]
+    return " / ".join(parts) or "UNKNOWN"
 
 
 class ResearchMainWindow(TimelineMainWindow):
-    """Timeline + first-class Network Analyzer."""
+    """Timeline + host-oriented Network Analyzer."""
 
     def _build_ui(self) -> None:
         super()._build_ui()
@@ -104,7 +132,7 @@ class ResearchMainWindow(TimelineMainWindow):
         )
         self.network_search = QLineEdit()
         self.network_search.setPlaceholderText(
-            "Host / IP / process / DNS / SNI"
+            "Host / IP / process / DNS / SNI / action"
         )
         controls.addWidget(
             self.network_load_selected
@@ -130,40 +158,78 @@ class ResearchMainWindow(TimelineMainWindow):
         self.network_summary.setWordWrap(True)
         layout.addWidget(self.network_summary)
 
-        self.network_table = QTableWidget(
-            0,
-            9,
-        )
-        self.network_table.setHorizontalHeaderLabels(
+        self.network_tree = QTreeWidget()
+        self.network_table = self.network_tree
+        self.network_tree.setColumnCount(9)
+        self.network_tree.setHeaderLabels(
             [
-                "Время",
+                "Host / Flow",
                 "Owner",
-                "Host",
                 "Protocol",
                 "Local",
                 "Remote",
                 "↑",
                 "↓",
                 "Confidence",
+                "Timeline",
             ]
         )
-        self.network_table.setSelectionBehavior(
-            QTableWidget.SelectionBehavior.SelectRows
+        self.network_tree.setAlternatingRowColors(
+            True
         )
-        self.network_table.setEditTriggers(
-            QTableWidget.EditTrigger.NoEditTriggers
+        self.network_tree.setUniformRowHeights(
+            True
         )
-        self.network_table.horizontalHeader().setStretchLastSection(
+        self.network_tree.setRootIsDecorated(True)
+        self.network_tree.setExpandsOnDoubleClick(
+            False
+        )
+        self.network_tree.header().setStretchLastSection(
             True
         )
         layout.addWidget(
-            self.network_table,
+            self.network_tree,
             1,
         )
 
+        hint = QLabel(
+            "Раскройте хост, чтобы увидеть соединения. "
+            "Двойной клик по flow открывает связанное действие Timeline."
+        )
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        action_row = QHBoxLayout()
+        action_row.addWidget(
+            QLabel("Связанные действия Timeline")
+        )
+        self.network_action_select = QComboBox()
+        self.network_action_select.setEnabled(
+            False
+        )
+        self.network_open_timeline = QPushButton(
+            "Открыть в Timeline"
+        )
+        self.network_open_timeline.setEnabled(
+            False
+        )
+        action_row.addWidget(
+            self.network_action_select,
+            1,
+        )
+        action_row.addWidget(
+            self.network_open_timeline
+        )
+        layout.addLayout(action_row)
+
         self.network_details = QPlainTextEdit()
         self.network_details.setReadOnly(True)
-        self.network_details.setMaximumHeight(220)
+        self.network_details.setMaximumHeight(
+            280
+        )
+        self.network_details.setPlaceholderText(
+            "Выберите хост или соединение."
+        )
         layout.addWidget(self.network_details)
         return page
 
@@ -187,14 +253,17 @@ class ResearchMainWindow(TimelineMainWindow):
         self.network_search.textChanged.connect(
             self._apply_network_filters
         )
-        self.network_table.itemSelectionChanged.connect(
+        self.network_tree.itemSelectionChanged.connect(
             self._show_network_details
+        )
+        self.network_tree.itemDoubleClicked.connect(
+            self._open_network_item
+        )
+        self.network_open_timeline.clicked.connect(
+            self._open_selected_network_timeline
         )
         self.timeline_table.cellDoubleClicked.connect(
             self._open_timeline_flow
-        )
-        self.network_table.cellDoubleClicked.connect(
-            self._open_network_timeline
         )
 
     def _inspect_selected_network(self) -> None:
@@ -213,123 +282,115 @@ class ResearchMainWindow(TimelineMainWindow):
         self._network_archive = str(
             data.get("archive") or ""
         )
+        self._network_package = str(
+            data.get("package") or ""
+        )
+        self._network_actions = [
+            item
+            for item in (
+                data.get("timeline_actions")
+                or []
+            )
+            if isinstance(item, dict)
+        ]
+        self._network_action_index = (
+            build_action_index(
+                self._network_actions
+            )
+        )
         flows = [
             item
             for item in data.get("flows") or []
             if isinstance(item, dict)
         ]
+        self._network_groups = (
+            group_flows_by_host(flows)
+        )
         summary = (
             data.get("summary")
-            if isinstance(data.get("summary"), dict)
+            if isinstance(
+                data.get("summary"),
+                dict,
+            )
             else {}
-        )
-        package = str(
-            data.get("package") or "—"
         )
         schema = str(
             data.get("schema_version") or "—"
         )
+        host_count = len(
+            self._network_groups
+        )
+        self._network_summary_base = (
+            f"{self._network_package or '—'}"
+            f" • schema {schema}"
+            f" • {host_count} hosts"
+            f" • {int(summary.get('flow_count') or len(flows))} flows"
+            f" • app {int(summary.get('attributed_flow_count') or 0)}"
+            f" • unknown {int(summary.get('unknown_flow_count') or 0)}"
+            f" • non-TCP/UDP "
+            f"{int(summary.get('non_tcp_udp_packet_count') or 0)} pkt"
+            f" • ↑ {size_text(int(summary.get('outbound_bytes') or 0))}"
+            f" • ↓ {size_text(int(summary.get('inbound_bytes') or 0))}"
+        )
         self.network_summary.setText(
-            f"{package} • schema {schema} • "
-            f"{int(summary.get('flow_count') or len(flows))} flows • "
-            f"app {int(summary.get('attributed_flow_count') or 0)} • "
-            f"unknown {int(summary.get('unknown_flow_count') or 0)} • "
-            f"non-TCP/UDP "
-            f"{int(summary.get('non_tcp_udp_packet_count') or 0)} pkt • "
-            f"↑ {_size_text(int(summary.get('outbound_bytes') or 0))} • "
-            f"↓ {_size_text(int(summary.get('inbound_bytes') or 0))}"
+            self._network_summary_base
         )
 
-        self.network_table.setRowCount(
-            len(flows)
-        )
-        for row, flow in enumerate(flows):
-            owner = (
-                flow.get("owner")
-                if isinstance(flow.get("owner"), dict)
-                else {}
+        self.network_tree.clear()
+        for group in self._network_groups:
+            host_item = QTreeWidgetItem()
+            host_item.setData(
+                0,
+                _ROLE_KIND,
+                _KIND_HOST,
             )
-            confidence = str(
-                owner.get("confidence") or "UNKNOWN"
+            host_item.setData(
+                0,
+                _ROLE_DATA,
+                group,
             )
-            owner_name = (
-                str(owner.get("package") or "")
-                if confidence != "UNKNOWN"
-                else "Unknown"
+            self.network_tree.addTopLevelItem(
+                host_item
             )
-            if not owner_name:
-                owner_name = "Unknown"
-            sni = [
-                str(value)
-                for value in flow.get("tls_sni") or []
-                if value
-            ]
-            dns = [
-                str(value)
-                for value in flow.get("dns_queries") or []
-                if value
-            ]
-            host = (
-                sni[0]
-                if sni
-                else dns[0]
-                if dns
-                else str(flow.get("remote_ip") or "—")
+            self._set_host_item(
+                host_item,
+                group,
+                group.get("flows") or [],
             )
-            values = [
-                _time_text(
-                    flow.get("first_target_utc")
-                ),
-                owner_name,
-                host,
-                str(flow.get("protocol") or "").upper(),
-                _endpoint(
-                    flow.get("local_ip"),
-                    flow.get("local_port"),
-                ),
-                _endpoint(
-                    flow.get("remote_ip"),
-                    flow.get("remote_port"),
-                ),
-                _size_text(
-                    int(flow.get("outbound_bytes") or 0)
-                ),
-                _size_text(
-                    int(flow.get("inbound_bytes") or 0)
-                ),
-                confidence,
-            ]
-            searchable = " ".join(
-                [
-                    *values,
-                    json.dumps(
-                        flow,
-                        ensure_ascii=False,
-                        sort_keys=True,
-                    ),
-                ]
-            ).lower()
-            for column, value in enumerate(values):
-                item = QTableWidgetItem(value)
-                item.setData(
-                    Qt.ItemDataRole.UserRole,
+
+            for flow in group.get("flows") or []:
+                child = QTreeWidgetItem()
+                child.setData(
+                    0,
+                    _ROLE_KIND,
+                    _KIND_FLOW,
+                )
+                child.setData(
+                    0,
+                    _ROLE_DATA,
                     flow,
                 )
-                item.setData(
-                    int(Qt.ItemDataRole.UserRole) + 1,
-                    searchable,
-                )
-                self.network_table.setItem(
-                    row,
-                    column,
-                    item,
+                host_item.addChild(child)
+                self._set_flow_item(
+                    child,
+                    flow,
                 )
 
-        self.network_table.resizeColumnsToContents()
+        self.network_tree.resizeColumnToContents(0)
+        self.network_tree.resizeColumnToContents(1)
+        self.network_tree.resizeColumnToContents(2)
         self._apply_network_filters()
+        if (
+            self.network_tree.topLevelItemCount()
+            == 1
+        ):
+            self.network_tree.topLevelItem(
+                0
+            ).setExpanded(True)
         self.tabs.setCurrentIndex(
             self.network_tab_index
         )
+
         pending_flow_id = str(
             getattr(
                 self,
@@ -344,8 +405,140 @@ class ResearchMainWindow(TimelineMainWindow):
                 pending_flow_id
             )
 
+    def _set_host_item(
+        self,
+        item: QTreeWidgetItem,
+        group: dict[str, Any],
+        flows: list[dict[str, Any]],
+    ) -> None:
+        summary = summarize_flows(flows)
+        remote_ips = (
+            summary.get("remote_ips") or []
+        )
+        remote_text = (
+            str(remote_ips[0])
+            if len(remote_ips) == 1
+            else (
+                f"{len(remote_ips)} remote IP"
+                if remote_ips
+                else "—"
+            )
+        )
+        values = [
+            str(group.get("host") or "unknown-host"),
+            str(summary.get("owner_text") or "Unknown"),
+            " + ".join(
+                summary.get("protocols") or []
+            )
+            or "—",
+            _count_text(
+                summary.get("flow_count") or 0,
+                "соединений",
+            ),
+            remote_text,
+            size_text(
+                int(
+                    summary.get(
+                        "outbound_bytes"
+                    )
+                    or 0
+                )
+            ),
+            size_text(
+                int(
+                    summary.get(
+                        "inbound_bytes"
+                    )
+                    or 0
+                )
+            ),
+            _confidence_text(summary),
+            _count_text(
+                len(
+                    summary.get(
+                        "action_ids"
+                    )
+                    or []
+                ),
+                "действий",
+            ),
+        ]
+        for column, value in enumerate(values):
+            item.setText(
+                column,
+                value,
+            )
+
+    def _set_flow_item(
+        self,
+        item: QTreeWidgetItem,
+        flow: dict[str, Any],
+    ) -> None:
+        action_ids = [
+            str(value)
+            for value in (
+                flow.get(
+                    "correlated_action_ids"
+                )
+                or []
+            )
+            if value
+        ]
+        label = (
+            f"{time_text(flow.get('first_target_utc'))}"
+            f" • {flow.get('flow_id') or 'flow'}"
+        )
+        values = [
+            label,
+            flow_owner(flow),
+            str(
+                flow.get("protocol") or ""
+            ).upper(),
+            endpoint_text(
+                flow.get("local_ip"),
+                flow.get("local_port"),
+            ),
+            endpoint_text(
+                flow.get("remote_ip"),
+                flow.get("remote_port"),
+            ),
+            size_text(
+                int(
+                    flow.get(
+                        "outbound_bytes"
+                    )
+                    or 0
+                )
+            ),
+            size_text(
+                int(
+                    flow.get(
+                        "inbound_bytes"
+                    )
+                    or 0
+                )
+            ),
+            flow_confidence(flow),
+            (
+                _count_text(
+                    len(action_ids),
+                    "действий",
+                )
+                if action_ids
+                else "—"
+            ),
+        ]
+        for column, value in enumerate(values):
+            item.setText(
+                column,
+                value,
+            )
+
     def _apply_network_filters(self) -> None:
-        if not hasattr(self, "network_table"):
+        if not hasattr(
+            self,
+            "network_tree",
+        ):
             return
         owner_filter = str(
             self.network_owner_filter.currentData()
@@ -355,116 +548,147 @@ class ResearchMainWindow(TimelineMainWindow):
             self.network_protocol_filter.currentData()
             or "all"
         )
-        query = self.network_search.text().strip().lower()
+        query = (
+            self.network_search.text()
+            .strip()
+            .lower()
+        )
+        package = str(
+            getattr(
+                self,
+                "_network_package",
+                "",
+            )
+            or ""
+        )
 
-        visible = 0
-        for row in range(
-            self.network_table.rowCount()
+        visible_hosts = 0
+        visible_flows = 0
+        for group_index in range(
+            self.network_tree.topLevelItemCount()
         ):
-            first = self.network_table.item(row, 0)
-            flow = (
-                first.data(Qt.ItemDataRole.UserRole)
-                if first is not None
-                else {}
-            )
-            if not isinstance(flow, dict):
-                flow = {}
-            owner = (
-                flow.get("owner")
-                if isinstance(flow.get("owner"), dict)
-                else {}
-            )
-            confidence = str(
-                owner.get("confidence") or "UNKNOWN"
-            )
-            owner_ok = (
-                owner_filter == "all"
-                or (
-                    owner_filter == "app"
-                    and confidence != "UNKNOWN"
-                )
-                or (
-                    owner_filter == "unknown"
-                    and confidence == "UNKNOWN"
+            host_item = (
+                self.network_tree.topLevelItem(
+                    group_index
                 )
             )
-            protocol = str(
-                flow.get("protocol") or ""
-            ).lower()
-            protocol_ok = (
-                protocol_filter == "all"
-                or protocol == protocol_filter
+            group = host_item.data(
+                0,
+                _ROLE_DATA,
             )
-            searchable = (
-                str(
-                    first.data(
-                        int(Qt.ItemDataRole.UserRole) + 1
+            if not isinstance(group, dict):
+                host_item.setHidden(True)
+                continue
+            visible_group_flows: list[
+                dict[str, Any]
+            ] = []
+            for child_index in range(
+                host_item.childCount()
+            ):
+                child = host_item.child(
+                    child_index
+                )
+                flow = child.data(
+                    0,
+                    _ROLE_DATA,
+                )
+                show = (
+                    isinstance(flow, dict)
+                    and flow_matches(
+                        flow,
+                        owner_filter=owner_filter,
+                        protocol_filter=protocol_filter,
+                        query=query,
+                        package=package,
                     )
-                    or ""
                 )
-                if first is not None
-                else ""
+                child.setHidden(
+                    not show
+                )
+                if show:
+                    visible_group_flows.append(
+                        flow
+                    )
+                    visible_flows += 1
+
+            host_item.setHidden(
+                not visible_group_flows
             )
-            query_ok = (
-                not query
-                or query in searchable
+            if visible_group_flows:
+                visible_hosts += 1
+                self._set_host_item(
+                    host_item,
+                    group,
+                    visible_group_flows,
+                )
+                if query:
+                    host_item.setExpanded(
+                        True
+                    )
+
+        base = str(
+            getattr(
+                self,
+                "_network_summary_base",
+                "",
             )
-            show = (
-                owner_ok
-                and protocol_ok
-                and query_ok
-            )
-            self.network_table.setRowHidden(
-                row,
-                not show,
-            )
-            if show:
-                visible += 1
-        if hasattr(self, "_network_inventory"):
-            base = self.network_summary.text().split(
-                " • показано "
-            )[0]
+        )
+        if base:
             self.network_summary.setText(
-                f"{base} • показано {visible}"
+                f"{base} • показано "
+                f"{visible_hosts} hosts / "
+                f"{visible_flows} flows"
             )
 
     def _select_network_flow(
         self,
         flow_id: str,
     ) -> bool:
-        for row in range(
-            self.network_table.rowCount()
+        for group_index in range(
+            self.network_tree.topLevelItemCount()
         ):
-            item = self.network_table.item(
-                row,
-                0,
-            )
-            flow = (
-                item.data(
-                    Qt.ItemDataRole.UserRole
+            host_item = (
+                self.network_tree.topLevelItem(
+                    group_index
                 )
-                if item is not None
-                else None
             )
-            if (
-                isinstance(flow, dict)
-                and str(
-                    flow.get("flow_id") or ""
-                )
-                == flow_id
+            for child_index in range(
+                host_item.childCount()
             ):
-                self.network_table.setRowHidden(
-                    row,
-                    False,
+                child = host_item.child(
+                    child_index
                 )
-                self.network_table.selectRow(row)
-                self.network_table.scrollToItem(
-                    item
+                flow = child.data(
+                    0,
+                    _ROLE_DATA,
                 )
-                self.tabs.setCurrentIndex(
-                    self.network_tab_index
-                )
-                return True
+                if (
+                    isinstance(flow, dict)
+                    and str(
+                        flow.get(
+                            "flow_id"
+                        )
+                        or ""
+                    )
+                    == flow_id
+                ):
+                    host_item.setHidden(
+                        False
+                    )
+                    child.setHidden(False)
+                    host_item.setExpanded(
+                        True
+                    )
+                    self.network_tree.setCurrentItem(
+                        child
+                    )
+                    self.network_tree.scrollToItem(
+                        child
+                    )
+                    self.tabs.setCurrentIndex(
+                        self.network_tab_index
+                    )
+                    return True
         return False
 
     def _select_timeline_action(
@@ -517,7 +741,9 @@ class ResearchMainWindow(TimelineMainWindow):
             0,
         )
         row_data = (
-            item.data(Qt.ItemDataRole.UserRole)
+            item.data(
+                Qt.ItemDataRole.UserRole
+            )
             if item is not None
             else None
         )
@@ -562,20 +788,29 @@ class ResearchMainWindow(TimelineMainWindow):
             archive
         )
 
-    def _open_network_timeline(
+    def _open_network_item(
         self,
-        row: int,
+        item: QTreeWidgetItem,
         column: int,
     ) -> None:
         del column
-        item = self.network_table.item(
-            row,
-            0,
+        kind = str(
+            item.data(
+                0,
+                _ROLE_KIND,
+            )
+            or ""
         )
-        flow = (
-            item.data(Qt.ItemDataRole.UserRole)
-            if item is not None
-            else None
+        if kind == _KIND_HOST:
+            item.setExpanded(
+                not item.isExpanded()
+            )
+            return
+        if kind != _KIND_FLOW:
+            return
+        flow = item.data(
+            0,
+            _ROLE_DATA,
         )
         if not isinstance(flow, dict):
             return
@@ -589,9 +824,27 @@ class ResearchMainWindow(TimelineMainWindow):
             )
             if value
         ]
-        if not action_ids:
-            return
-        action_id = action_ids[0]
+        if action_ids:
+            self._open_action_in_timeline(
+                action_ids[0]
+            )
+
+    def _open_selected_network_timeline(
+        self,
+    ) -> None:
+        action_id = str(
+            self.network_action_select.currentData()
+            or ""
+        )
+        if action_id:
+            self._open_action_in_timeline(
+                action_id
+            )
+
+    def _open_action_in_timeline(
+        self,
+        action_id: str,
+    ) -> None:
         archive = str(
             getattr(
                 self,
@@ -645,25 +898,170 @@ class ResearchMainWindow(TimelineMainWindow):
                 pending_action_id
             )
 
-    def _show_network_details(self) -> None:
-        row = self.network_table.currentRow()
-        if row < 0:
-            self.network_details.clear()
-            return
-        item = self.network_table.item(row, 0)
-        flow = (
-            item.data(Qt.ItemDataRole.UserRole)
-            if item is not None
-            else None
-        )
-        if not isinstance(flow, dict):
-            self.network_details.clear()
-            return
-        self.network_details.setPlainText(
-            json.dumps(
-                flow,
-                ensure_ascii=False,
-                indent=2,
-                sort_keys=True,
+    def _selected_network_data(
+        self,
+    ) -> tuple[
+        str,
+        dict[str, Any] | None,
+    ]:
+        item = self.network_tree.currentItem()
+        if item is None:
+            return "", None
+        kind = str(
+            item.data(
+                0,
+                _ROLE_KIND,
             )
+            or ""
+        )
+        value = item.data(
+            0,
+            _ROLE_DATA,
+        )
+        return (
+            kind,
+            value
+            if isinstance(value, dict)
+            else None,
+        )
+
+    def _show_network_details(self) -> None:
+        kind, value = (
+            self._selected_network_data()
+        )
+        self.network_action_select.clear()
+        self.network_action_select.setEnabled(
+            False
+        )
+        self.network_open_timeline.setEnabled(
+            False
+        )
+        if value is None:
+            self.network_details.clear()
+            return
+
+        action_index = getattr(
+            self,
+            "_network_action_index",
+            {},
+        )
+        action_ids: list[str] = []
+        if kind == _KIND_FLOW:
+            self.network_details.setPlainText(
+                format_flow_details(
+                    value,
+                    action_index,
+                )
+            )
+            action_ids = [
+                str(item)
+                for item in (
+                    value.get(
+                        "correlated_action_ids"
+                    )
+                    or []
+                )
+                if item
+            ]
+        elif kind == _KIND_HOST:
+            flows = [
+                item
+                for item in (
+                    value.get("flows") or []
+                )
+                if isinstance(
+                    item,
+                    dict,
+                )
+            ]
+            summary = summarize_flows(
+                flows
+            )
+            action_ids = [
+                str(item)
+                for item in (
+                    summary.get(
+                        "action_ids"
+                    )
+                    or []
+                )
+                if item
+            ]
+            confidence = (
+                _confidence_text(
+                    summary
+                )
+            )
+            details = [
+                f"Хост: {value.get('host') or 'unknown-host'}",
+                "",
+                "Сводка",
+                (
+                    f"  Соединений: "
+                    f"{summary.get('flow_count') or 0}"
+                ),
+                (
+                    f"  Протоколы: "
+                    f"{' + '.join(summary.get('protocols') or []) or '—'}"
+                ),
+                (
+                    f"  Owner: "
+                    f"{summary.get('owner_text') or 'Unknown'}"
+                ),
+                (
+                    f"  Confidence: {confidence}"
+                ),
+                (
+                    f"  Трафик: "
+                    f"↑ {size_text(int(summary.get('outbound_bytes') or 0))}"
+                    f"  ↓ {size_text(int(summary.get('inbound_bytes') or 0))}"
+                ),
+                (
+                    f"  Пакеты: "
+                    f"{int(summary.get('packet_count') or 0)}"
+                ),
+                (
+                    f"  Remote IP: "
+                    f"{', '.join(summary.get('remote_ips') or []) or '—'}"
+                ),
+                "",
+                "Timeline",
+                (
+                    f"  Связанных действий: "
+                    f"{len(action_ids)}"
+                ),
+            ]
+            for action_id in action_ids:
+                details.append(
+                    "  • "
+                    + action_label(
+                        action_id,
+                        action_index,
+                    )
+                )
+            if not action_ids:
+                details.append(
+                    "  В temporal window действий не найдено."
+                )
+            self.network_details.setPlainText(
+                "\n".join(details)
+            )
+        else:
+            self.network_details.clear()
+            return
+
+        for action_id in action_ids:
+            self.network_action_select.addItem(
+                action_label(
+                    action_id,
+                    action_index,
+                ),
+                action_id,
+            )
+        enabled = bool(action_ids)
+        self.network_action_select.setEnabled(
+            enabled
+        )
+        self.network_open_timeline.setEnabled(
+            enabled
         )
