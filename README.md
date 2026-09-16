@@ -1,5 +1,11 @@
 # Mobile Research
 
+## v0.10.4 — Immediate clean-start boundary
+
+Реальный v0.10.3 архив показал, что визуальный task transition уже скрыт корректно, но сам verified clean restart начинался слишком поздно: примерно через 7 секунд после создания сессии. Из них около 5.3 секунды занимал полный Device/Package Metadata snapshot до arm collectors. Из-за этого пользователь видел неожиданную «перезагрузку» уже через несколько секунд после нажатия «Начать исследование».
+
+v0.10.4 меняет порядок без ослабления evidence. Быстрые network/socket preflight выполняются первыми, затем сразу arm'ятся logcat/screen/PCAP/socket attribution и выполняется verified clean restart. Только после `package_launched` собирается тяжёлый Device/Package Metadata snapshot и выполняется clock calibration. RAW collectors уже работают до cold start и непрерывно покрывают весь запуск; metadata остаётся обязательным evidence, но больше не задерживает сам clean-start boundary.
+
 ## v0.10.3 — Stable operator preview during verified cold start
 
 Реальный Windows-тест v0.10.2 подтвердил `LaunchState: COLD`, но raw screen-video показал оставшийся системный close-transition старой Activity. Это неизбежная часть настоящего `force-stop`: после уничтожения окна исследуемого процесса Android физически не может продолжать показывать его как live surface. `FLAG_ACTIVITY_NO_ANIMATION` относится к запуску новой Activity и не отменяет уже инициированный stop/task transition.
