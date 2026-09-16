@@ -18,7 +18,5 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run complete product rename
-        run: python tools/one_shot_rename_to_apk_research.py
-
-# split migration: workflows are updated separately via connector
+      - name: Rename uppercase environment namespace
+        run: python tools/one_shot_uppercase_rename.py
