@@ -24,7 +24,7 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install Mobile Research
+      - name: Install apk-research
         run: python -m pip install -e ".[dev,transport]"
 
       - name: Install Android SDK components
@@ -53,7 +53,7 @@ jobs:
           mkdir -p "$ANDROID_AVD_HOME"
           AVDMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name avdmanager | sort | tail -n 1)"
           test -n "$AVDMANAGER"
-          echo no | "$AVDMANAGER" create avd --force --name mobile_research_api35 --package "system-images;android-35;default;x86_64"
+          echo no | "$AVDMANAGER" create avd --force --name apk_research_api35 --package "system-images;android-35;default;x86_64"
           "$ANDROID_HOME/emulator/emulator" -list-avds
           find "$ANDROID_AVD_HOME" -maxdepth 2 -type f -print
 
@@ -61,7 +61,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          nohup "$ANDROID_HOME/emulator/emulator"             @mobile_research_api35             -port 5554             -no-window             -gpu auto             -grpc 8554             -no-snapshot             -noaudio             -no-boot-anim             -wipe-data             > emulator.log 2>&1 &
+          nohup "$ANDROID_HOME/emulator/emulator"             @apk_research_api35             -port 5554             -no-window             -gpu auto             -grpc 8554             -no-snapshot             -noaudio             -no-boot-anim             -wipe-data             > emulator.log 2>&1 &
           echo $! > emulator.pid
 
           sleep 5
@@ -125,7 +125,7 @@ jobs:
         run: python tools/acceptance_avd.py
 
       - name: Verify generated Research ZIP again
-        run: python -m mobile_research research-zip-verify acceptance-output/mobile-research-acceptance.research.zip --json
+        run: python -m apk_research research-zip-verify acceptance-output/apk-research-acceptance.research.zip --json
 
       - name: Stop emulator
         if: always()
