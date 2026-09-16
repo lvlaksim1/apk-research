@@ -70,6 +70,7 @@ ScreenFactory = Callable[
     CollectorLike,
 ]
 Exporter = Callable[..., ExportResult]
+EventObserver = Callable[[dict[str, object]], None]
 
 
 class OrchestratorError(RuntimeError):
@@ -245,6 +246,7 @@ class ResearchOrchestrator:
         attribution_factory: AttributionFactory = _attribution_factory,
         exporter: Exporter = export_research_zip,
         launch_mode: str = "continue",
+        event_observer: EventObserver | None = None,
     ) -> None:
         self.adb = adb
         self.serial = serial.strip()
@@ -269,6 +271,7 @@ class ResearchOrchestrator:
                 "launch_mode must be 'clean' or 'continue'"
             )
         self.launch_mode = launch_mode
+        self.event_observer = event_observer
 
         self.session: SessionManager | None = None
         self.logcat: CollectorLike | None = None
@@ -929,6 +932,14 @@ class ResearchOrchestrator:
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
+
+        observer = self.event_observer
+        if observer is not None:
+            try:
+                observer(dict(value))
+            except Exception:
+                # UI/presentation observers must never alter evidence capture.
+                pass
 
     def _write_launch_output(self, output: str) -> None:
         session = self._require_session()

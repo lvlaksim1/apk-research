@@ -438,6 +438,7 @@ def test_clean_launch_uses_single_restart_transaction_after_collectors(
     tmp_path: Path,
 ) -> None:
     adb = FakeAdb()
+    observed_events: list[dict[str, object]] = []
 
     orchestrator = ResearchOrchestrator(
         adb,  # type: ignore[arg-type]
@@ -446,6 +447,7 @@ def test_clean_launch_uses_single_restart_transaction_after_collectors(
         runtime_root=tmp_path / "sessions-clean",
         output_path=tmp_path / "clean.research.zip",
         launch_mode="clean",
+        event_observer=observed_events.append,
         metadata_factory=lambda a, s: FakeMetadata(a, s),
         logcat_factory=lambda a, s: FakeContinuous(
             "logcat", s, order=adb.order
@@ -489,6 +491,13 @@ def test_clean_launch_uses_single_restart_transaction_after_collectors(
     assert events.index("package_launch_requested") < events.index(
         "package_launched"
     )
+    observed_names = [
+        str(item.get("event") or "")
+        for item in observed_events
+    ]
+    assert observed_names.index(
+        "package_clean_restart_requested"
+    ) < observed_names.index("package_launched")
 
 def test_clean_launch_rejects_reused_activity_instance(
     tmp_path: Path,

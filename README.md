@@ -1,5 +1,11 @@
 # Mobile Research
 
+## v0.10.3 — Stable operator preview during verified cold start
+
+Реальный Windows-тест v0.10.2 подтвердил `LaunchState: COLD`, но raw screen-video показал оставшийся системный close-transition старой Activity. Это неизбежная часть настоящего `force-stop`: после уничтожения окна исследуемого процесса Android физически не может продолжать показывать его как live surface. `FLAG_ACTIVITY_NO_ANIMATION` относится к запуску новой Activity и не отменяет уже инициированный stop/task transition.
+
+v0.10.3 разделяет две плоскости. Forensic evidence остаётся полностью честным: Android `screenrecord`, logcat и PCAP непрерывно фиксируют stop → splash → cold start. Операторский gRPC/MMAP preview во время короткой clean-restart границы удерживает последний опубликованный кадр и сразу после подтверждённого `package_launched` переключается на свежий framebuffer. Android animation scales не меняются, приложение/AVD не модифицируются и evidence не фильтруется.
+
 ## v0.10.2 — Seamless clean launch
 
 Реальный Windows-тест выявил видимый Android task transition в режиме «Чистый запуск»: после arm collectors Mobile Research выполняла отдельные host round-trips `force-stop → pidof verification → am start`, поэтому на встроенном экране успевал появиться Launcher и проигрывались close/open-анимации.

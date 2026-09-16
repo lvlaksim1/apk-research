@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.10.2 — Clean-launch transition hardening on the validated single-path runtime.
+**Этап:** v0.10.3 — Operator-preview isolation during verified clean launch.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -376,4 +376,7 @@ A real Windows v0.10.0 Research ZIP showed valid target-UID socket observations 
 
 ### ADR-101 — Clean restart is one Android-side stop/start transaction
 A real v0.10.1 Windows archive showed that clean mode was forensically correct but visually noisy: after collectors were armed, separate host commands `am force-stop`, repeated `pidof` verification and a later `am start -W` let Launcher become a visible intermediate task and Android played close/open transitions. v0.10.2 keeps the ADR-087 boundary after collectors, but collapses stop and start into one Android shell transaction with no host polling gap and applies `FLAG_ACTIVITY_NO_ANIMATION` to the new Activity. The clean invariant is verified from the launch result itself: `LaunchState: COLD` is mandatory and existing-instance reuse is forbidden. Real AVD acceptance prewarms the package before the research session and requires the exported launch evidence to prove COLD start.
+
+### ADR-102 — Operator preview may hold a frame; forensic screen evidence may not
+A real Windows v0.10.2 Research ZIP proved both facts at once: the launch was a valid `COLD` start, and Android still rendered the outgoing task transition produced by destroying the old package window. Those requirements cannot both be removed inside Android: a force-stopped process has no live surface to keep displaying. v0.10.3 therefore separates presentation from evidence. The canonical raw `screenrecord` collector remains continuous and records the actual stop/splash/cold-start sequence. Only the desktop gRPC/MMAP operator preview holds its last already-published frame from `package_clean_restart_requested` until `package_launched`, while the underlying framebuffer stream continues collecting fresh frames. No Android animation scale, task policy or application setting is changed. Presentation callbacks are best-effort observers and are forbidden from affecting orchestrator/evidence lifecycle.
 

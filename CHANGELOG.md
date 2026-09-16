@@ -2,6 +2,18 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.10.3] - 2026-09-16
+
+### Clean-start operator preview isolation
+
+- Real v0.10.2 evidence confirmed a genuine `LaunchState: COLD` but also proved that Android still renders the old task's close transition when `force-stop` destroys its window.
+- Keeps the Android clean-start semantics and raw screen evidence unchanged.
+- Adds a non-blocking orchestrator event observer used only by the desktop presentation layer.
+- During `package_clean_restart_requested → package_launched`, the embedded gRPC/MMAP operator preview holds the last already-published frame while the framebuffer stream continues receiving fresh frames in the background.
+- Raw Android `screenrecord`, logcat, PCAP and socket attribution continue uninterrupted and retain the actual cold-start transition.
+- No global/window/transition animation scales are changed; the research Android environment remains semantically unchanged.
+- Adds regression tests proving intermediate live-preview frames are not published while the raw stream remains active.
+
 ## [0.10.2] - 2026-09-16
 
 ### Seamless clean launch

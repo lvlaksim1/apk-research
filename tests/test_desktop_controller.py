@@ -223,3 +223,45 @@ def test_wheel_swipe_is_recorded_as_user_action(
     assert recorded[0]["details"]["duration_ms"] == 220
     controller.close()
 
+
+def test_clean_restart_holds_operator_preview_only() -> None:
+    controller = DesktopController()
+    frames: list[object] = []
+    logs: list[str] = []
+    controller.screenFrame.connect(frames.append)
+    controller.log.connect(logs.append)
+
+    first = object()
+    intermediate = object()
+    restarted = object()
+
+    with controller._frame_lock:
+        controller._latest_frame = first
+        controller._latest_frame_id = 1
+    controller._publish_latest_frame()
+    assert frames == [first]
+
+    controller._on_orchestrator_event(
+        {"event": "package_clean_restart_requested"}
+    )
+    with controller._frame_lock:
+        controller._latest_frame = intermediate
+        controller._latest_frame_id = 2
+    controller._publish_latest_frame()
+    assert frames == [first]
+
+    with controller._frame_lock:
+        controller._latest_frame = restarted
+        controller._latest_frame_id = 3
+    controller._on_orchestrator_event(
+        {"event": "package_launched"}
+    )
+    controller._publish_latest_frame()
+
+    assert frames == [first, restarted]
+    assert any(
+        "RAW screenrecord" in message
+        for message in logs
+    )
+    controller.close()
+

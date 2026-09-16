@@ -1,16 +1,16 @@
-# Mobile Research v0.10.2
+# Mobile Research v0.10.3
 
-v0.10.2 fixes the visible minimize/reopen transition reported on real Windows hardware when starting research in «Чистый запуск» mode.
+v0.10.3 removes the visible «свернулось → развернулось» effect from the embedded operator view during a verified clean launch without changing the Android research environment or hiding evidence from the Research ZIP.
 
 ## Changes
 
-- Clean mode no longer performs separate host-side `force-stop`, process polling and later Activity launch commands.
-- The stop and cold start are issued in one Android shell transaction immediately after all collectors are armed.
-- The launched Activity carries `FLAG_ACTIVITY_NO_ANIMATION`, suppressing the redundant task entrance animation without changing application-internal animations.
-- Clean launch is accepted only when Android `am start -W` reports `LaunchState: COLD`; reuse or WARM/HOT launch fails the invariant.
-- Real AVD acceptance first prewarms the target package and then verifies that the exported Research ZIP records a COLD launch.
-- «Продолжить текущее состояние» behavior is unchanged.
-- Package-aware PID/socket attribution from v0.10.1 is unchanged.
-- Installer asset: `MobileResearchSetup_v0.10.2.exe`.
+- Keeps the same true clean start: collectors are armed first and Android must report `LaunchState: COLD`.
+- The gRPC/MMAP operator preview temporarily holds the last published frame only while the target package is being force-stopped and cold-started.
+- The underlying framebuffer stream continues running; fresh frames are retained and the preview resumes immediately after `package_launched`.
+- Raw Android `screenrecord` is not frozen or edited. It still records the real stop/task transition, splash screen and cold-start sequence.
+- Logcat, PCAP, socket attribution and Timeline capture remain continuous.
+- Android animation scales are not modified.
+- Continue-current-state mode is unchanged.
+- Installer asset: `MobileResearchSetup_v0.10.3.exe`.
 
-The clean-launch boundary remains after collector startup, so raw screen/logcat/PCAP evidence still covers the cold-start itself.
+This establishes a strict separation between forensic evidence and the operator presentation surface.

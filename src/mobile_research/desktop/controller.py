@@ -79,6 +79,7 @@ class DesktopController(QObject):
         self._latest_frame = None
         self._latest_frame_id = 0
         self._published_frame_id = 0
+        self._screen_presentation_hold = False
         self._frame_timer = QTimer(self)
         self._frame_timer.setTimerType(
             Qt.TimerType.PreciseTimer
@@ -427,6 +428,7 @@ class DesktopController(QObject):
                     if self._clean_launch
                     else "continue"
                 ),
+                event_observer=self._on_orchestrator_event,
             )
             self.orchestrator = orchestrator
             started = orchestrator.start()
@@ -476,6 +478,7 @@ class DesktopController(QObject):
                 )
             self.error.emit(message)
         finally:
+            self._set_screen_presentation_hold(False)
             self.orchestrator = None
             self._set_busy(False)
 
@@ -811,8 +814,37 @@ class DesktopController(QObject):
                 )
                 self._screen_ready.set()
 
+    def _set_screen_presentation_hold(
+        self,
+        value: bool,
+    ) -> bool:
+        with self._frame_lock:
+            previous = self._screen_presentation_hold
+            self._screen_presentation_hold = bool(value)
+        return previous
+
+    def _on_orchestrator_event(
+        self,
+        value: dict[str, object],
+    ) -> None:
+        event = str(value.get("event") or "")
+        if event == "package_clean_restart_requested":
+            self._set_screen_presentation_hold(True)
+            self.log.emit(
+                "Чистый запуск: live preview удерживает последний кадр; "
+                "RAW screenrecord продолжает запись."
+            )
+            return
+        if event == "package_launched":
+            if self._set_screen_presentation_hold(False):
+                self.log.emit(
+                    "Чистый запуск завершён: live preview снова в реальном времени."
+                )
+
     def _publish_latest_frame(self) -> None:
         with self._frame_lock:
+            if self._screen_presentation_hold:
+                return
             if (
                 self._latest_frame is None
                 or self._latest_frame_id
