@@ -46,7 +46,12 @@ class AttributionCollectorLike(CollectorLike, Protocol):
 
 
 class MetadataCollectorLike(Protocol):
-    def collect(self) -> Any: ...
+    def collect(
+        self,
+        *,
+        defer_package_dump: bool = False,
+    ) -> Any: ...
+    def capture_deferred_package_dump(self) -> bool: ...
 
 
 MetadataFactory = Callable[
@@ -274,6 +279,7 @@ class ResearchOrchestrator:
         self.event_observer = event_observer
 
         self.session: SessionManager | None = None
+        self.metadata: MetadataCollectorLike | None = None
         self.logcat: CollectorLike | None = None
         self.screen: CollectorLike | None = None
         self.network: NetworkCollectorLike | None = None
@@ -324,8 +330,16 @@ class ResearchOrchestrator:
                 self.adb,
                 self.session,
             )
-            metadata.collect()
-            self._event("device_metadata_completed")
+            self.metadata = metadata
+            metadata.collect(
+                defer_package_dump=True,
+            )
+            self._event(
+                "device_metadata_completed",
+                details={
+                    "package_dump": "deferred-until-stop",
+                },
+            )
 
             self.network = self.network_factory(
                 self.adb,
@@ -751,6 +765,32 @@ class ResearchOrchestrator:
             )
 
         self._stop_started_collectors()
+
+        if (
+            session.status == SessionStatus.STOPPING
+            and self.metadata is not None
+        ):
+            try:
+                package_dump_complete = (
+                    self.metadata.capture_deferred_package_dump()
+                )
+                self._event(
+                    "package_dump_deferred_completed",
+                    details={
+                        "complete": package_dump_complete,
+                    },
+                )
+            except Exception as exc:
+                self._event(
+                    "package_dump_deferred_failed",
+                    details={
+                        "error": (
+                            str(exc)
+                            or exc.__class__.__name__
+                        ),
+                        "required_for_complete_session": False,
+                    },
+                )
 
         if session.status == SessionStatus.STOPPING:
             session.finish()
