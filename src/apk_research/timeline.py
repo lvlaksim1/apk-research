@@ -732,6 +732,7 @@ def _read_pcap(
 
     packets: list[dict[str, Any]] = []
     captured_bytes = 0
+    packet_index = 0
     quic_contexts: dict[tuple[Any, ...], QuicFlowInspector] = {}
     with handle:
         endian, scale, linktype = _pcap_header(
@@ -745,6 +746,7 @@ def _read_pcap(
             }
 
         while True:
+            record_offset = handle.tell()
             record = handle.read(16)
             if not record:
                 break
@@ -765,6 +767,7 @@ def _read_pcap(
             if len(payload) != included:
                 break
 
+            packet_index += 1
             epoch = (
                 seconds
                 + fraction / scale
@@ -787,6 +790,8 @@ def _read_pcap(
             value: dict[str, Any] = {
                 "epoch": epoch,
                 "target_utc": _iso_epoch(epoch),
+                "pcap_packet_index": packet_index,
+                "pcap_record_offset": record_offset,
                 "captured_length": included,
                 "original_length": original,
                 "direction": direction,
