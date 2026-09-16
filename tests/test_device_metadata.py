@@ -398,3 +398,80 @@ def test_package_dump_failure_degrades_but_does_not_abort_metadata(
     ).read_text(encoding="utf-8").startswith(
         "package:com.example.app versionCode:123"
     )
+
+
+def test_package_dump_can_be_deferred_until_stop(
+    tmp_path: Path,
+) -> None:
+    session = create_session(tmp_path)
+    adb = FakeAdb()
+    collector = DeviceMetadataCollector(
+        adb,
+        session,
+        clock=TestClock(),
+    )
+
+    result = collector.collect(
+        defer_package_dump=True,
+    )
+
+    assert result.status == "completed"
+    assert adb.captured_commands == []
+
+    package_path = (
+        session.paths.raw_device
+        / "package.txt"
+    )
+    assert package_path.read_text(
+        encoding="utf-8"
+    ).startswith("PACKAGE DUMP DEFERRED")
+
+    normalized_path = (
+        session.paths.normalized_dir
+        / "target.json"
+    )
+    normalized = json.loads(
+        normalized_path.read_text(
+            encoding="utf-8"
+        )
+    )
+    assert (
+        normalized["package_dump"]["method"]
+        == "deferred-until-stop"
+    )
+    assert normalized["package"]["version_code"] == "123"
+
+    complete = (
+        collector.capture_deferred_package_dump()
+    )
+
+    assert complete is True
+    assert adb.captured_commands == [
+        (
+            "cmd",
+            "package",
+            "dump",
+            "com.example.app",
+        )
+    ]
+    assert package_path.read_text(
+        encoding="utf-8"
+    ).startswith("Packages:")
+
+    normalized = json.loads(
+        normalized_path.read_text(
+            encoding="utf-8"
+        )
+    )
+    assert normalized["package_dump"]["complete"] is True
+    assert (
+        normalized["package_dump"]["method"]
+        == "cmd-package-dump"
+    )
+    assert (
+        normalized["package_dump"]["capture_phase"]
+        == "session-stop"
+    )
+    assert normalized["package"]["version_name"] == "1.2.3"
+
+
