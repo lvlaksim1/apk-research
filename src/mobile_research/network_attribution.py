@@ -697,6 +697,13 @@ def _canonical_connection_key(
     return protocol, left, right
 
 
+def canonical_connection_key(
+    packet: dict[str, Any],
+) -> tuple[Any, ...] | None:
+    """Public stable identity used by Timeline and Network Analyzer."""
+    return _canonical_connection_key(packet)
+
+
 def _packet_orientation(
     packet: dict[str, Any],
     owner: dict[str, Any],
@@ -765,6 +772,10 @@ def build_flow_inventory(
     """
 
     flows: dict[tuple[Any, ...], dict[str, Any]] = {}
+    non_tcp_udp_packet_count = 0
+    non_tcp_udp_bytes = 0
+    non_tcp_udp_protocol_counts: dict[str, int] = {}
+    unresolved_transport_packet_count = 0
 
     for packet in packets:
         try:
@@ -772,8 +783,28 @@ def build_flow_inventory(
         except (KeyError, TypeError, ValueError):
             continue
 
+        protocol = str(
+            packet.get("protocol") or ""
+        ).lower()
+        length = int(
+            packet.get("captured_length") or 0
+        )
+        if protocol not in {"tcp", "udp"}:
+            non_tcp_udp_packet_count += 1
+            non_tcp_udp_bytes += length
+            label = protocol or "unknown"
+            non_tcp_udp_protocol_counts[label] = (
+                non_tcp_udp_protocol_counts.get(
+                    label,
+                    0,
+                )
+                + 1
+            )
+            continue
+
         key = _canonical_connection_key(packet)
         if key is None:
+            unresolved_transport_packet_count += 1
             continue
 
         owner = index.attribute_packet(packet)
@@ -873,9 +904,6 @@ def build_flow_inventory(
                     else None
                 )
 
-        length = int(
-            packet.get("captured_length") or 0
-        )
         current["packet_count"] += 1
         current["captured_bytes"] += length
         current[
@@ -1008,6 +1036,25 @@ def build_flow_inventory(
             ),
             "inbound_bytes": (
                 total_inbound_bytes
+            ),
+            "source_packet_count": len(packets),
+            "flow_packet_count": sum(
+                int(item.get("packet_count") or 0)
+                for item in values
+            ),
+            "non_tcp_udp_packet_count": (
+                non_tcp_udp_packet_count
+            ),
+            "non_tcp_udp_bytes": (
+                non_tcp_udp_bytes
+            ),
+            "non_tcp_udp_protocol_counts": dict(
+                sorted(
+                    non_tcp_udp_protocol_counts.items()
+                )
+            ),
+            "unresolved_transport_packet_count": (
+                unresolved_transport_packet_count
             ),
         },
         "flows": values,
