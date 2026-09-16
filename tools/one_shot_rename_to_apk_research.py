@@ -1,9 +1,7 @@
 from pathlib import Path
-import re
 import subprocess
 
 root = Path('.')
-workflow = root / '.github/workflows/rename-to-apk-research.yml'
 script_file = root / 'tools/one_shot_rename_to_apk_research.py'
 
 replacements = [
@@ -15,8 +13,13 @@ replacements = [
 ]
 
 skip_dirs = {'.git', '.venv', 'venv', '__pycache__', 'dist', 'build', 'installer'}
+
+def is_workflow(path: Path) -> bool:
+    parts = path.parts
+    return len(parts) >= 2 and parts[0] == '.github' and parts[1] == 'workflows'
+
 for path in list(root.rglob('*')):
-    if not path.is_file():
+    if not path.is_file() or is_workflow(path):
         continue
     if any(part in skip_dirs for part in path.parts):
         continue
@@ -40,39 +43,28 @@ for old, new in rename_pairs:
         new.parent.mkdir(parents=True, exist_ok=True)
         old.rename(new)
 
-pyproject = Path('pyproject.toml')
-text = pyproject.read_text(encoding='utf-8')
-text = re.sub(r'(?m)^version = "0\.14\.0"$', 'version = "0.15.0"', text, count=1)
-pyproject.write_text(text, encoding='utf-8', newline='\n')
-
-init_file = Path('src/apk_research/__init__.py')
-text = init_file.read_text(encoding='utf-8')
-text = text.replace('__version__ = "0.14.0"', '__version__ = "0.15.0"')
-lines = [line for line in text.splitlines() if not line.startswith('# v0.14.0 ')]
-insert_at = next((i + 1 for i, line in enumerate(lines) if line.startswith('__version__ = ')), len(lines))
-lines.insert(insert_at, '# v0.15.0 completes the product rename to apk-research.')
-init_file.write_text('\n'.join(lines).rstrip() + '\n', encoding='utf-8', newline='\n')
-
 readme = Path('README.md')
 text = readme.read_text(encoding='utf-8')
 marker = '# apk-research\n\n'
 if not text.startswith(marker):
     raise SystemExit('README title was not renamed')
-section = '''## v0.15.0 — Product rename to apk-research
+if '## v0.15.0 — Product rename to apk-research' not in text:
+    section = '''## v0.15.0 — Product rename to apk-research
 
 Начиная с v0.15.0 программа, репозиторий, Python distribution/namespace, GUI, CLI, EXE, installer, release assets, каталоги установки и техническая документация используют единое имя `apk-research`.
 
 Это rename-only release: validated hidden Emulator → gRPC/MMAP runtime, v0.10.5 clean-launch sequencing, collectors, Research ZIP schemas, raw PCAP, attribution, Timeline и Network Analyzer semantics не меняются.
 
 '''
-readme.write_text(marker + section + text[len(marker):], encoding='utf-8', newline='\n')
+    readme.write_text(marker + section + text[len(marker):], encoding='utf-8', newline='\n')
 
 changelog = Path('CHANGELOG.md')
 text = changelog.read_text(encoding='utf-8')
 marker = '# Changelog\n\nAll notable apk-research changes are recorded here.\n\n'
 if not text.startswith(marker):
     raise SystemExit('CHANGELOG header was not renamed')
-section = '''## [0.15.0] - 2026-09-17
+if '## [0.15.0] - 2026-09-17' not in text:
+    section = '''## [0.15.0] - 2026-09-17
 
 ### Product rename
 
@@ -85,12 +77,15 @@ section = '''## [0.15.0] - 2026-09-17
 - Keeps runtime, capture, Research ZIP and evidence semantics unchanged.
 
 '''
-changelog.write_text(marker + section + text[len(marker):], encoding='utf-8', newline='\n')
+    changelog.write_text(marker + section + text[len(marker):], encoding='utf-8', newline='\n')
 
 refactoring = Path('REFACTORING.md')
 text = refactoring.read_text(encoding='utf-8')
 marker = '# Refactoring and Architecture Log\n\n'
-section = '''## v0.15.0 — Product identity: apk-research
+if not text.startswith(marker):
+    raise SystemExit('REFACTORING header missing')
+if '## v0.15.0 — Product identity: apk-research' not in text:
+    section = '''## v0.15.0 — Product identity: apk-research
 
 ### Scope
 
@@ -101,9 +96,7 @@ section = '''## v0.15.0 — Product identity: apk-research
 AppId Inno Setup сохраняется, чтобы v0.15.0 оставался обновлением существующей Windows-установки, а не независимым продуктом. Forensic/runtime architecture не меняется.
 
 '''
-if not text.startswith(marker):
-    raise SystemExit('REFACTORING header missing')
-refactoring.write_text(marker + section + text[len(marker):], encoding='utf-8', newline='\n')
+    refactoring.write_text(marker + section + text[len(marker):], encoding='utf-8', newline='\n')
 
 Path('RELEASE_NOTES.md').write_text('''# apk-research v0.15.0
 
@@ -136,14 +129,15 @@ The Python namespace is `apk_research`. The Windows executable is `apk-research.
 The existing Inno Setup AppId is intentionally preserved for upgrade continuity. No collector, emulator, gRPC/MMAP, clean-launch, PCAP, attribution, Timeline or Research ZIP semantics are changed by this release.
 ''', encoding='utf-8', newline='\n')
 
-for transient in (workflow, script_file):
-    if transient.exists():
-        transient.unlink()
+if script_file.exists():
+    script_file.unlink()
 
 forbidden = ('Mobile Research', 'MobileResearch', 'mobile-research', 'mobile_research')
 offenders = []
 for path in root.rglob('*'):
-    if not path.is_file() or any(part in skip_dirs | {'.git'} for part in path.parts):
+    if not path.is_file() or is_workflow(path):
+        continue
+    if any(part in skip_dirs for part in path.parts):
         continue
     try:
         text = path.read_text(encoding='utf-8')
@@ -153,10 +147,10 @@ for path in root.rglob('*'):
     if hits:
         offenders.append((str(path), hits))
 if offenders:
-    raise SystemExit('Old product name remains: ' + repr(offenders[:100]))
+    raise SystemExit('Old product name remains outside workflows: ' + repr(offenders[:100]))
 
 subprocess.run(['git', 'config', 'user.name', 'github-actions[bot]'], check=True)
 subprocess.run(['git', 'config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com'], check=True)
 subprocess.run(['git', 'add', '-A'], check=True)
-subprocess.run(['git', 'commit', '-m', 'Release apk-research v0.15.0 product rename'], check=True)
+subprocess.run(['git', 'commit', '-m', 'Rename product to apk-research'], check=True)
 subprocess.run(['git', 'push', 'origin', 'HEAD:main'], check=True)
