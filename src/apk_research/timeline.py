@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-from apk_research.quic import inspect_quic_datagram
+from apk_research.quic import QuicInitialTracker
 from apk_research.session import SessionManager
 
 USER_ACTIONS_ARTIFACT = "02_normalized/user-actions.jsonl"
@@ -732,6 +732,7 @@ def _read_pcap(
 
     packets: list[dict[str, Any]] = []
     captured_bytes = 0
+    quic_tracker = QuicInitialTracker()
     with handle:
         endian, scale, linktype = _pcap_header(
             handle
@@ -853,7 +854,7 @@ def _read_pcap(
                     and 443
                     in {src_port, dst_port}
                 ):
-                    quic = inspect_quic_datagram(
+                    quic = quic_tracker.inspect(
                         transport_payload
                     )
                     if quic is not None:
