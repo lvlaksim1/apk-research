@@ -1,39 +1,53 @@
-# Mobile Research v0.12.0
+# Mobile Research v0.13.0
 
-v0.12.0 unifies Research Timeline and Network Analyzer around the same normalized network flow identity.
+v0.13.0 makes Network Analyzer host-oriented and turns the existing normalized flow evidence into a practical investigation view without changing capture semantics.
 
-## Unified flow model
+## Host → Flow analysis
 
-- Research Timeline schema is now `0.4`.
-- Timeline no longer creates separate directional TCP/UDP flow markers.
-- Every Timeline network event references the canonical `flow_id` from `02_normalized/network-flows.json`.
-- User action correlations contain:
-  - `flow_ids` — normalized flows that carried packets inside the temporal window;
-  - `new_flow_ids` — normalized flows whose first packet appeared in that window.
-- Every normalized flow contains `correlated_action_ids` for reverse lookup.
-- Ownership remains evidence-based and correlation remains `temporal-only`; no causal claim is introduced.
+- Network Analyzer now groups connections by host instead of presenting only a flat list of flows.
+- Host identity uses TLS SNI first, DNS query second, and remote IP as a fallback.
+- Each host row summarizes:
+  - flow and packet counts;
+  - TCP/UDP protocols;
+  - owner/package state;
+  - confidence breakdown;
+  - remote IPs;
+  - upload/download bytes;
+  - linked Timeline actions.
+- Expanding a host exposes the original normalized bidirectional flows.
 
-## Network coverage accounting
+## Human-readable flow evidence
 
-`network-flows.json` summary now explicitly reports:
+Selecting a flow now shows a readable evidence card instead of raw JSON only:
 
-- total source packet count;
-- packets represented in TCP/UDP normalized flows;
-- non-TCP/UDP packet count and captured bytes;
-- non-TCP/UDP protocol counts;
-- unresolved TCP/UDP packet count.
+- protocol and local/remote endpoints;
+- first/last timestamps and duration;
+- upload/download packet and byte counters;
+- package owner and confidence;
+- attribution evidence, process, PID and socket inode when available;
+- packet-confidence breakdown;
+- DNS and TLS SNI evidence;
+- correlated Timeline actions.
 
-Timeline summary exposes `network_flows` and `network_non_tcp_udp_packets`.
+## Timeline navigation
 
-## GUI navigation
+- Network Analyzer loads Timeline actions together with network flows.
+- Linked actions are listed explicitly and can be selected.
+- The **Открыть в Timeline** action jumps to the selected Timeline event.
+- Double-clicking a flow opens its first linked action.
+- Existing Timeline → Network navigation continues to use the same canonical `flow_id`.
 
-- Double-click a Timeline action or network-flow row to open the referenced flow in Network Analyzer.
-- Double-click a Network Analyzer flow with linked actions to jump back to the first matching Timeline action.
-- Network Analyzer summary shows non-TCP/UDP packets explicitly.
+## Search and filtering
 
-## Compatibility
+- Existing owner and TCP/UDP filters are retained.
+- Free-text search now covers host/IP/process/DNS/SNI/flow identity and correlated action IDs.
+- Host grouping is presentation-only; filtering never rewrites evidence.
+
+## Forensic compatibility
 
 - Raw PCAP remains the source of truth.
-- v0.11 flow schema `0.2` remains the normalized connection format.
-- The validated v0.10.5 clean-launch/runtime path is unchanged.
-- Installer asset: `MobileResearchSetup_v0.12.0.exe`.
+- `network-flows.json` remains schema `0.2`.
+- Research Timeline remains schema `0.4`.
+- Ownership confidence and `temporal-only` correlation semantics are unchanged.
+- The validated v0.10.5 clean-launch and hidden Emulator → gRPC/MMAP runtime path are unchanged.
+- Installer asset: `MobileResearchSetup_v0.13.0.exe`.

@@ -2,6 +2,20 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.13.0] - 2026-09-17
+
+### Host-oriented Network Analyzer
+
+- Replaces the flat flow table with a hierarchical Host → Flow tree while preserving canonical normalized flow records.
+- Groups flows by TLS SNI, then DNS query, then remote IP when no hostname evidence is available.
+- Adds host-level aggregate traffic, packet, protocol, owner, confidence, remote-IP and Timeline-action summaries.
+- Adds a dedicated presentation/view-model layer with regression tests for grouping, filtering, mixed ownership and readable evidence rendering.
+- Loads Timeline actions alongside Network Analyzer data and resolves `correlated_action_ids` into readable action labels.
+- Replaces raw JSON-only flow details with a human-readable evidence card containing endpoints, duration, traffic, owner confidence/evidence, process/PID/socket inode, DNS/SNI and Timeline links.
+- Adds explicit selection of linked Timeline actions plus Network → Timeline navigation; Timeline → Network canonical flow navigation remains intact.
+- Extends free-text search to action IDs.
+- Keeps Research ZIP schemas, raw PCAP, attribution semantics, Timeline schema 0.4 and the validated v0.10.5 startup/runtime path unchanged.
+
 ## [0.12.0] - 2026-09-16
 
 ### Unified Timeline / Network model

@@ -1,5 +1,15 @@
 # Mobile Research
 
+## v0.13.0 — Host-oriented Network Analyzer
+
+v0.13.0 переводит Network Analyzer с плоского списка соединений на исследовательскую модель `Host → Flow → Timeline`. Верхний уровень дерева группирует normalized flows по лучшему доступному имени узла: TLS SNI, затем DNS query, затем remote IP.
+
+Для каждого host отображается агрегированная сводка: число соединений и пакетов, TCP/UDP, owner, confidence breakdown, remote IP, суммарный входящий/исходящий трафик и связанные user actions. Раскрытие host показывает исходные normalized flows без изменения evidence.
+
+Для выбранного flow вместо сырого JSON показывается человекочитаемая карточка с endpoint, временем, длительностью, трафиком, package/process/PID/socket inode evidence, DNS/SNI и связанными Timeline actions. Поиск также учитывает action ID. Переход Network → Timeline поддерживает выбор конкретного связанного действия; обратная навигация Timeline → Network сохраняется.
+
+Формат Research ZIP, raw PCAP, schema `network-flows.json 0.2`, Timeline schema `0.4` и подтверждённый v0.10.5 clean-launch/runtime path не изменяются.
+
 ## v0.12.0 — Unified Timeline ↔ Network flow model
 
 v0.12.0 переводит Research Timeline на ту же нормализованную модель соединений, которую использует Network Analyzer. Timeline schema теперь `0.4`: события `network_flow_started` создаются по `flow_id` из `network-flows.json`, а не по старым directional packet-flow ключам.

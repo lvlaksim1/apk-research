@@ -1,6 +1,6 @@
 """Mobile Research core package."""
 
-__version__ = "0.12.0"
+__version__ = "0.13.0"
 
-# v0.12.0 unifies Timeline and Network Analyzer on normalized flow IDs.
+# v0.13.0 groups normalized flows by host and adds human-readable evidence navigation.
 __all__ = ["__version__"]

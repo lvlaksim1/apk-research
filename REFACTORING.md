@@ -1,5 +1,29 @@
 # Refactoring and Architecture Log
 
+## v0.13.0 — Host-oriented Network Analyzer
+
+### Scope
+
+Этот релиз изменяет только post-capture desktop analysis. Collector lifecycle, Android Emulator gRPC/MMAP runtime, clean-launch sequencing, raw PCAP capture, socket attribution, Research ZIP structure и нормализованные forensic schemas остаются без изменения.
+
+### Network view model
+
+Добавлен отдельный `desktop/network_view_model.py`, который формирует presentation-only модель поверх `02_normalized/network-flows.json`:
+
+- canonical host выбирается в порядке TLS SNI → DNS query → remote IP;
+- bidirectional normalized flows группируются по host без слияния или переписывания исходных flow records;
+- для host вычисляются агрегаты packets/bytes, protocols, owners, confidence counts, remote IP и correlated action IDs;
+- фильтрация остаётся flow-based, а host остаётся видимым, если после фильтрации у него есть хотя бы один matching flow;
+- human-readable detail renderer не заменяет исходный normalized evidence и не вводит новых forensic claims.
+
+### Timeline integration
+
+Network inspection теперь одновременно читает `research-timeline.json`. `correlated_action_ids` отображаются как конкретные действия с временем и типом. Пользователь может выбрать действие и перейти к нему в Timeline. Двойной клик по flow открывает первое связанное действие; переход Timeline → canonical `flow_id` остаётся симметричным.
+
+### Regression boundaries
+
+Нельзя возвращать flat-only Network table как единственный UX, нельзя изменять raw evidence ради удобства GUI и нельзя трактовать temporal correlation как causal attribution. Runtime baseline остаётся hidden Emulator → gRPC/MMAP → AndroidView с persistent `streamInputEvent`; startup baseline остаётся v0.10.5.
+
 Файл фиксирует архитектурные решения, границы и будущие крупные изменения Mobile Research. Это не журнал каждого мелкого коммита.
 
 ## Текущее состояние
