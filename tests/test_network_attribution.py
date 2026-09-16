@@ -277,7 +277,7 @@ def test_refined_timeline_exposes_exact_package_flow_owner(
 
     timeline = build_research_timeline(session)
 
-    assert timeline["schema_version"] == "0.3"
+    assert timeline["schema_version"] == "0.4"
     assert timeline["network_attribution"][
         "packet_counts"
     ]["EXACT"] == 1
@@ -287,6 +287,21 @@ def test_refined_timeline_exposes_exact_package_flow_owner(
     assert flow["owner"]["package"] == PACKAGE
     assert flow["owner"]["confidence"] == "EXACT"
     assert flow["owner"]["inode"] == 55555
+    assert flow["flow_id"] == "flow-000001"
+    assert timeline["summary"]["network_flows"] == 1
+    assert timeline["summary"][
+        "network_non_tcp_udp_packets"
+    ] == 0
+    network_events = [
+        item
+        for item in timeline["events"]
+        if item.get("kind") == "network_flow"
+    ]
+    assert len(network_events) == 1
+    assert (
+        network_events[0]["flow_id"]
+        == "flow-000001"
+    )
 
     inventory = json.loads(
         (root / FLOW_INVENTORY_ARTIFACT).read_text(
@@ -296,6 +311,9 @@ def test_refined_timeline_exposes_exact_package_flow_owner(
     assert inventory["summary"]["flow_count"] == 1
     assert inventory["summary"]["attributed_flow_count"] == 1
     assert inventory["flows"][0]["owner"]["confidence"] == "EXACT"
+    assert inventory["flows"][0][
+        "correlated_action_ids"
+    ] == ["action-000001"]
 
 
 
@@ -392,4 +410,35 @@ def test_flow_inventory_absorbs_early_unknown_into_owned_flow() -> None:
         "MEDIUM": 0,
         "UNKNOWN": 1,
     }
+
+
+def test_flow_inventory_counts_non_tcp_udp_packets() -> None:
+    snapshots, summary = _raw_snapshot()
+    index = SocketAttributionIndex(summary, snapshots)
+    tcp = _packet()
+    tcp["captured_length"] = 100
+    icmp = {
+        "epoch": tcp["epoch"] + 0.01,
+        "protocol": "icmp",
+        "src": "10.0.2.15",
+        "dst": "10.0.2.2",
+        "captured_length": 84,
+    }
+
+    inventory = build_flow_inventory(
+        [tcp, icmp],
+        index,
+    )
+
+    summary_value = inventory["summary"]
+    assert summary_value["source_packet_count"] == 2
+    assert summary_value["flow_packet_count"] == 1
+    assert (
+        summary_value["non_tcp_udp_packet_count"]
+        == 1
+    )
+    assert summary_value["non_tcp_udp_bytes"] == 84
+    assert summary_value[
+        "non_tcp_udp_protocol_counts"
+    ] == {"icmp": 1}
 
