@@ -1,6 +1,6 @@
 """Mobile Research core package."""
 
-__version__ = "0.13.0"
+__version__ = "0.14.0"
 
-# v0.13.0 groups normalized flows by host and adds human-readable evidence navigation.
+# v0.14.0 separates service endpoints from DNS-resolution evidence in host intelligence.
 __all__ = ["__version__"]

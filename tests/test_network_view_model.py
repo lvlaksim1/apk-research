@@ -5,8 +5,11 @@ from mobile_research.desktop.network_view_model import (
     build_action_index,
     flow_matches,
     format_flow_details,
+    format_host_details,
     group_flows_by_host,
+    is_dns_resolution_flow,
     summarize_flows,
+    summarize_host_flows,
 )
 
 
@@ -176,3 +179,59 @@ def test_details_are_human_readable_and_include_timeline() -> None:
     assert "Package: com.evrasia" in details
     assert "Связанных действий: 1" in details
     assert "action-000001" in details
+
+
+def test_host_summary_separates_dns_resolver_from_service() -> None:
+    service = _flow(
+        flow_id="flow-service",
+        host="evrasia.spb.ru",
+    )
+    service["remote_ip"] = "217.197.238.66"
+    service["remote_port"] = 443
+    dns = _flow(
+        flow_id="flow-dns",
+        host="evrasia.spb.ru",
+        confidence="UNKNOWN",
+        protocol="udp",
+    )
+    dns["remote_ip"] = "10.0.2.3"
+    dns["remote_port"] = 53
+    dns["tls_sni"] = []
+    dns["dns_queries"] = ["evrasia.spb.ru"]
+
+    assert is_dns_resolution_flow(dns)
+    summary = summarize_host_flows(
+        [dns, service]
+    )
+    assert summary["flow_count"] == 2
+    assert summary["service_flow_count"] == 1
+    assert summary["resolution_flow_count"] == 1
+    assert summary["service_remote_ips"] == [
+        "217.197.238.66"
+    ]
+    assert summary["resolver_ips"] == ["10.0.2.3"]
+    assert summary["service_ports"] == ["443"]
+    assert summary["owner_text"] == "com.evrasia"
+    assert summary["confidence_counts"] == {"EXACT": 1}
+
+
+def test_host_details_explain_resolution_only_evidence() -> None:
+    dns = _flow(
+        flow_id="flow-dns",
+        host="time.google.com",
+        confidence="UNKNOWN",
+        protocol="udp",
+    )
+    dns["remote_ip"] = "10.0.2.3"
+    dns["remote_port"] = 53
+    dns["tls_sni"] = []
+    dns["dns_queries"] = ["time.google.com"]
+
+    details = format_host_details(
+        "time.google.com",
+        [dns],
+        {},
+    )
+    assert "service 0, DNS 1" in details
+    assert "Resolver IP: 10.0.2.3" in details
+    assert "только DNS-разрешение" in details

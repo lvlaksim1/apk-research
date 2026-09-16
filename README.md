@@ -1,5 +1,13 @@
 # Mobile Research
 
+## v0.14.0 — Host Intelligence: Service vs DNS
+
+v0.14.0 уточняет host-oriented Network Analyzer по результату реального v0.13.0 Research ZIP. DNS-resolution flows больше не смешиваются с service endpoints в host-сводке: DNS resolver показывается отдельно, а owner/confidence хоста вычисляются по service flows, если они существуют.
+
+Для каждого host теперь отдельно отображаются service IP/ports, DNS resolver IP, количество service/DNS flows, период активности, суммарный трафик и связанные Timeline actions. Для DNS-only имени интерфейс явно сообщает, что наблюдалось разрешение имени, но отдельный service flow с этим hostname не подтверждён.
+
+Изменение presentation-only: исходные normalized flows, flow_id, raw PCAP, socket attribution, Timeline schema 0.4, Research ZIP и подтверждённый v0.10.5 runtime/clean-launch path не меняются.
+
 ## v0.13.0 — Host-oriented Network Analyzer
 
 v0.13.0 переводит Network Analyzer с плоского списка соединений на исследовательскую модель `Host → Flow → Timeline`. Верхний уровень дерева группирует normalized flows по лучшему доступному имени узла: TLS SNI, затем DNS query, затем remote IP.

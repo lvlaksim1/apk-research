@@ -1,5 +1,25 @@
 # Refactoring and Architecture Log
 
+## v0.14.0 — Host Intelligence: Service vs DNS
+
+### Scope
+
+Релиз исправляет только presentation semantics Network Analyzer после проверки реального v0.13.0 Research ZIP. Capture/runtime и forensic schemas не меняются.
+
+### Host role separation
+
+Host group по-прежнему объединяет DNS evidence и service connections по имени, но теперь внутри presentation model явно разделяются роли:
+
+- DNS resolution flow — TCP/UDP flow с DNS query и портом 53;
+- service flow — остальные flows группы;
+- owner/confidence host-level сводки вычисляются по service flows, если они есть;
+- service remote IP/ports и resolver IP выводятся раздельно;
+- если наблюдалось только DNS-разрешение, UI не выдаёт resolver endpoint за service endpoint и явно сообщает об отсутствии подтверждённого service flow для имени.
+
+### Evidence boundary
+
+Разделение ролей является только derived desktop presentation. network-flows.json, raw PCAP, attribution evidence и canonical flow_id остаются неизменными. DNS query не превращается в доказательство того, что последующий IP-flow принадлежит имени без собственного SNI/DNS-derived host evidence.
+
 ## v0.13.0 — Host-oriented Network Analyzer
 
 ### Scope
@@ -28,7 +48,7 @@ Network inspection теперь одновременно читает `research-
 
 ## Текущее состояние
 
-**Этап:** v0.12.0 — Unified Timeline ↔ Network normalized-flow model.
+**Этап:** v0.14.0 — Host Intelligence: Service vs DNS.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  

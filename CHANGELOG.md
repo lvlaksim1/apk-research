@@ -2,6 +2,19 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.14.0] - 2026-09-17
+
+### Host Intelligence: service endpoints vs DNS resolution
+
+- Separates DNS-resolution flows from service flows inside host-oriented Network Analyzer presentation.
+- Detects DNS-resolution evidence only for TCP/UDP port-53 flows that actually contain DNS queries.
+- Computes host owner/confidence from service flows when available, preventing Unknown DNS resolver traffic from diluting proven app-owned service connections.
+- Shows service remote IP/ports separately from DNS resolver IPs.
+- Adds first/last host activity and explicit service/DNS flow counts to human-readable host details.
+- Marks DNS-only host groups explicitly instead of presenting the resolver endpoint as a confirmed service endpoint.
+- Adds regression coverage based on the real v0.13.0 pattern: app-owned HTTPS flow plus Unknown DNS flow to the emulator resolver.
+- Preserves raw PCAP, normalized flow schema 0.2, canonical flow IDs, Timeline schema 0.4, attribution semantics and the validated v0.10.5 runtime/clean-launch path.
+
 ## [0.13.0] - 2026-09-17
 
 ### Host-oriented Network Analyzer

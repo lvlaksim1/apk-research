@@ -50,6 +50,23 @@ def flow_host(flow: dict[str, Any]) -> str:
     return remote_ip or "unknown-host"
 
 
+def is_dns_resolution_flow(
+    flow: dict[str, Any],
+) -> bool:
+    protocol = str(
+        flow.get("protocol") or ""
+    ).lower()
+    ports = {
+        str(flow.get("local_port") or ""),
+        str(flow.get("remote_port") or ""),
+    }
+    return (
+        protocol in {"tcp", "udp"}
+        and "53" in ports
+        and bool(flow.get("dns_queries"))
+    )
+
+
 def flow_owner(flow: dict[str, Any]) -> str:
     owner = (
         flow.get("owner")
@@ -201,6 +218,74 @@ def summarize_flows(
     }
 
 
+def summarize_host_flows(
+    flows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    all_summary = summarize_flows(flows)
+    resolution_flows = [
+        flow
+        for flow in flows
+        if is_dns_resolution_flow(flow)
+    ]
+    service_flows = [
+        flow
+        for flow in flows
+        if not is_dns_resolution_flow(flow)
+    ]
+    ownership_flows = service_flows or flows
+    ownership_summary = summarize_flows(
+        ownership_flows
+    )
+    service_remote_ips = _unique_strings(
+        [
+            flow.get("remote_ip")
+            for flow in service_flows
+        ]
+    )
+    resolver_ips = _unique_strings(
+        [
+            flow.get("remote_ip")
+            for flow in resolution_flows
+        ]
+    )
+    service_ports = sorted(
+        {
+            str(flow.get("remote_port"))
+            for flow in service_flows
+            if flow.get("remote_port")
+            not in {None, ""}
+        }
+    )
+    return {
+        **all_summary,
+        "service_flow_count": len(service_flows),
+        "resolution_flow_count": len(
+            resolution_flows
+        ),
+        "service_remote_ips": service_remote_ips,
+        "resolver_ips": resolver_ips,
+        "service_ports": service_ports,
+        "service_owner_text": ownership_summary[
+            "owner_text"
+        ],
+        "service_best_confidence": (
+            ownership_summary["best_confidence"]
+        ),
+        "service_confidence_counts": (
+            ownership_summary["confidence_counts"]
+        ),
+        "owner_text": ownership_summary[
+            "owner_text"
+        ],
+        "best_confidence": ownership_summary[
+            "best_confidence"
+        ],
+        "confidence_counts": ownership_summary[
+            "confidence_counts"
+        ],
+    }
+
+
 def group_flows_by_host(
     flows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -220,7 +305,7 @@ def group_flows_by_host(
                 or ""
             ),
         )
-        summary = summarize_flows(host_flows)
+        summary = summarize_host_flows(host_flows)
         values.append(
             {
                 "host": host,
@@ -338,6 +423,137 @@ def action_label(
         f"{time_text(when)} • "
         f"{action_name} • {action_id}"
     )
+
+
+def format_host_details(
+    host: str,
+    flows: list[dict[str, Any]],
+    action_index: dict[str, dict[str, Any]],
+) -> str:
+    summary = summarize_host_flows(flows)
+    action_ids = [
+        str(value)
+        for value in summary.get("action_ids") or []
+        if value
+    ]
+    confidence_counts = (
+        summary.get("service_confidence_counts")
+        if isinstance(
+            summary.get("service_confidence_counts"),
+            dict,
+        )
+        else {}
+    )
+    confidence_text = " / ".join(
+        f"{key} {int(confidence_counts.get(key) or 0)}"
+        for key in (
+            "EXACT",
+            "HIGH",
+            "MEDIUM",
+            "UNKNOWN",
+        )
+        if int(confidence_counts.get(key) or 0) > 0
+    ) or "UNKNOWN"
+    service_ips = [
+        str(value)
+        for value in summary.get("service_remote_ips") or []
+        if value
+    ]
+    resolver_ips = [
+        str(value)
+        for value in summary.get("resolver_ips") or []
+        if value
+    ]
+    service_ports = [
+        str(value)
+        for value in summary.get("service_ports") or []
+        if value
+    ]
+    lines = [
+        f"Хост: {host or 'unknown-host'}",
+        "",
+        "Активность",
+        (
+            f"  Период: {summary.get('first_target_utc') or '—'}"
+            f" → {summary.get('last_target_utc') or '—'}"
+        ),
+        (
+            f"  Соединений: {summary.get('flow_count') or 0}"
+            f" (service {summary.get('service_flow_count') or 0}"
+            f", DNS {summary.get('resolution_flow_count') or 0})"
+        ),
+        (
+            f"  Протоколы: "
+            f"{' + '.join(summary.get('protocols') or []) or '—'}"
+        ),
+        (
+            f"  Трафик: "
+            f"↑ {size_text(int(summary.get('outbound_bytes') or 0))}"
+            f"  ↓ {size_text(int(summary.get('inbound_bytes') or 0))}"
+        ),
+        (
+            f"  Пакеты: {int(summary.get('packet_count') or 0)}"
+        ),
+        "",
+        "Service endpoints",
+        (
+            "  Remote IP: "
+            + (", ".join(service_ips) or "—")
+        ),
+        (
+            "  Remote ports: "
+            + (", ".join(service_ports) or "—")
+        ),
+        (
+            f"  Owner: {summary.get('service_owner_text') or 'Unknown'}"
+        ),
+        f"  Confidence: {confidence_text}",
+    ]
+    if resolver_ips or int(
+        summary.get("resolution_flow_count") or 0
+    ):
+        lines.extend(
+            [
+                "",
+                "DNS resolution",
+                (
+                    "  Resolver IP: "
+                    + (", ".join(resolver_ips) or "—")
+                ),
+                (
+                    f"  DNS flows: "
+                    f"{int(summary.get('resolution_flow_count') or 0)}"
+                ),
+            ]
+        )
+    if (
+        int(summary.get("service_flow_count") or 0) == 0
+        and int(summary.get("resolution_flow_count") or 0) > 0
+    ):
+        lines.append(
+            "  Для этого имени наблюдалось только DNS-разрешение; "
+            "service flow с этим именем не подтверждён."
+        )
+    lines.extend(
+        [
+            "",
+            "Timeline",
+            f"  Связанных действий: {len(action_ids)}",
+        ]
+    )
+    for action_id in action_ids:
+        lines.append(
+            "  • "
+            + action_label(
+                action_id,
+                action_index,
+            )
+        )
+    if not action_ids:
+        lines.append(
+            "  В temporal window действий не найдено."
+        )
+    return "\n".join(lines)
 
 
 def format_flow_details(

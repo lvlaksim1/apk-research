@@ -25,9 +25,11 @@ from mobile_research.desktop.network_view_model import (
     flow_matches,
     flow_owner,
     format_flow_details,
+    format_host_details,
     group_flows_by_host,
     size_text,
     summarize_flows,
+    summarize_host_flows,
     time_text,
 )
 from mobile_research.desktop.timeline_window import (
@@ -411,17 +413,28 @@ class ResearchMainWindow(TimelineMainWindow):
         group: dict[str, Any],
         flows: list[dict[str, Any]],
     ) -> None:
-        summary = summarize_flows(flows)
+        summary = summarize_host_flows(flows)
         remote_ips = (
-            summary.get("remote_ips") or []
+            summary.get("service_remote_ips") or []
+        )
+        resolver_ips = (
+            summary.get("resolver_ips") or []
         )
         remote_text = (
             str(remote_ips[0])
             if len(remote_ips) == 1
             else (
-                f"{len(remote_ips)} remote IP"
+                f"{len(remote_ips)} service IP"
                 if remote_ips
-                else "—"
+                else (
+                    "DNS " + str(resolver_ips[0])
+                    if len(resolver_ips) == 1
+                    else (
+                        f"DNS {len(resolver_ips)} resolver IP"
+                        if resolver_ips
+                        else "—"
+                    )
+                )
             )
         )
         values = [
@@ -974,7 +987,7 @@ class ResearchMainWindow(TimelineMainWindow):
                     dict,
                 )
             ]
-            summary = summarize_flows(
+            summary = summarize_host_flows(
                 flows
             )
             action_ids = [
@@ -987,64 +1000,15 @@ class ResearchMainWindow(TimelineMainWindow):
                 )
                 if item
             ]
-            confidence = (
-                _confidence_text(
-                    summary
-                )
-            )
-            details = [
-                f"Хост: {value.get('host') or 'unknown-host'}",
-                "",
-                "Сводка",
-                (
-                    f"  Соединений: "
-                    f"{summary.get('flow_count') or 0}"
-                ),
-                (
-                    f"  Протоколы: "
-                    f"{' + '.join(summary.get('protocols') or []) or '—'}"
-                ),
-                (
-                    f"  Owner: "
-                    f"{summary.get('owner_text') or 'Unknown'}"
-                ),
-                (
-                    f"  Confidence: {confidence}"
-                ),
-                (
-                    f"  Трафик: "
-                    f"↑ {size_text(int(summary.get('outbound_bytes') or 0))}"
-                    f"  ↓ {size_text(int(summary.get('inbound_bytes') or 0))}"
-                ),
-                (
-                    f"  Пакеты: "
-                    f"{int(summary.get('packet_count') or 0)}"
-                ),
-                (
-                    f"  Remote IP: "
-                    f"{', '.join(summary.get('remote_ips') or []) or '—'}"
-                ),
-                "",
-                "Timeline",
-                (
-                    f"  Связанных действий: "
-                    f"{len(action_ids)}"
-                ),
-            ]
-            for action_id in action_ids:
-                details.append(
-                    "  • "
-                    + action_label(
-                        action_id,
-                        action_index,
-                    )
-                )
-            if not action_ids:
-                details.append(
-                    "  В temporal window действий не найдено."
-                )
             self.network_details.setPlainText(
-                "\n".join(details)
+                format_host_details(
+                    str(
+                        value.get("host")
+                        or "unknown-host"
+                    ),
+                    flows,
+                    action_index,
+                )
             )
         else:
             self.network_details.clear()
