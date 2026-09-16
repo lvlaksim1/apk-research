@@ -305,7 +305,7 @@ class ResearchMainWindow(TimelineMainWindow):
                     flow,
                 )
                 item.setData(
-                    Qt.ItemDataRole.UserRole + 1,
+                    int(Qt.ItemDataRole.UserRole) + 1,
                     searchable,
                 )
                 self.network_table.setItem(
