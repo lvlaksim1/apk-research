@@ -190,6 +190,12 @@ class ResearchMainWindow(TimelineMainWindow):
         self.network_table.itemSelectionChanged.connect(
             self._show_network_details
         )
+        self.timeline_table.cellDoubleClicked.connect(
+            self._open_timeline_flow
+        )
+        self.network_table.cellDoubleClicked.connect(
+            self._open_network_timeline
+        )
 
     def _inspect_selected_network(self) -> None:
         path = self._selected_table_path(
@@ -204,6 +210,9 @@ class ResearchMainWindow(TimelineMainWindow):
         data: dict,
     ) -> None:
         self._network_inventory = data
+        self._network_archive = str(
+            data.get("archive") or ""
+        )
         flows = [
             item
             for item in data.get("flows") or []
@@ -225,6 +234,8 @@ class ResearchMainWindow(TimelineMainWindow):
             f"{int(summary.get('flow_count') or len(flows))} flows • "
             f"app {int(summary.get('attributed_flow_count') or 0)} • "
             f"unknown {int(summary.get('unknown_flow_count') or 0)} • "
+            f"non-TCP/UDP "
+            f"{int(summary.get('non_tcp_udp_packet_count') or 0)} pkt • "
             f"↑ {_size_text(int(summary.get('outbound_bytes') or 0))} • "
             f"↓ {_size_text(int(summary.get('inbound_bytes') or 0))}"
         )
@@ -319,6 +330,19 @@ class ResearchMainWindow(TimelineMainWindow):
         self.tabs.setCurrentIndex(
             self.network_tab_index
         )
+        pending_flow_id = str(
+            getattr(
+                self,
+                "_pending_network_flow_id",
+                "",
+            )
+            or ""
+        )
+        if pending_flow_id:
+            self._pending_network_flow_id = ""
+            self._select_network_flow(
+                pending_flow_id
+            )
 
     def _apply_network_filters(self) -> None:
         if not hasattr(self, "network_table"):
@@ -374,7 +398,7 @@ class ResearchMainWindow(TimelineMainWindow):
             searchable = (
                 str(
                     first.data(
-                        Qt.ItemDataRole.UserRole + 1
+                        int(Qt.ItemDataRole.UserRole) + 1
                     )
                     or ""
                 )
@@ -402,6 +426,223 @@ class ResearchMainWindow(TimelineMainWindow):
             )[0]
             self.network_summary.setText(
                 f"{base} • показано {visible}"
+            )
+
+    def _select_network_flow(
+        self,
+        flow_id: str,
+    ) -> bool:
+        for row in range(
+            self.network_table.rowCount()
+        ):
+            item = self.network_table.item(
+                row,
+                0,
+            )
+            flow = (
+                item.data(
+                    Qt.ItemDataRole.UserRole
+                )
+                if item is not None
+                else None
+            )
+            if (
+                isinstance(flow, dict)
+                and str(
+                    flow.get("flow_id") or ""
+                )
+                == flow_id
+            ):
+                self.network_table.setRowHidden(
+                    row,
+                    False,
+                )
+                self.network_table.selectRow(row)
+                self.network_table.scrollToItem(
+                    item
+                )
+                self.tabs.setCurrentIndex(
+                    self.network_tab_index
+                )
+                return True
+        return False
+
+    def _select_timeline_action(
+        self,
+        action_id: str,
+    ) -> bool:
+        for row in range(
+            self.timeline_table.rowCount()
+        ):
+            item = self.timeline_table.item(
+                row,
+                0,
+            )
+            row_data = (
+                item.data(
+                    Qt.ItemDataRole.UserRole
+                )
+                if item is not None
+                else None
+            )
+            if not isinstance(row_data, dict):
+                continue
+            event = row_data.get("event")
+            if (
+                isinstance(event, dict)
+                and str(
+                    event.get("action_id")
+                    or ""
+                )
+                == action_id
+            ):
+                self.timeline_table.selectRow(
+                    row
+                )
+                self.timeline_table.scrollToItem(
+                    item
+                )
+                self.tabs.setCurrentIndex(1)
+                return True
+        return False
+
+    def _open_timeline_flow(
+        self,
+        row: int,
+        column: int,
+    ) -> None:
+        del column
+        item = self.timeline_table.item(
+            row,
+            0,
+        )
+        row_data = (
+            item.data(Qt.ItemDataRole.UserRole)
+            if item is not None
+            else None
+        )
+        if not isinstance(row_data, dict):
+            return
+        flow_ids = [
+            str(value)
+            for value in (
+                row_data.get("flow_ids")
+                or []
+            )
+            if value
+        ]
+        if not flow_ids:
+            return
+        flow_id = flow_ids[0]
+        archive = str(
+            row_data.get("archive") or ""
+        )
+        if (
+            archive
+            and archive
+            == str(
+                getattr(
+                    self,
+                    "_network_archive",
+                    "",
+                )
+                or ""
+            )
+            and self._select_network_flow(
+                flow_id
+            )
+        ):
+            return
+        if not archive:
+            return
+        self._pending_network_flow_id = (
+            flow_id
+        )
+        self.controller.inspect_network(
+            archive
+        )
+
+    def _open_network_timeline(
+        self,
+        row: int,
+        column: int,
+    ) -> None:
+        del column
+        item = self.network_table.item(
+            row,
+            0,
+        )
+        flow = (
+            item.data(Qt.ItemDataRole.UserRole)
+            if item is not None
+            else None
+        )
+        if not isinstance(flow, dict):
+            return
+        action_ids = [
+            str(value)
+            for value in (
+                flow.get(
+                    "correlated_action_ids"
+                )
+                or []
+            )
+            if value
+        ]
+        if not action_ids:
+            return
+        action_id = action_ids[0]
+        archive = str(
+            getattr(
+                self,
+                "_network_archive",
+                "",
+            )
+            or ""
+        )
+        if (
+            archive
+            and archive
+            == str(
+                getattr(
+                    self,
+                    "_timeline_archive",
+                    "",
+                )
+                or ""
+            )
+            and self._select_timeline_action(
+                action_id
+            )
+        ):
+            return
+        if not archive:
+            return
+        self._pending_timeline_action_id = (
+            action_id
+        )
+        self.controller._thread(
+            self._load_refined_timeline,
+            archive,
+        )
+
+    def _on_timeline_ready(
+        self,
+        data: dict,
+    ) -> None:
+        super()._on_timeline_ready(data)
+        pending_action_id = str(
+            getattr(
+                self,
+                "_pending_timeline_action_id",
+                "",
+            )
+            or ""
+        )
+        if pending_action_id:
+            self._pending_timeline_action_id = ""
+            self._select_timeline_action(
+                pending_action_id
             )
 
     def _show_network_details(self) -> None:
