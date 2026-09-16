@@ -1,4 +1,4 @@
-name: One-shot apk-research rename
+name: apk-research rename audit
 
 on:
   push:
@@ -7,16 +7,25 @@ on:
       - '.github/workflows/rename-to-apk-research.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  rename:
+  audit:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Rename uppercase environment namespace
-        run: python tools/one_shot_uppercase_rename.py
+      - name: Verify old product identity is absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -n -I -E 'Mobile Research|MobileResearch|mobile-research|mobile_research|MOBILE_RESEARCH' -- .; then
+            echo 'Old product identity remains in tracked files.'
+            exit 1
+          fi
+          test -d src/apk_research
+          test ! -e src/mobile_research
+          test -f packaging/apk-research.spec
+          test -f packaging/apk-research.iss
+          grep -F 'name = "apk-research"' pyproject.toml
+          grep -F 'apk-research = "apk_research.cli:main"' pyproject.toml
+          echo 'apk-research rename audit passed.'
