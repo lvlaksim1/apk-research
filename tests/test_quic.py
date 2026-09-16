@@ -7,6 +7,7 @@ from apk_research.network_attribution import build_flow_inventory
 from apk_research.quic import (
     QUIC_V1,
     QUIC_V2,
+    QuicInitialTracker,
     derive_initial_keys,
     inspect_quic_datagram,
     parse_tls_client_hello,
@@ -296,3 +297,129 @@ def test_flow_inventory_preserves_quic_intelligence() -> None:
     assert flow[
         "quic_initial_decrypted_packet_count"
     ] == 1
+
+
+
+def _protected_crypto_fragment(
+    fragment: bytes,
+    *,
+    crypto_offset: int,
+    packet_number: int,
+) -> bytes:
+    dcid = bytes.fromhex(
+        "8394c8f03e515708"
+    )
+    keys = derive_initial_keys(
+        QUIC_V1,
+        dcid,
+    )
+    assert keys is not None
+    plaintext = (
+        b"\x06"
+        + _varint(crypto_offset)
+        + _varint(len(fragment))
+        + fragment
+        + b"\x00" * 24
+    )
+    packet_number_bytes = (
+        packet_number.to_bytes(2, "big")
+    )
+    prefix = (
+        b"\xc1"
+        + QUIC_V1.to_bytes(4, "big")
+        + bytes([len(dcid)])
+        + dcid
+        + b"\x00"
+        + _varint(0)
+    )
+    header = (
+        prefix
+        + _varint(
+            len(packet_number_bytes)
+            + len(plaintext)
+            + 16
+        )
+        + packet_number_bytes
+    )
+    nonce = bytes(
+        left ^ right
+        for left, right in zip(
+            keys["iv"],
+            packet_number.to_bytes(
+                12,
+                "big",
+            ),
+        )
+    )
+    ciphertext = AESGCM(
+        keys["key"]
+    ).encrypt(
+        nonce,
+        plaintext,
+        header,
+    )
+    pn_offset = (
+        len(header)
+        - len(packet_number_bytes)
+    )
+    protected = bytearray(
+        header + ciphertext
+    )
+    sample = bytes(
+        protected[
+            pn_offset + 4 : pn_offset + 20
+        ]
+    )
+    encryptor = Cipher(
+        algorithms.AES(keys["hp"]),
+        modes.ECB(),
+    ).encryptor()
+    mask = (
+        encryptor.update(sample)
+        + encryptor.finalize()
+    )
+    protected[0] ^= mask[0] & 0x0F
+    for index in range(
+        len(packet_number_bytes)
+    ):
+        protected[
+            pn_offset + index
+        ] ^= mask[index + 1]
+    return bytes(protected)
+
+
+def test_tracker_reassembles_split_client_hello() -> None:
+    hello = _client_hello()
+    split = len(hello) // 2
+    tracker = QuicInitialTracker()
+
+    first = tracker.inspect(
+        _protected_crypto_fragment(
+            hello[:split],
+            crypto_offset=0,
+            packet_number=0,
+        )
+    )
+    assert first is not None
+    assert first["initial_decrypted"] is True
+    assert first["sni"] is None
+
+    second = tracker.inspect(
+        _protected_crypto_fragment(
+            hello[split:],
+            crypto_offset=split,
+            packet_number=1,
+        )
+    )
+    assert second is not None
+    assert second["sni"] == (
+        "api.example.com"
+    )
+    assert second["alpn"] == [
+        "h3",
+        "h3-29",
+    ]
+    assert (
+        second["application_protocol"]
+        == "HTTP/3"
+    )
