@@ -8,12 +8,12 @@ from typing import Any
 
 import pytest
 
-from mobile_research.export import verify_research_zip
-from mobile_research.orchestrator import (
+from apk_research.export import verify_research_zip
+from apk_research.orchestrator import (
     OrchestratorError,
     ResearchOrchestrator,
 )
-from mobile_research.session import SessionManager, SessionStatus
+from apk_research.session import SessionManager, SessionStatus
 
 
 @dataclass(frozen=True)

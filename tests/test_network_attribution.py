@@ -4,7 +4,7 @@ import json
 import struct
 from datetime import datetime, timezone
 
-from mobile_research.network_attribution import (
+from apk_research.network_attribution import (
     FLOW_INVENTORY_ARTIFACT,
     SocketAttributionIndex,
     build_flow_inventory,
@@ -12,8 +12,8 @@ from mobile_research.network_attribution import (
     summarize_snapshots,
     write_normalized_attribution,
 )
-from mobile_research.session import SessionManager
-from mobile_research.timeline_engine import build_research_timeline
+from apk_research.session import SessionManager
+from apk_research.timeline_engine import build_research_timeline
 
 
 PACKAGE = "com.example.app"

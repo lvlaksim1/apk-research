@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from mobile_research.export import (
+from apk_research.export import (
     ExportError,
     export_research_zip,
     validate_session,
     verify_research_zip,
 )
-from mobile_research.session import SessionManager, SessionStatus
+from apk_research.session import SessionManager, SessionStatus
 
 
 class FixedClock:

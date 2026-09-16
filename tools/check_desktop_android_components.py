@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import urllib.parse
 
-from mobile_research.desktop.components import ComponentManager
+from apk_research.desktop.components import ComponentManager
 
 
 def main() -> int:

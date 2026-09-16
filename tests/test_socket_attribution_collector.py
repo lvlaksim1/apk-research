@@ -4,8 +4,8 @@ import subprocess
 from pathlib import Path
 from typing import BinaryIO, Sequence
 
-from mobile_research.collectors import SocketAttributionCollector
-from mobile_research.session import SessionManager
+from apk_research.collectors import SocketAttributionCollector
+from apk_research.session import SessionManager
 
 
 RAW = (

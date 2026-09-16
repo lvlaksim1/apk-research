@@ -6,7 +6,7 @@ import pytest
 
 pytest.importorskip("PySide6.QtCore")
 
-from mobile_research.desktop.controller import DesktopController
+from apk_research.desktop.controller import DesktopController
 
 
 class _Result:

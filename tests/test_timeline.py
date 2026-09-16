@@ -5,8 +5,8 @@ import struct
 from datetime import datetime, timezone
 from pathlib import Path
 
-from mobile_research.session import SessionManager
-from mobile_research.timeline import (
+from apk_research.session import SessionManager
+from apk_research.timeline import (
     TIMELINE_ARTIFACT,
     USER_ACTIONS_ARTIFACT,
     build_research_timeline,

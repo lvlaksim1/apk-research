@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from mobile_research import cli
+from apk_research import cli
 
 
 def test_parser_targets_json() -> None:

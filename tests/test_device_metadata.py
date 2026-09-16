@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from mobile_research.collectors import (
+from apk_research.collectors import (
     DeviceMetadataCollector,
     MetadataCollectorError,
 )
-from mobile_research.session import SessionManager
+from apk_research.session import SessionManager
 
 
 class TestClock:
@@ -82,7 +82,7 @@ class FakeAdb:
         command = tuple(arguments)
         self.captured_commands.append(command)
         if command in self.capture_failures:
-            from mobile_research.targets import AdbError
+            from apk_research.targets import AdbError
 
             raise AdbError(
                 "simulated package dump timeout: "
@@ -114,7 +114,7 @@ class FakeAdb:
         self.shell_commands.append(tuple(arguments))
         label = " ".join(arguments)
         if arguments and arguments[0] in self.optional_failures:
-            from mobile_research.targets import AdbError
+            from apk_research.targets import AdbError
 
             raise AdbError(f"optional failure: {label}")
         if arguments[:5] == (
@@ -176,7 +176,7 @@ def test_metadata_collector_writes_raw_and_normalized_files(
         "com.example.app",
     ) in collector.adb.captured_commands
     assert collector.adb.remote_dirs == [
-        "/data/local/tmp/mobile-research/metadata-session"
+        "/data/local/tmp/apk-research/metadata-session"
     ]
 
     manifest = session.manifest

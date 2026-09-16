@@ -1,6 +1,6 @@
 # AVD-RESEARCH profile
 
-AVD-RESEARCH is the deep-observability Android target for Mobile Research v0.1.
+AVD-RESEARCH is the deep-observability Android target for apk-research v0.1.
 It prioritizes reproducible diagnostics, root ADB and raw packet capture rather than Play Store equivalence.
 
 ## v0.1 reference profile
@@ -22,7 +22,7 @@ The current v0.1 network backend requires a usable tcpdump executable on the tar
 
 ## Automated real-device acceptance
 
-The normal CI validates host code on windows-latest. A separate commit-triggered workflow creates a real Android Emulator on Ubuntu/KVM and executes the actual Mobile Research orchestration.
+The normal CI validates host code on windows-latest. A separate commit-triggered workflow creates a real Android Emulator on Ubuntu/KVM and executes the actual apk-research orchestration.
 
 The workflow selects a launchable built-in package from the AOSP image, preferring Android Settings. No target APK or research material is stored in the repository.
 

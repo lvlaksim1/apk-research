@@ -1,4 +1,10 @@
-# Mobile Research
+# apk-research
+
+## v0.15.0 — Product rename to apk-research
+
+Начиная с v0.15.0 программа, репозиторий, Python distribution/namespace, GUI, CLI, EXE, installer, release assets, каталоги установки и техническая документация используют единое имя `apk-research`.
+
+Это rename-only release: validated hidden Emulator → gRPC/MMAP runtime, v0.10.5 clean-launch sequencing, collectors, Research ZIP schemas, raw PCAP, attribution, Timeline и Network Analyzer semantics не меняются.
 
 ## v0.14.0 — Host Intelligence: Service vs DNS
 
@@ -58,7 +64,7 @@ v0.10.3 разделяет две плоскости. Forensic evidence оста
 
 ## v0.10.2 — Seamless clean launch
 
-Реальный Windows-тест выявил видимый Android task transition в режиме «Чистый запуск»: после arm collectors Mobile Research выполняла отдельные host round-trips `force-stop → pidof verification → am start`, поэтому на встроенном экране успевал появиться Launcher и проигрывались close/open-анимации.
+Реальный Windows-тест выявил видимый Android task transition в режиме «Чистый запуск»: после arm collectors apk-research выполняла отдельные host round-trips `force-stop → pidof verification → am start`, поэтому на встроенном экране успевал появиться Launcher и проигрывались close/open-анимации.
 
 v0.10.2 сохраняет forensic-границу после arm collectors, но выполняет clean restart одной Android shell-транзакцией: `am force-stop <package> && am start -W --activity-no-animation ...`. Отдельная пауза/poll между stop и start удалена. Clean invariant теперь подтверждается самим `am start -W`: релиз требует `LaunchState: COLD` и запрещает reuse уже работающего Activity. Режим «Продолжить текущее состояние» не меняется.
 
@@ -70,17 +76,17 @@ Real AVD release gate теперь требует не только socket snaps
 
 ## v0.10.0 — Package-aware Network Attribution
 
-Mobile Research теперь сопоставляет сетевой трафик с исследуемым Android package по цепочке `package → UID → PID/process → socket inode → 5-tuple → PCAP flow`. Во время исследования отдельный collector снимает временные snapshots `/proc/net/tcp*` / `/proc/net/udp*` и socket-FD процессов целевого UID. Производные evidence сохраняются в `02_normalized/socket-attribution.jsonl`, `02_normalized/socket-attribution.json` и `02_normalized/network-flows.json`.
+apk-research теперь сопоставляет сетевой трафик с исследуемым Android package по цепочке `package → UID → PID/process → socket inode → 5-tuple → PCAP flow`. Во время исследования отдельный collector снимает временные snapshots `/proc/net/tcp*` / `/proc/net/udp*` и socket-FD процессов целевого UID. Производные evidence сохраняются в `02_normalized/socket-attribution.jsonl`, `02_normalized/socket-attribution.json` и `02_normalized/network-flows.json`.
 
 Для каждого flow/packet ownership имеет доказательный уровень `EXACT`, `HIGH`, `MEDIUM` или `UNKNOWN`. `EXACT` требует socket inode, точного 5-tuple, попадания пакета в непосредственно наблюдавшийся интервал жизни сокета и однозначного owner evidence: либо UID принадлежит только исследуемому package, либо при shared UID имеется прямая цепочка target-package process/PID → FD → inode. Shared UID без такой process/socket-связи остаётся `UNKNOWN`; sampling margin и wildcard endpoints явно понижают confidence. Raw `traffic.pcap` остаётся первичным источником истины. При этом связь user action → network по-прежнему маркируется отдельно как `temporal-only` с `causal_claim=false`: доказанная принадлежность сокета приложению не означает доказанную причинность конкретного tap/swipe.
 
 ## v0.9.2 — Refined Timeline is canonical in Research ZIP
 
-v0.9.2 исправляет разрыв между GUI-анализом и forensic archive: `ResearchOrchestrator` теперь записывает в итоговый `.research.zip` тот же refined Timeline schema 0.2, который использует GUI. Экспортируемый Timeline использует high-resolution `adb-ntp-midpoint` calibration, неперекрывающиеся action windows и явно маркирует корреляцию как `temporal-only` без ложного утверждения причинности. Real AVD acceptance теперь проверяет именно Timeline внутри готового ZIP. Windows installer начиная с этого релиза всегда содержит версию в имени: `MobileResearchSetup_v<version>.exe`.
+v0.9.2 исправляет разрыв между GUI-анализом и forensic archive: `ResearchOrchestrator` теперь записывает в итоговый `.research.zip` тот же refined Timeline schema 0.2, который использует GUI. Экспортируемый Timeline использует high-resolution `adb-ntp-midpoint` calibration, неперекрывающиеся action windows и явно маркирует корреляцию как `temporal-only` без ложного утверждения причинности. Real AVD acceptance теперь проверяет именно Timeline внутри готового ZIP. Windows installer начиная с этого релиза всегда содержит версию в имени: `apk-research-setup_v<version>.exe`.
 
 ## v0.9.1 / v0.9.0 — User Actions + Research Timeline
 
-Mobile Research теперь фиксирует действия пользователя во время активного исследования и строит производный `02_normalized/research-timeline.json`, объединяющий lifecycle, пользовательские действия и сетевые маркеры. Pointer gesture сохраняется как один `tap` или `swipe`, wheel — как swipe, клавиши и текстовый ввод — как user actions; последовательные символы группируются в timeline. Для каждого action рассчитывается временное окно и привязываются packet/flow statistics, новые network flows, DNS queries, best-effort TLS SNI и релевантный logcat sample. Host action clock переводится в target clock по сохранённым clock markers, поэтому correlation не предполагает, что Windows и Android имеют нулевой clock skew. В GUI вкладки «Результаты» добавлена кнопка **Research Timeline**.
+apk-research теперь фиксирует действия пользователя во время активного исследования и строит производный `02_normalized/research-timeline.json`, объединяющий lifecycle, пользовательские действия и сетевые маркеры. Pointer gesture сохраняется как один `tap` или `swipe`, wheel — как swipe, клавиши и текстовый ввод — как user actions; последовательные символы группируются в timeline. Для каждого action рассчитывается временное окно и привязываются packet/flow statistics, новые network flows, DNS queries, best-effort TLS SNI и релевантный logcat sample. Host action clock переводится в target clock по сохранённым clock markers, поэтому correlation не предполагает, что Windows и Android имеют нулевой clock skew. В GUI вкладки «Результаты» добавлена кнопка **Research Timeline**.
 
 > Важно: введённый через встроенный Android текст сохраняется в локальном Research ZIP как research evidence. Архив следует считать потенциально чувствительным.
 
@@ -98,7 +104,7 @@ Mobile Research теперь фиксирует действия пользов�
 
 ## v0.8.6 — Single required runtime path
 
-Mobile Research больше не имеет пользовательской страховочной display/input-архитектуры. Штатный Windows runtime теперь один: скрытый Android Emulator `-qt-hide-window` → Emulator gRPC → MMAP framebuffer → `AndroidView`; ввод — только через постоянный gRPC `streamInputEvent`. DWM, visible Emulator, gRPC byte-frame fallback, ADB screencap и ADB input fallback удалены. Если обязательный transport не работает, подготовка завершается диагностической ошибкой вместо перехода в другой режим. Startup cleanup и один `-wipe-data` при guest boot stall сохранены как recovery, а не как альтернативный runtime.
+apk-research больше не имеет пользовательской страховочной display/input-архитектуры. Штатный Windows runtime теперь один: скрытый Android Emulator `-qt-hide-window` → Emulator gRPC → MMAP framebuffer → `AndroidView`; ввод — только через постоянный gRPC `streamInputEvent`. DWM, visible Emulator, gRPC byte-frame fallback, ADB screencap и ADB input fallback удалены. Если обязательный transport не работает, подготовка завершается диагностической ошибкой вместо перехода в другой режим. Startup cleanup и один `-wipe-data` при guest boot stall сохранены как recovery, а не как альтернативный runtime.
 
 ## v0.8.5 — GUI smoke correction
 
@@ -130,11 +136,11 @@ Release-ready сборка механизма v0.7.10. Runtime не изменё
 
 ## v0.7.10 — Self-healing Android boot
 
-Поверх v0.7.9 добавлено только восстановление зависшей загрузки Android. Если Emulator жив, но Android не достигает `sys.boot_completed=1`, Mobile Research один раз мягко перезапускает тот же AVD с сохранением userdata. Если повторная загрузка тоже зависает — один раз выполняется штатный Emulator `-wipe-data` и чистая загрузка. После успеха подготовка APK продолжается автоматически. DWM и real-time swipe не изменены.
+Поверх v0.7.9 добавлено только восстановление зависшей загрузки Android. Если Emulator жив, но Android не достигает `sys.boot_completed=1`, apk-research один раз мягко перезапускает тот же AVD с сохранением userdata. Если повторная загрузка тоже зависает — один раз выполняется штатный Emulator `-wipe-data` и чистая загрузка. После успеха подготовка APK продолжается автоматически. DWM и real-time swipe не изменены.
 
 ## v0.7.9 — Automatic stale-Emulator cleanup
 
-Поверх стабильной базы v0.7.8 добавлена только стартовая очистка private Android runtime. До создания GUI программа ищет зависшие `emulator.exe` / `qemu-system-*.exe`, относящиеся строго к `mobile_research_api35`, корректно завершает их и удаляет оставшиеся AVD `*.lock` только после исчезновения процессов. Сторонние Emulator и общий `adb.exe` не затрагиваются. DWM, загрузка Android, reset и real-time swipe не изменены.
+Поверх стабильной базы v0.7.8 добавлена только стартовая очистка private Android runtime. До создания GUI программа ищет зависшие `emulator.exe` / `qemu-system-*.exe`, относящиеся строго к `apk_research_api35`, корректно завершает их и удаляет оставшиеся AVD `*.lock` только после исчезновения процессов. Сторонние Emulator и общий `adb.exe` не затрагиваются. DWM, загрузка Android, reset и real-time swipe не изменены.
 
 ## v0.7.8 — v0.7.4 baseline + real-time swipe only
 
@@ -142,11 +148,11 @@ Release-ready сборка механизма v0.7.10. Runtime не изменё
 
 ## v0.7.4 — Covered DWM source window
 
-После теста v0.7.3 source Emulator больше не уводится за virtual desktop: это обнуляло его DWM/GPU surface. Вместо этого настоящее standalone GPU-окно постоянно располагается полностью внутри границ Mobile Research и непосредственно за ним по Z-order. Пользователь видит только DWM live внутри вкладки Исследование. При переключении на другие вкладки DWM thumbnail явно скрывается; при возврате включается снова.
+После теста v0.7.3 source Emulator больше не уводится за virtual desktop: это обнуляло его DWM/GPU surface. Вместо этого настоящее standalone GPU-окно постоянно располагается полностью внутри границ apk-research и непосредственно за ним по Z-order. Пользователь видит только DWM live внутри вкладки Исследование. При переключении на другие вкладки DWM thumbnail явно скрывается; при возврате включается снова.
 
 ## v0.7.3 — Single-window DWM live
 
-DWM live теперь работает как единое пользовательское окно: standalone Emulator остаётся техническим top-level GPU source для Windows, но постоянно удерживается за пределами всего virtual desktop и исключается из taskbar/Alt+Tab. Mobile Research поддерживает это состояние на протяжении всей загрузки и работы, поэтому Qt Emulator не может вернуть окно на экран. При закрытии сначала завершается Emulator, затем отключается DWM — без вспышки второго окна.
+DWM live теперь работает как единое пользовательское окно: standalone Emulator остаётся техническим top-level GPU source для Windows, но постоянно удерживается за пределами всего virtual desktop и исключается из taskbar/Alt+Tab. apk-research поддерживает это состояние на протяжении всей загрузки и работы, поэтому Qt Emulator не может вернуть окно на экран. При закрытии сначала завершается Emulator, затем отключается DWM — без вспышки второго окна.
 
 ## v0.7.2 — DWM live Emulator composition
 
@@ -154,11 +160,11 @@ DWM live теперь работает как единое пользовате�
 
 ## v0.7.1 — DWM live Emulator composition
 
-Финальный release DWM live path: Android Emulator остаётся самостоятельным GPU/top-level окном, DWM композитит его в Android-панель Mobile Research без `SetParent`; дополнительно исправлена обработка Win32 thumbnail handle.
+Финальный release DWM live path: Android Emulator остаётся самостоятельным GPU/top-level окном, DWM композитит его в Android-панель apk-research без `SetParent`; дополнительно исправлена обработка Win32 thumbnail handle.
 
 ## v0.7.0 — DWM live Emulator composition
 
-Основной Windows display path больше не использует cross-process `SetParent`. Android Emulator остаётся обычным standalone GPU-окном, а Windows Desktop Window Manager композитит его live-содержимое прямо в Android-панель Mobile Research. Исходное окно после успешного DWM attach перемещается за пределы видимого рабочего стола, не скрывается и не минимизируется. Управление остаётся через gRPC. gRPC/MMAP сохраняется как автоматический fallback.
+Основной Windows display path больше не использует cross-process `SetParent`. Android Emulator остаётся обычным standalone GPU-окном, а Windows Desktop Window Manager композитит его live-содержимое прямо в Android-панель apk-research. Исходное окно после успешного DWM attach перемещается за пределы видимого рабочего стола, не скрывается и не минимизируется. Управление остаётся через gRPC. gRPC/MMAP сохраняется как автоматический fallback.
 
 ## v0.6.0 — Real standalone Emulator HWND
 
@@ -170,11 +176,11 @@ DWM live теперь работает как единое пользовате�
 
 ## v0.5.1 — Windows Emulator startup fallback
 
-После реального теста v0.5.0 Windows startup получил многоступенчатый fallback. Mobile Research сначала пытается запустить native HWND + host GPU, затем при сбое автоматически переходит на headless + host GPU и, при необходимости, на headless + SwiftShader. В headless-режиме интерфейс автоматически возвращается к MMAP/gRPC framebuffer, поэтому сбой native Qt/GPU path больше не блокирует исследование. Внутренний Android Emulator crash reporter для managed-запуска отключён, а все попытки старта сохраняются в диагностике.
+После реального теста v0.5.0 Windows startup получил многоступенчатый fallback. apk-research сначала пытается запустить native HWND + host GPU, затем при сбое автоматически переходит на headless + host GPU и, при необходимости, на headless + SwiftShader. В headless-режиме интерфейс автоматически возвращается к MMAP/gRPC framebuffer, поэтому сбой native Qt/GPU path больше не блокирует исследование. Внутренний Android Emulator crash reporter для managed-запуска отключён, а все попытки старта сохраняются в диагностике.
 
 ## v0.5.0 — Native Emulator Window
 
-Windows-версия больше не использует screenshot/framebuffer mirroring как основной способ показа Android. Mobile Research запускает managed Android Emulator в скрытом Qt-режиме, находит его настоящее native HWND после загрузки и переподчиняет это окно непосредственно центральному Android-контейнеру программы. Рендеринг и ввод остаются внутри самого Android Emulator; MMAP/gRPC и ADB используются только как fallback и research/control transport.
+Windows-версия больше не использует screenshot/framebuffer mirroring как основной способ показа Android. apk-research запускает managed Android Emulator в скрытом Qt-режиме, находит его настоящее native HWND после загрузки и переподчиняет это окно непосредственно центральному Android-контейнеру программы. Рендеринг и ввод остаются внутри самого Android Emulator; MMAP/gRPC и ADB используются только как fallback и research/control transport.
 
 ## v0.4.0 — 60 Hz shared-memory embedded Android
 
@@ -196,9 +202,9 @@ v0.3.1 исправляет обнаруженные на реальном Windo
 
 После стабильного v0.1.0 проект перешёл к полноценному Windows-приложению.
 Штатный пользовательский сценарий v0.2 не требует Python, PowerShell, Android Studio, отдельного ADB или ручного AVD.
-Mobile Research сама управляет Android-компонентами, устанавливает APK, показывает Android внутри GUI и запускает существующее research core кнопками START/STOP.
+apk-research сама управляет Android-компонентами, устанавливает APK, показывает Android внутри GUI и запускает существующее research core кнопками START/STOP.
 
-Desktop Build собирает автономный MobileResearchSetup.exe. Android SDK/Emulator/system image загружаются самой программой в %LOCALAPPDATA%\MobileResearch\components после одноразового принятия Android SDK License Agreement.
+Desktop Build собирает автономный apk-research-setup.exe. Android SDK/Emulator/system image загружаются самой программой в %LOCALAPPDATA%\apk-research\components после одноразового принятия Android SDK License Agreement.
 
 Подробный desktop contract: docs/V0.2_DESKTOP.md.
 
@@ -206,20 +212,20 @@ Desktop Build собирает автономный MobileResearchSetup.exe. And
 
 В v0.2.2 исправлена регрессия v0.2.1: рабочий AEHD/GVM снова является допустимым пользовательским fallback, при этом WHPX остаётся предпочтительным и обязательным для dedicated Windows hardware acceptance. WHPX остаётся предпочтительным Windows hypervisor и обязательным hardware release-acceptance path, но пользовательский runtime снова принимает уже установленный и рабочий AEHD/GVM как совместимый fallback до завершения его официального переходного периода. Это разделяет две разные задачи: release должен доказать современный WHPX path, а приложение не должно ломать уже рабочий компьютер пользователя только из-за наличия поддерживаемого legacy hypervisor.
 
-При отсутствии любого usable hypervisor Mobile Research включает только Windows Hypervisor Platform одним UAC-запросом, выставляет `hypervisorlaunchtype=Auto` и явно сообщает о необходимости перезагрузки, если она требуется.
+При отсутствии любого usable hypervisor apk-research включает только Windows Hypervisor Platform одним UAC-запросом, выставляет `hypervisorlaunchtype=Auto` и явно сообщает о необходимости перезагрузки, если она требуется.
 
 
 ## v0.2.1 — hardening пользовательского Windows-сценария
 
-v0.2.1 исправляет обнаруженный на реальном приложении `com.evrasia` отказ preflight: зависший полный Package Manager dump больше не уничтожает всё исследование. Mobile Research ожидает завершения pending Package Manager operations, использует ограниченные по времени основной и резервный способы получения package dump, а при их отказе продолжает logcat/screen/PCAP и завершает сессию как `partial`.
+v0.2.1 исправляет обнаруженный на реальном приложении `com.evrasia` отказ preflight: зависший полный Package Manager dump больше не уничтожает всё исследование. apk-research ожидает завершения pending Package Manager operations, использует ограниченные по времени основной и резервный способы получения package dump, а при их отказе продолжает logcat/screen/PCAP и завершает сессию как `partial`.
 
-Также release contract усилен отдельным `Windows WHPX Acceptance`: он использует именно собранный `MobileResearchSetup.exe` того же commit SHA, устанавливает приложение на выделенный Windows x64 runner, начинает с чистого `%LOCALAPPDATA%\MobileResearch`, требует реальный WHPX, загружает managed Android, через установленный EXE определяет package и устанавливает фиксированный проверяемый APK Appium ApiDemos, запускает его и завершает полноценную research-сессию с проверкой и semantic audit Research ZIP.
+Также release contract усилен отдельным `Windows WHPX Acceptance`: он использует именно собранный `apk-research-setup.exe` того же commit SHA, устанавливает приложение на выделенный Windows x64 runner, начинает с чистого `%LOCALAPPDATA%\apk-research`, требует реальный WHPX, загружает managed Android, через установленный EXE определяет package и устанавливает фиксированный проверяемый APK Appium ApiDemos, запускает его и завершает полноценную research-сессию с проверкой и semantic audit Research ZIP.
 
 Обычный GitHub-hosted `windows-latest` сохраняется для build/provisioning checks, но не считается доказательством реального Windows/WHPX boot.
 
 ## Stable core baseline
 
-Mobile Research — Windows-система для воспроизводимого исследования сетевой активности Android-приложений в управляемой исследовательской среде.
+apk-research — Windows-система для воспроизводимого исследования сетевой активности Android-приложений в управляемой исследовательской среде.
 
 ## Статус
 
@@ -429,25 +435,25 @@ Collector failure во время ACTIVE не останавливает ост�
 ## CLI
 
 ```powershell
-mobile-research targets
-mobile-research targets --json
-mobile-research target-info emulator-5554 --json
-mobile-research package-check emulator-5554 com.example.app
+apk-research targets
+apk-research targets --json
+apk-research target-info emulator-5554 --json
+apk-research package-check emulator-5554 com.example.app
 
-mobile-research session-create emulator-5554 com.example.app --json
-mobile-research metadata-collect "C:\path\to\session" --json
-mobile-research session-status "C:\path\to\session" --json
-mobile-research session-export "C:\path\to\session" --json
-mobile-research research-zip-verify "C:\path\to\session.research.zip" --json
-mobile-research research-zip-audit "C:\path\to\session.research.zip" --json
+apk-research session-create emulator-5554 com.example.app --json
+apk-research metadata-collect "C:\path\to\session" --json
+apk-research session-status "C:\path\to\session" --json
+apk-research session-export "C:\path\to\session" --json
+apk-research research-zip-verify "C:\path\to\session.research.zip" --json
+apk-research research-zip-audit "C:\path\to\session.research.zip" --json
 
-mobile-research run emulator-5554 com.example.app
+apk-research run emulator-5554 com.example.app
 ```
 
 То же без установленного entry point:
 
 ```powershell
-python -m mobile_research targets --json
+python -m apk_research targets --json
 ```
 
 ## v0.1: целевой сценарий
@@ -485,7 +491,7 @@ Research ZIP
 ## Среда разработки
 
 - Windows — целевая host-платформа.
-- Для пользователя поставляется self-contained `MobileResearchSetup.exe`; Python, Android Studio и отдельный ADB не требуются.
+- Для пользователя поставляется self-contained `apk-research-setup.exe`; Python, Android Studio и отдельный ADB не требуются.
 - Python >= 3.11 и CLI используются только как development/test interfaces внутри репозитория.
 
 ```powershell
@@ -502,6 +508,6 @@ python -m pytest -q
 - `CI` автоматически запускается на push/pull request на Windows;
 - `AVD Research Acceptance` проверяет Research Session Core на настоящем Android Emulator под Linux/KVM;
 - `Desktop Build` собирает и smoke-тестирует standalone Windows application/installer и clean provisioning;
-- `Release` для stable version ждёт успешные CI + AVD Research Acceptance + Desktop Build того же commit SHA и публикует проверенный `MobileResearchSetup.exe`;
+- `Release` для stable version ждёт успешные CI + AVD Research Acceptance + Desktop Build того же commit SHA и публикует проверенный `apk-research-setup.exe`;
 - `Windows WHPX Acceptance` является дополнительной hardware-проверкой и сейчас advisory, а не блокирующим gate;
 - ручной `workflow_dispatch` не используется.

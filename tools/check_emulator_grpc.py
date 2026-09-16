@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from mobile_research.desktop.emulator_grpc import (
+from apk_research.desktop.emulator_grpc import (
     EmulatorGrpcClient,
 )
 

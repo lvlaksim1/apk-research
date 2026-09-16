@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from mobile_research.export import (
+from apk_research.export import (
     ExportError,
     audit_complete_research_zip,
 )
@@ -148,7 +148,7 @@ def _build_zip(
     manifest = {
         "schema_version": "0.1",
         "session_id": "audit-session",
-        "mobile_research_version": "0.1.0.dev0",
+        "apk_research_version": "0.1.0.dev0",
         "status": "complete",
         "degraded": degraded,
         "errors": [],

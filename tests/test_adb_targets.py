@@ -6,7 +6,7 @@ from typing import Sequence
 
 import pytest
 
-from mobile_research.targets import (
+from apk_research.targets import (
     AdbClient,
     AdbError,
     parse_adb_devices,
@@ -296,14 +296,14 @@ def test_remote_screen_recording_helpers(tmp_path: Path) -> None:
             "shell",
             "mkdir",
             "-p",
-            "/data/local/tmp/mobile-research/session-1",
+            "/data/local/tmp/apk-research/session-1",
         ): _completed(),
         (
             "-s",
             "emulator-5554",
             "pull",
             (
-                "/data/local/tmp/mobile-research/"
+                "/data/local/tmp/apk-research/"
                 "session-1/screen-0001.mp4"
             ),
             str(local_file),
@@ -315,7 +315,7 @@ def test_remote_screen_recording_helpers(tmp_path: Path) -> None:
             "rm",
             "-f",
             (
-                "/data/local/tmp/mobile-research/"
+                "/data/local/tmp/apk-research/"
                 "session-1/screen-0001.mp4"
             ),
         ): _completed(),
@@ -346,12 +346,12 @@ def test_remote_screen_recording_helpers(tmp_path: Path) -> None:
 
     client.make_remote_directory(
         "emulator-5554",
-        "/data/local/tmp/mobile-research/session-1",
+        "/data/local/tmp/apk-research/session-1",
     )
     client.pull_file(
         "emulator-5554",
         (
-            "/data/local/tmp/mobile-research/"
+            "/data/local/tmp/apk-research/"
             "session-1/screen-0001.mp4"
         ),
         local_file,
@@ -359,7 +359,7 @@ def test_remote_screen_recording_helpers(tmp_path: Path) -> None:
     client.remove_remote_file(
         "emulator-5554",
         (
-            "/data/local/tmp/mobile-research/"
+            "/data/local/tmp/apk-research/"
             "session-1/screen-0001.mp4"
         ),
     )
@@ -378,7 +378,7 @@ def test_remote_research_path_rejects_escape() -> None:
     with pytest.raises(ValueError):
         client.make_remote_directory(
             "emulator-5554",
-            "/data/local/tmp/mobile-research/../escape",
+            "/data/local/tmp/apk-research/../escape",
         )
 
 
@@ -653,7 +653,7 @@ def test_capture_shell_output_to_remote_file() -> None:
             "shell",
             (
                 "sh -c 'dumpsys package com.example.app "
-                ">/data/local/tmp/mobile-research/"
+                ">/data/local/tmp/apk-research/"
                 "session-1/package-dump.txt'"
             ),
         ): _completed(),
@@ -669,7 +669,7 @@ def test_capture_shell_output_to_remote_file() -> None:
     client.capture_shell_output_to_file(
         "emulator-5554",
         (
-            "/data/local/tmp/mobile-research/"
+            "/data/local/tmp/apk-research/"
             "session-1/package-dump.txt"
         ),
         "dumpsys",
@@ -687,7 +687,7 @@ def test_capture_shell_output_rejects_remote_escape() -> None:
     with pytest.raises(ValueError):
         client.capture_shell_output_to_file(
             "emulator-5554",
-            "/data/local/tmp/mobile-research/../escape.txt",
+            "/data/local/tmp/apk-research/../escape.txt",
             "dumpsys",
             "package",
             "com.example.app",

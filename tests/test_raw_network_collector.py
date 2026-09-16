@@ -7,12 +7,12 @@ from typing import BinaryIO, Sequence
 
 import pytest
 
-from mobile_research.collectors import (
+from apk_research.collectors import (
     RawNetworkCollector,
     RawNetworkCollectorError,
     inspect_pcap,
 )
-from mobile_research.session import SessionManager
+from apk_research.session import SessionManager
 
 
 PCAP_HEADER = (
@@ -111,7 +111,7 @@ class FakeAdb:
         version_arguments: Sequence[str] = ("--version",),
     ) -> tuple[str, str]:
         if not self.tcpdump_available:
-            from mobile_research.targets import AdbError
+            from apk_research.targets import AdbError
 
             raise AdbError("No usable executable found")
         return "tcpdump", "tcpdump version 4.99.5"
@@ -236,7 +236,7 @@ def test_raw_network_graceful_stop(tmp_path: Path) -> None:
         "-c",
         (
             "tcpdump -i any -p -s 0 -U -w - "
-            "2>/data/local/tmp/mobile-research/"
+            "2>/data/local/tmp/apk-research/"
             "network-session/tcpdump.stderr.txt"
         ),
     ]

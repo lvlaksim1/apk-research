@@ -7,12 +7,12 @@ from typing import BinaryIO, Sequence
 
 import pytest
 
-from mobile_research.collectors import (
+from apk_research.collectors import (
     ScreenRecordingCollector,
     ScreenRecordingCollectorError,
     inspect_screenrecord_timing,
 )
-from mobile_research.session import SessionManager
+from apk_research.session import SessionManager
 
 
 class TestClock:
@@ -181,7 +181,7 @@ def test_screen_recording_graceful_stop_preserves_video(
         "--time-limit",
         "170",
         (
-            "/data/local/tmp/mobile-research/"
+            "/data/local/tmp/apk-research/"
             "screen-session/screen-0001.mp4"
         ),
     ]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mobile_research.desktop.network_view_model import (
+from apk_research.desktop.network_view_model import (
     action_label,
     build_action_index,
     flow_matches,

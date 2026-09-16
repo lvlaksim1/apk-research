@@ -6,13 +6,13 @@ import time
 import zipfile
 from pathlib import Path
 
-from mobile_research.export import (
+from apk_research.export import (
     audit_complete_research_zip,
     verify_research_zip,
 )
-from mobile_research.orchestrator import OrchestratorError, ResearchOrchestrator
-from mobile_research.targets import AdbClient, AdbError
-from mobile_research.timeline_reader import (
+from apk_research.orchestrator import OrchestratorError, ResearchOrchestrator
+from apk_research.targets import AdbClient, AdbError
+from apk_research.timeline_reader import (
     read_refined_timeline_archive,
 )
 
@@ -26,7 +26,7 @@ PACKAGE_CANDIDATES = (
 )
 OUTPUT_ROOT = Path("acceptance-output").resolve()
 SESSION_ROOT = OUTPUT_ROOT / "sessions"
-ARCHIVE = OUTPUT_ROOT / "mobile-research-acceptance.research.zip"
+ARCHIVE = OUTPUT_ROOT / "apk-research-acceptance.research.zip"
 
 
 def select_package(client: AdbClient) -> str:

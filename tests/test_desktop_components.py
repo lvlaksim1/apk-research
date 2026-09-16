@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from mobile_research.desktop.android_runtime import (
+from apk_research.desktop.android_runtime import (
     parse_aapt_package_name,
 )
-from mobile_research.desktop.components import (
+from apk_research.desktop.components import (
     ComponentManager,
     repository_base_url,
     select_archive_from_repository_xml,
@@ -47,7 +47,7 @@ def test_parse_aapt_package_name() -> None:
     assert parse_aapt_package_name(output) == "com.example.research"
 
 
-def test_avd_profile_is_private_to_mobile_research(
+def test_avd_profile_is_private_to_apk_research(
     tmp_path: Path,
 ) -> None:
     manager = ComponentManager(tmp_path)
@@ -70,7 +70,7 @@ def test_avd_profile_is_private_to_mobile_research(
 def test_software_emulator_command_uses_unaccelerated_mode(
     tmp_path: Path,
 ) -> None:
-    from mobile_research.desktop.android_runtime import AndroidRuntime
+    from apk_research.desktop.android_runtime import AndroidRuntime
 
     manager = ComponentManager(tmp_path)
     runtime = AndroidRuntime(manager)

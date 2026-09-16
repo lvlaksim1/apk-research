@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-import mobile_research.orchestrator as orchestrator_module
-from mobile_research.orchestrator import ResearchOrchestrator
-from mobile_research.session import SessionManager
-from mobile_research.targets import AdbClient
-from mobile_research.timeline_engine import build_research_timeline
+import apk_research.orchestrator as orchestrator_module
+from apk_research.orchestrator import ResearchOrchestrator
+from apk_research.session import SessionManager
+from apk_research.targets import AdbClient
+from apk_research.timeline_engine import build_research_timeline
 
 
 def _active_session(tmp_path: Path) -> SessionManager:

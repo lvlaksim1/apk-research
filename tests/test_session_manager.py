@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from mobile_research.session import (
+from apk_research.session import (
     InvalidArtifactPath,
     InvalidSessionTransition,
     SessionManager,

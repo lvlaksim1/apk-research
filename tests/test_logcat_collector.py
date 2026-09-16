@@ -8,11 +8,11 @@ from typing import BinaryIO, Sequence
 
 import pytest
 
-from mobile_research.collectors import (
+from apk_research.collectors import (
     LogcatCollector,
     LogcatCollectorError,
 )
-from mobile_research.session import SessionManager
+from apk_research.session import SessionManager
 
 
 class TestClock:

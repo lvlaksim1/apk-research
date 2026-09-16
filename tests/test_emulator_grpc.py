@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from mobile_research.desktop.emulator_grpc import (
+from apk_research.desktop.emulator_grpc import (
     FRAME_ROWS_TOP_DOWN,
     EmulatorGrpcClient,
     EmulatorGrpcError,

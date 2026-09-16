@@ -6,14 +6,14 @@ import time
 
 import pytest
 
-from mobile_research.desktop.android_runtime import (
+from apk_research.desktop.android_runtime import (
     AndroidBootTimeout,
     AndroidRuntime,
     AndroidRuntimeError,
     acceleration_provider,
 )
-from mobile_research.desktop.components import ComponentManager
-from mobile_research.desktop.emulator_grpc import LiveFrame
+from apk_research.desktop.components import ComponentManager
+from apk_research.desktop.emulator_grpc import LiveFrame
 
 
 def _make_components_ready(manager: ComponentManager) -> None:
@@ -224,7 +224,7 @@ def test_windows_setup_requires_reboot_when_no_hypervisor(
     tmp_path,
     monkeypatch,
 ) -> None:
-    from mobile_research.desktop.android_runtime import AndroidRuntimeError
+    from apk_research.desktop.android_runtime import AndroidRuntimeError
 
     manager = ComponentManager(tmp_path)
     _make_components_ready(manager)
@@ -505,7 +505,7 @@ def test_startup_cleanup_does_not_remove_locks_while_process_remains(
     )
     monkeypatch.setattr(
         runtime,
-        "_other_mobile_research_instance_running",
+        "_other_apk_research_instance_running",
         lambda: False,
     )
     monkeypatch.setattr(
@@ -515,7 +515,7 @@ def test_startup_cleanup_does_not_remove_locks_while_process_remains(
             {
                 "pid": 1234,
                 "name": "emulator.exe",
-                "command_line": "@mobile_research_api35",
+                "command_line": "@apk_research_api35",
             }
         ],
     )

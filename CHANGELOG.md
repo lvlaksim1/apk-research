@@ -1,6 +1,18 @@
 # Changelog
 
-All notable Mobile Research changes are recorded here.
+All notable apk-research changes are recorded here.
+
+## [0.15.0] - 2026-09-17
+
+### Product rename
+
+- Renames the product to `apk-research` across the repository and all user-visible surfaces.
+- Renames the Python distribution to `apk-research` and the import namespace to `apk_research`.
+- Renames GUI application/QSettings identity, CLI entry points, PyInstaller target, EXE, installation directory and Start-menu/desktop shortcuts.
+- Renames packaging sources to `apk-research.spec` and `apk-research.iss`.
+- Renames release installer assets to `apk-research-setup_v<version>.exe`.
+- Updates workflows, tests, tools and documentation to the new namespace and artifact names.
+- Keeps runtime, capture, Research ZIP and evidence semantics unchanged.
 
 ## [0.14.0] - 2026-09-17
 
@@ -110,7 +122,7 @@ All notable Mobile Research changes are recorded here.
 - Uses `FLAG_ACTIVITY_NO_ANIMATION` for the new Activity task transition so the managed Android view no longer intentionally plays a second launch animation during clean restart.
 - Removes the host-side stopped-process polling gap that exposed Launcher between the old task and the cold start.
 - Strengthens the clean-launch invariant: `am start -W` must report `LaunchState: COLD`; an existing-activity reuse or WARM/HOT state aborts the session.
-- Real AVD acceptance now prewarms the target app and then proves that Mobile Research converts it into a verified COLD launch.
+- Real AVD acceptance now prewarms the target app and then proves that apk-research converts it into a verified COLD launch.
 - Continue-current-state mode is unchanged.
 
 ## [0.10.1] - 2026-09-16
@@ -137,7 +149,7 @@ All notable Mobile Research changes are recorded here.
 - Extends the Timeline GUI with package-attributed packet counts and confidence breakdown.
 - Extends synthetic/unit and real AVD release acceptance to validate attribution evidence and exported flow inventory.
 - Fixes remote sampler PID tracking so graceful stop signals the actual Android shell sampler and cleans up its PID file reliably.
-- Windows installer naming remains `MobileResearchSetup_v<version>.exe`.
+- Windows installer naming remains `apk-research-setup_v<version>.exe`.
 
 ## [0.9.2] - 2026-09-16
 
@@ -148,7 +160,7 @@ All notable Mobile Research changes are recorded here.
 - Exported action correlations use exclusive non-overlapping windows and explicitly remain `temporal-only` with `causal_claim=false`.
 - Real AVD acceptance validates these invariants by reading `02_normalized/research-timeline.json` directly from the completed ZIP.
 - Adds an end-to-end regression assertion that the exported ZIP itself contains the refined Timeline contract.
-- Windows installer assets are now versioned as `MobileResearchSetup_v<version>.exe`; build, checksum, release and WHPX workflows use the same name.
+- Windows installer assets are now versioned as `apk-research-setup_v<version>.exe`; build, checksum, release and WHPX workflows use the same name.
 - The validated hidden Emulator + gRPC/MMAP framebuffer + persistent gRPC input runtime is unchanged.
 
 ## [0.9.1] - 2026-09-15
@@ -238,7 +250,7 @@ Timeline reliability update.
 - Keeps the validated v0.8.2 gRPC/MMAP display/input behavior and the v0.8.3 boot policy unchanged.
 - Renames the active DWM compatibility module from `native_emulator.py` to `dwm_emulator.py`.
 - Replaces misleading Native/attach naming with explicit DWM presenter, signal and state names across AndroidView, DesktopController and MainWindow.
-- Removes the legacy `WA_NativeWindow` requirement from AndroidView; current DWM presentation targets the top-level Mobile Research HWND and does not use SetParent.
+- Removes the legacy `WA_NativeWindow` requirement from AndroidView; current DWM presentation targets the top-level apk-research HWND and does not use SetParent.
 - Removes unused Win32 virtual-screen constants, a no-op focus helper and an unused detach parameter from the DWM path.
 - Removes the dead GUI `tapRequested → controller.tap` chain; click/drag input continues through the already-active DOWN/MOVE/UP lifecycle, while AndroidRuntime.tap remains as the ADB fallback.
 - Renames DWM diagnostics from the obsolete `native_display` terminology.
@@ -282,7 +294,7 @@ Timeline reliability update.
 - Ordered Windows profiles: gRPC/MMAP + host GPU, gRPC/MMAP + auto GPU, headless SwiftShader, then DWM compatibility profiles only as last-resort fallbacks.
 - DWM source-window code is retained unchanged for compatibility fallback, but is no longer part of the normal startup path.
 - gRPC is primed immediately after the hidden Emulator process starts, before Android reaches `sys.boot_completed`.
-- Embedded/headless display readiness now starts the framebuffer worker immediately, so boot frames can appear inside Mobile Research while Android is still loading.
+- Embedded/headless display readiness now starts the framebuffer worker immediately, so boot frames can appear inside apk-research while Android is still loading.
 - The framebuffer worker can dynamically upgrade from temporary ADB screencap to gRPC/MMAP if gRPC becomes ready after the worker starts.
 - Existing 60 Hz Qt publication and real-time DOWN/MOVE/UP input are retained.
 
@@ -299,8 +311,8 @@ Timeline reliability update.
 
 - Keeps the v0.7.9 DWM/input/startup-cleanup behavior unchanged and adds bounded recovery only when the Emulator process remains alive but Android never reaches `sys.boot_completed=1`.
 - Hardware boot is now considered stalled after 150 seconds total or 75 seconds continuously online in ADB without completing Android boot.
-- On the first detected stall, Mobile Research performs one soft Emulator restart with the existing userdata.
-- If the soft restart also stalls, Mobile Research performs exactly one official Android Emulator `-wipe-data` launch and gives the clean boot an extended 240-second window.
+- On the first detected stall, apk-research performs one soft Emulator restart with the existing userdata.
+- If the soft restart also stalls, apk-research performs exactly one official Android Emulator `-wipe-data` launch and gives the clean boot an extended 240-second window.
 - `-wipe-data` is an in-memory one-launch recovery flag; it is never persisted and is never used on a normal successful boot.
 - After either recovery succeeds, APK preparation continues normally in the same user action.
 - A failed clean recovery falls back to the existing graphics compatibility profiles; no infinite restart/wipe loop is possible.
@@ -310,10 +322,10 @@ Timeline reliability update.
 ### Startup recovery for stale private Emulator processes
 
 - Preserves the v0.7.8 runtime/DWM/swipe baseline and adds only pre-GUI stale-runtime cleanup.
-- Before the Mobile Research window is created, Windows is scanned for `emulator.exe` and `qemu-system-*.exe` processes whose command line belongs specifically to the private `mobile_research_api35` AVD and whose executable lives under Mobile Research's managed Android Emulator directory.
+- Before the apk-research window is created, Windows is scanned for `emulator.exe` and `qemu-system-*.exe` processes whose command line belongs specifically to the private `apk_research_api35` AVD and whose executable lives under apk-research's managed Android Emulator directory.
 - Matching processes are first asked to stop through `adb emu kill`; any survivors are terminated as a process tree with `taskkill /T /F`.
 - Generic `adb.exe` processes and unrelated Android Emulator instances are never terminated by startup cleanup.
-- A second running Mobile Research executable causes cleanup to be skipped, preventing a newly launched copy from killing the active copy's Emulator.
+- A second running apk-research executable causes cleanup to be skipped, preventing a newly launched copy from killing the active copy's Emulator.
 - After no managed AVD processes remain, only root-level `*.lock` files/directories in the private AVD home/profile are removed. Userdata, config.ini, system images and SDK files are not touched.
 - Startup recovery is best-effort and cannot prevent the GUI from opening if process inspection itself fails.
 
@@ -332,9 +344,9 @@ Timeline reliability update.
 ### Covered DWM source window
 
 - Reverted the v0.7.3 off-screen source-window strategy after the real-PC test showed that moving the Emulator completely outside the virtual desktop makes its DWM thumbnail black.
-- The real standalone Emulator GPU window now remains on the active desktop but is continuously positioned and, if necessary, scaled entirely inside the Mobile Research top-level bounds.
-- The source window is kept immediately behind Mobile Research in top-level z-order, remains visible/non-minimized for GPU/DWM rendering, and stays excluded from taskbar/Alt+Tab.
-- When Mobile Research is minimized, the source Emulator window is temporarily hidden; it is positioned behind Mobile Research before being shown again on restore.
+- The real standalone Emulator GPU window now remains on the active desktop but is continuously positioned and, if necessary, scaled entirely inside the apk-research top-level bounds.
+- The source window is kept immediately behind apk-research in top-level z-order, remains visible/non-minimized for GPU/DWM rendering, and stays excluded from taskbar/Alt+Tab.
+- When apk-research is minimized, the source Emulator window is temporarily hidden; it is positioned behind apk-research before being shown again on restore.
 - DWM source geometry and z-order are maintained every 100 ms so later Qt geometry changes cannot expose the standalone Emulator window.
 
 ### Tabs
@@ -350,14 +362,14 @@ Timeline reliability update.
 - The source top-level window is marked as a tool window and has APPWINDOW removed, keeping it out of Alt+Tab/taskbar while preserving the visible/non-minimized state required by DWM composition.
 - DWM destination geometry and source-window suppression are maintained every 100 ms while live mode is active.
 - Initial source-window discovery now polls every 15 ms to minimize any startup flash before the window is moved off-screen.
-- Shutdown order is reversed: Mobile Research stops the Emulator process while the DWM thumbnail is still registered, and only then unregisters DWM. This removes the second-window flash observed when closing v0.7.2.
+- Shutdown order is reversed: apk-research stops the Emulator process while the DWM thumbnail is still registered, and only then unregisters DWM. This removes the second-window flash observed when closing v0.7.2.
 - No SetParent, hiding, minimizing, or framebuffer copy is used in DWM live mode.
 
 ## [0.7.2] - 2026-09-15
 
 ### Release workflow
 
-- Fixed release-candidate detection for the ephemeral Windows installer artifact. Desktop Build now uploads the one-day installer artifact only for commits whose message starts with `Release Mobile Research v`, matching the project's commit-driven release contract.
+- Fixed release-candidate detection for the ephemeral Windows installer artifact. Desktop Build now uploads the one-day installer artifact only for commits whose message starts with `Release apk-research v`, matching the project's commit-driven release contract.
 - This avoids both false negatives on real releases and unnecessary installer artifacts on ordinary commits.
 
 ## [0.7.1] - 2026-09-15
@@ -371,9 +383,9 @@ Timeline reliability update.
 ### DWM live display
 
 - Removed cross-process Win32 `SetParent` from the active display path after the real v0.6.0 test proved that re-parenting the Emulator Qt window leaves its GPU surface black.
-- Windows now keeps the real Android Emulator as an independent top-level GPU window and registers it as a live Desktop Window Manager thumbnail in the Mobile Research top-level window.
+- Windows now keeps the real Android Emulator as an independent top-level GPU window and registers it as a live Desktop Window Manager thumbnail in the apk-research top-level window.
 - The source Emulator window is moved outside the virtual desktop only after DWM registration succeeds; it remains visible/non-minimized for composition and is never restored during shutdown, eliminating the second-window flash.
-- DWM renders directly into the Android panel region; Mobile Research does not copy the Emulator GPU frame through Python or QPainter.
+- DWM renders directly into the Android panel region; apk-research does not copy the Emulator GPU frame through Python or QPainter.
 - Emulator side-toolbar pixels are cropped from the DWM source region when the normal phone aspect can be inferred.
 - Mouse, swipe, keyboard and text input continue through Emulator gRPC, independent of the DWM presentation path.
 - gRPC/MMAP remains the automatic fallback if DWM composition, thumbnail registration, or source-window discovery fails.
@@ -403,7 +415,7 @@ Timeline reliability update.
 ### Fixed
 
 - Removed the false-positive native HWND display path that could report "Нативное окно Android Emulator встроено" while the Android panel remained blank.
-- Windows stable display now uses the Android Emulator embedded mode for its intended purpose: `-qt-hide-window` keeps the Emulator UI hidden while Mobile Research consumes the live framebuffer through gRPC/MMAP.
+- Windows stable display now uses the Android Emulator embedded mode for its intended purpose: `-qt-hide-window` keeps the Emulator UI hidden while apk-research consumes the live framebuffer through gRPC/MMAP.
 - The screen stream is no longer stopped merely because a hidden Qt HWND exists.
 - Windows boot fallback now tries host GPU → GPU auto through the same embedded gRPC/MMAP path, then falls back to headless SwiftShader if required.
 
@@ -419,18 +431,18 @@ Timeline reliability update.
 - Real-Windows startup no longer treats a crash of the native Qt/GPU Emulator path as a fatal application failure.
 - Windows managed boot now uses an ordered compatibility ladder: native HWND + host GPU → headless + host GPU → headless + SwiftShader.
 - Native HWND attachment is attempted only when the successful boot actually uses the native-window profile; compatibility boots immediately use the existing MMAP/gRPC framebuffer path.
-- Android Emulator crash-report UI is disabled for managed launches so an internal QEMU failure cannot leave a Google crash dialog over the Mobile Research interface.
+- Android Emulator crash-report UI is disabled for managed launches so an internal QEMU failure cannot leave a Google crash dialog over the apk-research interface.
 
 ### Diagnostics
 
-- Every Emulator startup attempt now records its display mode, GPU mode, duration, exit code, error and exact command line in Mobile Research diagnostics.
+- Every Emulator startup attempt now records its display mode, GPU mode, duration, exit code, error and exact command line in apk-research diagnostics.
 - Compatibility fallback is reported explicitly in the progress log instead of looking like a stalled second boot.
 
 ## [0.5.0] - 2026-09-14
 
 ### Architecture
 
-- Windows interactive display now embeds the **real Android Emulator native Qt window (HWND)** into the Mobile Research GUI instead of redrawing a screenshot/framebuffer stream.
+- Windows interactive display now embeds the **real Android Emulator native Qt window (HWND)** into the apk-research GUI instead of redrawing a screenshot/framebuffer stream.
 - The Emulator keeps its own native GPU rendering and receives mouse/keyboard input directly from Windows.
 - The existing MMAP/gRPC framebuffer pipeline remains only as an automatic compatibility fallback if native-window attachment fails.
 
@@ -489,7 +501,7 @@ Timeline reliability update.
 ### Fixed
 
 - Restored compatibility with an already-installed and usable Android Emulator Hypervisor Driver (AEHD/GVM) on Windows. WHPX remains the preferred and release-accepted Windows path, but usable AEHD no longer blocks the user or triggers elevation.
-- Fixed duplicate UAC prompts during Windows virtualization setup: Mobile Research now performs the entire WHPX configuration through one elevated PowerShell process.
+- Fixed duplicate UAC prompts during Windows virtualization setup: apk-research now performs the entire WHPX configuration through one elevated PowerShell process.
 - Removed unnecessary automatic enablement of VirtualMachinePlatform; Android Emulator WHPX needs HypervisorPlatform, not a second unrelated Windows feature.
 - WHPX setup now also ensures `hypervisorlaunchtype=Auto` and explicitly reports when a reboot is required instead of immediately treating the still-running AEHD provider as a fatal error.
 
@@ -498,14 +510,14 @@ Timeline reliability update.
 
 ### Changed
 
-- Package metadata preflight no longer destroys an otherwise viable research session when a full Package Manager dump stalls. Mobile Research now waits for Package Manager handlers, uses bounded primary/fallback dump commands, and continues with degraded metadata so logcat/screen/PCAP can still be captured; the final session is `partial` rather than falsely `complete`.
+- Package metadata preflight no longer destroys an otherwise viable research session when a full Package Manager dump stalls. apk-research now waits for Package Manager handlers, uses bounded primary/fallback dump commands, and continues with degraded metadata so logcat/screen/PCAP can still be captured; the final session is `partial` rather than falsely `complete`.
 - Windows desktop runtime now requires the Microsoft Windows Hypervisor Platform (WHPX) instead of accepting AEHD/GVM as an equivalent Windows hypervisor.
 - Runtime acceptance can require a packaged/frozen executable, exact installed executable path, a clean managed-component root and verified WHPX.
 
 ### CI / Acceptance
 
 - Added a dedicated Windows WHPX end-to-end gate for a hardware-capable self-hosted Windows x64 runner.
-- The gate downloads the exact-SHA `Desktop Build` installer, performs a clean per-user installation, provisions Android through the installed `MobileResearch.exe`, boots the private AVD with WHPX, validates root/tcpdump/framebuffer, downloads the pinned Appium ApiDemos v6.0.17 fixture with SHA-256 verification, makes Mobile Research detect/install/launch that APK, records a real research session, and verifies plus semantically audits the resulting Research ZIP.
+- The gate downloads the exact-SHA `Desktop Build` installer, performs a clean per-user installation, provisions Android through the installed `apk-research.exe`, boots the private AVD with WHPX, validates root/tcpdump/framebuffer, downloads the pinned Appium ApiDemos v6.0.17 fixture with SHA-256 verification, makes apk-research detect/install/launch that APK, records a real research session, and verifies plus semantically audits the resulting Research ZIP.
 - Future stable releases must pass `Windows WHPX Acceptance` for the exact release SHA in addition to CI, Linux/KVM AVD acceptance and Desktop Build.
 
 ## [0.2.0] - 2026-09-14
@@ -514,7 +526,7 @@ Timeline reliability update.
 
 - Native Windows desktop GUI as the primary product interface.
 - Self-contained PyInstaller/Inno Setup distribution; no user-installed Python.
-- Managed private Android SDK/component store under `%LOCALAPPDATA%\MobileResearch\components`.
+- Managed private Android SDK/component store under `%LOCALAPPDATA%\apk-research\components`.
 - Automatic provisioning of ADB, Android Emulator, aapt2 and Android 15 API 35 AOSP image.
 - Private AVD lifecycle without Android Studio.
 - Best-effort Windows Hypervisor Platform enablement via UAC.
@@ -522,7 +534,7 @@ Timeline reliability update.
 - Headless Android with integrated GUI framebuffer and touch/swipe/keyboard input.
 - GUI START/STOP using ResearchOrchestrator directly.
 - GUI session history, Research ZIP verify/audit and diagnostics.
-- Desktop Build workflow producing `MobileResearchSetup.exe` plus SHA-256.
+- Desktop Build workflow producing `apk-research-setup.exe` plus SHA-256.
 - Stable release gate extended to exact-SHA CI + AVD acceptance + Desktop Build.
 - Stable-only Android repository selection (`channel-0`), preventing beta/dev/canary Emulator packages from entering the managed runtime.
 - Clean Windows Android provisioning acceptance: download, checksum verification, extraction, private AVD creation and executable/version checks.
