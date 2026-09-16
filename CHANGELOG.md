@@ -2,6 +2,25 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.12.0] - 2026-09-16
+
+### Unified Timeline / Network model
+
+- Upgrades Research Timeline to schema `0.4`.
+- Replaces legacy directional network markers with one `network_flow_started` event per normalized `flow_id`.
+- User action correlations now reference normalized `flow_ids` and `new_flow_ids` directly.
+- Correlation flow samples reuse the same owner/local/remote/DNS/SNI identity as `network-flows.json`.
+- Each normalized flow records `correlated_action_ids`, enabling reverse navigation from Network Analyzer to Timeline.
+- Timeline summary now reports normalized flow count and explicit non-TCP/UDP packet count.
+- Network inventory summary now reports source packets, packets represented by flows, non-TCP/UDP bytes/protocols, and unresolved TCP/UDP packets.
+
+### Cross-navigation GUI
+
+- Double-click a Timeline row with a flow reference to open the matching Network Analyzer flow.
+- Double-click a Network Analyzer flow with correlated actions to jump to the first matching Timeline action.
+- Network Analyzer summary displays the explicit non-TCP/UDP packet count.
+- Navigation is post-capture only and does not modify evidence.
+
 ## [0.11.0] - 2026-09-16
 
 ### Bidirectional flow normalization

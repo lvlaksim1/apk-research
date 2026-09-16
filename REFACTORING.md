@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.11.0 — Bidirectional Network Flow normalization and Network Analyzer GUI.
+**Этап:** v0.12.0 — Unified Timeline ↔ Network normalized-flow model.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -391,4 +391,13 @@ The v0.10.x inventory used different keys for attributed and unattributed packet
 
 ### ADR-106 — Network Analyzer reads normalized evidence, never live-mutates capture
 The desktop Network Analyzer is a post-capture reader of `02_normalized/network-flows.json` inside a Research ZIP. It does not alter collectors, PCAP, attribution, Timeline or the Android runtime. The GUI is therefore downstream of evidence production and can evolve independently without risking capture regressions. The first version intentionally exposes filters/search and complete flow JSON before adding higher-level protocol decoding or causal navigation.
+
+### ADR-107 — Timeline must reference normalized flow IDs instead of reconstructing packet flows
+v0.11.0 introduced a canonical bidirectional 5-tuple inventory, but Research Timeline still rebuilt its own directional packet-flow identity. Real evidence therefore contained one connection in Network Analyzer and multiple network markers in Timeline. v0.12.0 removes that second identity system. Timeline packet windows resolve packets through the same canonical 5-tuple key into the already-built normalized inventory and persist `flow_id` references. Network events are generated one-per-normalized-flow. This establishes one connection identity across PCAP-derived normalization, Timeline and Network Analyzer.
+
+### ADR-108 — Action/flow links are bidirectional temporal references, not causality
+For each action correlation window, v0.12.0 records the normalized flows that carried packets during that window. The flow inventory receives the reverse `correlated_action_ids` list. These links are navigation/evidence references only: `causal_claim=false` and `attribution=temporal-only` remain mandatory. UI navigation may move between Timeline and Network Analyzer using these IDs, but it must not upgrade temporal proximity into causal attribution.
+
+### ADR-109 — Packets outside TCP/UDP flow normalization remain explicit evidence
+Normalized flow inventory intentionally models TCP/UDP 5-tuples only. ICMP, ARP and other packets remain exclusively in raw PCAP/Timeline packet evidence. v0.12.0 makes this boundary explicit with source, flow, non-TCP/UDP and unresolved transport counters so users can distinguish “not normalized as a flow” from “not captured”.
 

@@ -1,34 +1,39 @@
-# Mobile Research v0.11.0
+# Mobile Research v0.12.0
 
-v0.11.0 adds normalized bidirectional network flows and the first integrated Network Analyzer GUI.
+v0.12.0 unifies Research Timeline and Network Analyzer around the same normalized network flow identity.
 
-## Network flow model
+## Unified flow model
 
-- `network-flows.json` is now schema `0.2`.
-- One TCP/UDP bidirectional 5-tuple is represented by one flow.
-- Inbound and outbound packets no longer become separate records.
-- Early packets that were initially `UNKNOWN` are retained in the same connection when later socket/PID evidence attributes that connection to the researched package.
-- Each flow contains:
-  - best package owner and confidence;
-  - per-packet confidence breakdown;
-  - outbound/inbound packet counts;
-  - outbound/inbound captured bytes;
-  - local and remote endpoints;
-  - first/last timestamps and duration;
-  - DNS queries and TLS SNI observed on the flow.
+- Research Timeline schema is now `0.4`.
+- Timeline no longer creates separate directional TCP/UDP flow markers.
+- Every Timeline network event references the canonical `flow_id` from `02_normalized/network-flows.json`.
+- User action correlations contain:
+  - `flow_ids` — normalized flows that carried packets inside the temporal window;
+  - `new_flow_ids` — normalized flows whose first packet appeared in that window.
+- Every normalized flow contains `correlated_action_ids` for reverse lookup.
+- Ownership remains evidence-based and correlation remains `temporal-only`; no causal claim is introduced.
 
-## Network Analyzer
+## Network coverage accounting
 
-- New `Network` tab in the desktop application.
-- `Network Analyzer` button opens the selected Research ZIP directly from Results.
-- Filters: researched application / unknown, TCP / UDP.
-- Search: host, IP, process, DNS and SNI.
-- Main table: time, owner, host, protocol, local endpoint, remote endpoint, upload, download and confidence.
-- Full normalized flow JSON is shown for the selected row.
+`network-flows.json` summary now explicitly reports:
+
+- total source packet count;
+- packets represented in TCP/UDP normalized flows;
+- non-TCP/UDP packet count and captured bytes;
+- non-TCP/UDP protocol counts;
+- unresolved TCP/UDP packet count.
+
+Timeline summary exposes `network_flows` and `network_non_tcp_udp_packets`.
+
+## GUI navigation
+
+- Double-click a Timeline action or network-flow row to open the referenced flow in Network Analyzer.
+- Double-click a Network Analyzer flow with linked actions to jump back to the first matching Timeline action.
+- Network Analyzer summary shows non-TCP/UDP packets explicitly.
 
 ## Compatibility
 
-- The validated v0.10.5 clean-launch mechanism is unchanged.
-- Raw PCAP remains the source of truth; normalized flows are derived forensic evidence.
-- Package/PID/socket attribution semantics remain additive and do not claim causality.
-- Installer asset: `MobileResearchSetup_v0.11.0.exe`.
+- Raw PCAP remains the source of truth.
+- v0.11 flow schema `0.2` remains the normalized connection format.
+- The validated v0.10.5 clean-launch/runtime path is unchanged.
+- Installer asset: `MobileResearchSetup_v0.12.0.exe`.

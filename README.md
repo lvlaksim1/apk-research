@@ -1,5 +1,17 @@
 # Mobile Research
 
+## v0.12.0 — Unified Timeline ↔ Network flow model
+
+v0.12.0 переводит Research Timeline на ту же нормализованную модель соединений, которую использует Network Analyzer. Timeline schema теперь `0.4`: события `network_flow_started` создаются по `flow_id` из `network-flows.json`, а не по старым directional packet-flow ключам.
+
+Каждое user action correlation теперь содержит `flow_ids` и `new_flow_ids`. В самом `network-flows.json` каждый flow получает `correlated_action_ids`, поэтому связь работает в обе стороны без изменения исходного PCAP и без заявления причинности.
+
+GUI поддерживает навигацию двойным кликом:
+- Timeline action / network flow → соответствующий flow в Network Analyzer;
+- Network Analyzer flow → первое связанное user action в Timeline.
+
+Timeline summary также явно показывает количество normalized flows и число пакетов, не входящих в TCP/UDP inventory (`network_non_tcp_udp_packets`).
+
 ## v0.11.0 — Bidirectional Network Flows + Network Analyzer
 
 v0.11.0 переводит `network-flows.json` на schema 0.2 и добавляет первый рабочий Network Analyzer в GUI.
