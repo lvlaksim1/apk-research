@@ -280,7 +280,7 @@ def test_flow_inventory_and_view_keep_quic_evidence_explicit() -> None:
         [packet],
         index,
     )
-    assert inventory["schema_version"] == "0.3"
+    assert inventory["schema_version"] == "0.4"
     assert inventory["summary"]["quic_flow_count"] == 1
     assert inventory["summary"]["http3_flow_count"] == 1
     assert (
