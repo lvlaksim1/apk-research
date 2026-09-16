@@ -2,6 +2,22 @@
 
 All notable apk-research changes are recorded here.
 
+## [0.16.0] - 2026-09-17
+
+### QUIC / HTTP/3 Network Intelligence
+
+- Adds QUIC v1 and QUIC v2 long-header recognition for UDP/443 traffic.
+- Derives only the public QUIC Initial secrets defined by RFC 9001 / RFC 9369 and decrypts client Initial packets without MITM.
+- Reassembles QUIC CRYPTO fragments across client Initial packets with the same version and Destination Connection ID.
+- Extracts TLS ClientHello SNI and ALPN from decrypted QUIC Initial CRYPTO data.
+- Labels confirmed h3 ALPN as `HTTP/3` while keeping transport protocol `UDP` separate.
+- Upgrades `network-flows.json` to schema 0.3 with QUIC versions, packet types, ALPN, application protocols and Initial-decryption counters.
+- Upgrades Research Timeline to schema 0.5 and propagates QUIC/application-protocol evidence into action correlation summaries.
+- Extends Network Analyzer search/details/tree labels with QUIC / HTTP/3 metadata.
+- Updates real-AVD acceptance to require network-flow schema 0.3 and Timeline schema 0.5.
+- Preserves raw PCAP, socket attribution, canonical flow identity, clean-launch sequencing and the validated hidden Emulator → gRPC/MMAP runtime.
+- Does not decrypt QUIC 1-RTT application payloads and does not use MITM, CA installation or app hooking.
+
 ## [0.15.0] - 2026-09-17
 
 ### Product rename
