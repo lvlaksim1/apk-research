@@ -10,6 +10,10 @@ from typing import Any
 SNAPSHOTS_ARTIFACT = "02_normalized/socket-attribution.jsonl"
 SUMMARY_ARTIFACT = "02_normalized/socket-attribution.json"
 FLOW_INVENTORY_ARTIFACT = "02_normalized/network-flows.json"
+RAW_PCAP_ARTIFACT = "01_raw/network/traffic.pcap"
+RAW_SOCKET_SNAPSHOTS_ARTIFACT = (
+    "01_raw/network/socket-snapshots.txt"
+)
 
 _CONFIDENCE_ORDER = {
     "UNKNOWN": 0,
@@ -760,6 +764,32 @@ def _add_unique(
     values.append(normalized)
 
 
+def _compress_packet_ranges(
+    indexes: list[int],
+) -> list[list[int]]:
+    values = sorted(
+        set(
+            value
+            for value in indexes
+            if value > 0
+        )
+    )
+    if not values:
+        return []
+    ranges: list[list[int]] = []
+    start = values[0]
+    end = values[0]
+    for value in values[1:]:
+        if value == end + 1:
+            end = value
+            continue
+        ranges.append([start, end])
+        start = value
+        end = value
+    ranges.append([start, end])
+    return ranges
+
+
 def build_flow_inventory(
     packets: list[dict[str, Any]],
     index: SocketAttributionIndex,
@@ -879,6 +909,8 @@ def build_flow_inventory(
                 "quic_sni": [],
                 "quic_alpn": [],
                 "quic_initial_decrypted": False,
+                "_pcap_packet_indexes": [],
+                "_pcap_record_offsets": [],
                 "_dns": set(),
                 "_sni": set(),
                 "_application_protocols": set(),
@@ -938,6 +970,36 @@ def build_flow_inventory(
             current["other_packet_count"] += 1
             current["other_bytes"] += length
 
+        try:
+            pcap_packet_index = int(
+                packet.get(
+                    "pcap_packet_index"
+                )
+                or 0
+            )
+        except (TypeError, ValueError):
+            pcap_packet_index = 0
+        if pcap_packet_index > 0:
+            current[
+                "_pcap_packet_indexes"
+            ].append(
+                pcap_packet_index
+            )
+        try:
+            pcap_record_offset = int(
+                packet.get(
+                    "pcap_record_offset"
+                )
+            )
+        except (TypeError, ValueError):
+            pcap_record_offset = -1
+        if pcap_record_offset >= 0:
+            current[
+                "_pcap_record_offsets"
+            ].append(
+                pcap_record_offset
+            )
+
         _add_unique(
             current["dns_queries"],
             current["_dns"],
@@ -993,6 +1055,92 @@ def build_flow_inventory(
             value["first_epoch"]
         ),
     ):
+        pcap_packet_indexes = [
+            int(value)
+            for value in current.pop(
+                "_pcap_packet_indexes",
+                [],
+            )
+        ]
+        pcap_record_offsets = [
+            int(value)
+            for value in current.pop(
+                "_pcap_record_offsets",
+                [],
+            )
+        ]
+        owner_value = (
+            current.get("owner")
+            if isinstance(
+                current.get("owner"),
+                dict,
+            )
+            else {}
+        )
+        raw_evidence: dict[str, Any] = {
+            "pcap_artifact": (
+                RAW_PCAP_ARTIFACT
+            ),
+            "pcap_packet_ranges": (
+                _compress_packet_ranges(
+                    pcap_packet_indexes
+                )
+            ),
+            "first_pcap_record_offset": (
+                min(pcap_record_offsets)
+                if pcap_record_offsets
+                else None
+            ),
+            "last_pcap_record_offset": (
+                max(pcap_record_offsets)
+                if pcap_record_offsets
+                else None
+            ),
+        }
+        if (
+            owner_value.get("inode")
+            or owner_value.get("pids")
+            or owner_value.get(
+                "processes"
+            )
+        ):
+            raw_evidence.update(
+                {
+                    "socket_snapshot_artifact": (
+                        RAW_SOCKET_SNAPSHOTS_ARTIFACT
+                    ),
+                    "socket_inode": (
+                        owner_value.get(
+                            "inode"
+                        )
+                    ),
+                    "socket_pids": list(
+                        owner_value.get(
+                            "pids"
+                        )
+                        or []
+                    ),
+                    "socket_processes": list(
+                        owner_value.get(
+                            "processes"
+                        )
+                        or []
+                    ),
+                    "socket_first_observed_utc": (
+                        owner_value.get(
+                            "first_observed_utc"
+                        )
+                    ),
+                    "socket_last_observed_utc": (
+                        owner_value.get(
+                            "last_observed_utc"
+                        )
+                    ),
+                }
+            )
+        current["raw_evidence"] = (
+            raw_evidence
+        )
         current.pop("_dns", None)
         current.pop("_sni", None)
         current.pop("_application_protocols", None)
@@ -1080,7 +1228,7 @@ def build_flow_inventory(
         if item.get("quic_initial_decrypted")
     )
     return {
-        "schema_version": "0.3",
+        "schema_version": "0.4",
         "method": (
             "bidirectional-5tuple+"
             "android-proc-socket-attribution"
@@ -1108,6 +1256,20 @@ def build_flow_inventory(
             "http3_flow_count": http3_flow_count,
             "quic_initial_decrypted_flow_count": (
                 quic_initial_decrypted_flow_count
+            ),
+            "raw_provenance_flow_count": sum(
+                1
+                for item in values
+                if (
+                    (
+                        item.get(
+                            "raw_evidence"
+                        )
+                        or {}
+                    ).get(
+                        "pcap_packet_ranges"
+                    )
+                )
             ),
             "flow_packet_count": sum(
                 int(item.get("packet_count") or 0)
