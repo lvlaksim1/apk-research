@@ -98,7 +98,11 @@ class DeviceMetadataCollector:
         self.session = session
         self.clock = clock
 
-    def collect(self) -> DeviceMetadataResult:
+    def collect(
+        self,
+        *,
+        defer_package_dump: bool = False,
+    ) -> DeviceMetadataResult:
         manifest = self.session.manifest
         serial = str(manifest.get("target", {}).get("serial") or "").strip()
         package_name = str(manifest.get("package", {}).get("name") or "").strip()
@@ -132,15 +136,26 @@ class DeviceMetadataCollector:
 
             target_started = self.adb.get_utc_time(serial)
             getprop = self.adb.get_all_properties(serial)
-            (
-                package_dump,
-                package_dump_complete,
-                package_dump_method,
-                package_dump_errors,
-            ) = self._capture_package_dump(
-                serial,
-                package_name,
-            )
+            if defer_package_dump:
+                package_dump = (
+                    "PACKAGE DUMP DEFERRED\n"
+                    "The optional full Package Manager dump is captured "
+                    "when the research session stops so it cannot delay "
+                    "the verified clean launch.\n"
+                )
+                package_dump_complete = False
+                package_dump_method = "deferred-until-stop"
+                package_dump_errors: list[str] = []
+            else:
+                (
+                    package_dump,
+                    package_dump_complete,
+                    package_dump_method,
+                    package_dump_errors,
+                ) = self._capture_package_dump(
+                    serial,
+                    package_name,
+                )
             (
                 package_summary,
                 package_summary_error,
@@ -251,6 +266,127 @@ class DeviceMetadataCollector:
             raise MetadataCollectorError(
                 f"Device metadata capture failed: {message}"
             ) from exc
+
+    def capture_deferred_package_dump(self) -> bool:
+        manifest = self.session.manifest
+        serial = str(
+            manifest.get("target", {}).get("serial") or ""
+        ).strip()
+        package_name = str(
+            manifest.get("package", {}).get("name") or ""
+        ).strip()
+        normalized_path = (
+            self.session.paths.normalized_dir
+            / "target.json"
+        )
+        raw_path = (
+            self.session.paths.raw_device
+            / "package.txt"
+        )
+        if not serial or not package_name:
+            return False
+        if not normalized_path.is_file():
+            return False
+
+        normalized = json.loads(
+            normalized_path.read_text(
+                encoding="utf-8",
+            )
+        )
+        package_dump_state = (
+            normalized.get("package_dump")
+            if isinstance(normalized, dict)
+            else None
+        )
+        if not isinstance(package_dump_state, dict):
+            return False
+        if package_dump_state.get("method") != "deferred-until-stop":
+            return False
+
+        (
+            package_dump,
+            package_dump_complete,
+            package_dump_method,
+            package_dump_errors,
+        ) = self._capture_package_dump(
+            serial,
+            package_name,
+        )
+        _write_text_atomic(
+            raw_path,
+            package_dump,
+        )
+
+        package_summary_path = (
+            self.session.paths.raw_device
+            / "package-summary.txt"
+        )
+        package_summary = (
+            package_summary_path.read_text(
+                encoding="utf-8",
+                errors="replace",
+            )
+            if package_summary_path.is_file()
+            else ""
+        )
+        package_value = normalized.get("package")
+        if isinstance(package_value, dict):
+            package_value["version_code"] = (
+                _search_group(
+                    _VERSION_CODE_RE,
+                    package_dump,
+                )
+                or package_value.get("version_code")
+                or _search_group(
+                    _SUMMARY_VERSION_CODE_RE,
+                    package_summary,
+                )
+            )
+            package_value["version_name"] = (
+                _search_group(
+                    _VERSION_NAME_RE,
+                    package_dump,
+                )
+                or package_value.get("version_name")
+            )
+            package_value["first_install_time"] = (
+                _search_group(
+                    _FIRST_INSTALL_RE,
+                    package_dump,
+                )
+                or package_value.get(
+                    "first_install_time"
+                )
+            )
+            package_value["last_update_time"] = (
+                _search_group(
+                    _LAST_UPDATE_RE,
+                    package_dump,
+                )
+                or package_value.get(
+                    "last_update_time"
+                )
+            )
+
+        normalized["package_dump"] = {
+            "complete": package_dump_complete,
+            "method": package_dump_method,
+            "attempt_errors": list(
+                package_dump_errors
+            ),
+            "required_for_complete_session": False,
+            "capture_phase": "session-stop",
+        }
+        _write_text_atomic(
+            normalized_path,
+            json.dumps(
+                normalized,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            ),
+        )
+        return package_dump_complete
 
     def _capture_package_summary(
         self,
