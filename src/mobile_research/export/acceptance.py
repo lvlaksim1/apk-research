@@ -22,6 +22,7 @@ _REQUIRED_COLLECTORS = (
 _REQUIRED_EVENT_SEQUENCE = (
     "session_created",
     "preflight_started",
+    "device_metadata_completed",
     "raw_network_preflight_completed",
     "preflight_completed",
     "logcat_started",
@@ -29,7 +30,6 @@ _REQUIRED_EVENT_SEQUENCE = (
     "raw_network_started",
     "capture_active",
     "package_launched",
-    "device_metadata_completed",
     "stop_requested",
     "raw_network_stopped",
     "screen_recording_stopped",

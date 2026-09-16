@@ -320,6 +320,13 @@ class ResearchOrchestrator:
             self.session.begin_preflight()
             self._event("preflight_started")
 
+            metadata = self.metadata_factory(
+                self.adb,
+                self.session,
+            )
+            metadata.collect()
+            self._event("device_metadata_completed")
+
             self.network = self.network_factory(
                 self.adb,
                 self.session,
@@ -375,6 +382,7 @@ class ResearchOrchestrator:
                 "capture_active",
                 target_utc=self._target_time_best_effort(),
             )
+            self._calibrate_clock()
 
             if self.launch_mode == "clean":
                 self._event(
@@ -425,15 +433,6 @@ class ResearchOrchestrator:
                 "user_action_capture_enabled",
                 target_utc=self._target_time_best_effort(),
             )
-
-            self._event("device_metadata_started")
-            metadata = self.metadata_factory(
-                self.adb,
-                self.session,
-            )
-            metadata.collect()
-            self._event("device_metadata_completed")
-            self._calibrate_clock()
 
             return StartResult(
                 session_id=self.session.session_id,

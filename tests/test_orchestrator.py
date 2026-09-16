@@ -498,12 +498,6 @@ def test_clean_launch_uses_single_restart_transaction_after_collectors(
     assert observed_names.index(
         "package_clean_restart_requested"
     ) < observed_names.index("package_launched")
-    assert observed_names.index("package_launched") < observed_names.index(
-        "device_metadata_started"
-    )
-    assert observed_names.index("device_metadata_started") < observed_names.index(
-        "device_metadata_completed"
-    )
 
 def test_clean_launch_rejects_reused_activity_instance(
     tmp_path: Path,

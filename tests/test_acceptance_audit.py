@@ -18,6 +18,7 @@ from mobile_research.export import (
 REQUIRED_EVENTS = (
     "session_created",
     "preflight_started",
+    "device_metadata_completed",
     "raw_network_preflight_completed",
     "preflight_completed",
     "logcat_started",
@@ -25,7 +26,6 @@ REQUIRED_EVENTS = (
     "raw_network_started",
     "capture_active",
     "package_launched",
-    "device_metadata_completed",
     "stop_requested",
     "raw_network_stopped",
     "screen_recording_stopped",
@@ -114,14 +114,14 @@ def _build_zip(
     event_seconds = (
         0.2,
         0.5,
-        0.8,
         1.0,
         1.2,
-        1.4,
-        1.6,
-        1.7,
+        1.5,
+        2.0,
         2.2,
-        3.2,
+        2.4,
+        2.5,
+        4.0,
         8.0,
         8.2,
         8.4,
@@ -165,10 +165,10 @@ def _build_zip(
     }
     target = {
         "clock": {
-            "host_started_utc": stamp(2.3),
-            "target_started_utc": stamp(2.0),
-            "host_finished_utc": stamp(3.1),
-            "target_finished_utc": stamp(3.0),
+            "host_started_utc": stamp(0.4),
+            "target_started_utc": stamp(0.0),
+            "host_finished_utc": stamp(1.4),
+            "target_finished_utc": stamp(1.0),
         }
     }
     screen = {
@@ -176,23 +176,23 @@ def _build_zip(
             {
                 "status": "completed",
                 "bytes": 100,
-                "host_started_utc": stamp(1.3),
+                "host_started_utc": stamp(1.9),
                 "host_finished_utc": stamp(8.2),
-                "capture_span_seconds": 6.9,
+                "capture_span_seconds": 6.3,
                 "frame_timing": {
                     "source": "winscope-v2",
                     "version": 2,
                     "frame_count": 12,
-                    "first_frame_utc": stamp(1.5),
+                    "first_frame_utc": stamp(2.1),
                     "last_frame_utc": stamp(5.0),
-                    "frame_span_seconds": 3.5,
+                    "frame_span_seconds": 2.9,
                 },
             }
         ]
     }
     logcat = (
-        f"{_epoch(stamp(1.4)):.3f}  1  1 I Test: start\n"
-        f"{_epoch(stamp(2.2)):.3f}  1  1 I Test: launch\n"
+        f"{_epoch(stamp(2.0)):.3f}  1  1 I Test: start\n"
+        f"{_epoch(stamp(4.0)):.3f}  1  1 I Test: launch\n"
         f"{_epoch(stamp(8.2)):.3f}  1  1 I Test: stop\n"
     ).encode()
 
@@ -205,8 +205,8 @@ def _build_zip(
         ),
         "01_raw/logcat/logcat.txt": logcat,
         "01_raw/network/traffic.pcap": _pcap(
-            stamp(1.8),
-            stamp(2.4),
+            stamp(2.6),
+            stamp(4.2),
             stamp(7.5),
         ),
         "02_normalized/session-events.jsonl": (
@@ -251,8 +251,8 @@ def test_complete_research_zip_semantic_audit(
     assert result.screen_frames == 12
     assert result.max_clock_skew_seconds <= 1.0
     assert result.screen_last_frame_gap_seconds >= 3.0
-    assert result.screen_capture_span_seconds == pytest.approx(6.9)
-    assert result.screen_capture_started_utc == stamp_for_test(1.3)
+    assert result.screen_capture_span_seconds == pytest.approx(6.3)
+    assert result.screen_capture_started_utc == stamp_for_test(1.9)
     assert result.screen_capture_stopped_utc == stamp_for_test(8.2)
 
 
