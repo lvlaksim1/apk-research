@@ -171,7 +171,7 @@ def _launch_reused_existing_instance(output: str) -> bool:
 
 def _launch_state(output: str) -> str | None:
     match = re.search(
-        r"(?im)^LaunchState:\\s*([A-Za-z_]+)\\s*$",
+        r"(?im)^LaunchState:\s*([A-Za-z_]+)\s*$",
         output,
     )
     return match.group(1).upper() if match else None
