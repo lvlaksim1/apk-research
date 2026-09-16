@@ -1,20 +1,21 @@
-# apk-research v0.15.0
+# apk-research v0.16.0
 
-v0.15.0 completes the product rename to **apk-research**.
+v0.16.0 adds passive **QUIC v1/v2 and HTTP/3 network intelligence** to post-capture analysis.
 
-## Renamed surfaces
+## Added
 
-- repository: `apk-research`;
-- Python distribution: `apk-research`;
-- Python namespace: `apk_research`;
-- GUI/QSettings identity: `apk-research`;
-- CLI: `apk-research` and `apk-research-gui`;
-- standalone executable: `apk-research.exe`;
-- PyInstaller target/spec: `apk-research` / `packaging/apk-research.spec`;
-- Inno Setup source: `packaging/apk-research.iss`;
-- installer/release asset: `apk-research-setup_v0.15.0.exe`;
-- installation directory and shortcuts: `apk-research`.
+- recognizes QUIC v1 and QUIC v2 long-header traffic from captured UDP payloads;
+- derives standards-defined public QUIC Initial protection material and decrypts Initial packets only;
+- reassembles client Initial CRYPTO evidence and extracts TLS ClientHello SNI and ALPN;
+- classifies ALPN `h3` / `h3-*` as HTTP/3;
+- upgrades `02_normalized/network-flows.json` to schema `0.3`;
+- records application protocols, QUIC versions, packet types, SNI, ALPN and Initial-decode status per normalized flow;
+- adds QUIC/HTTP3 summary counters;
+- extends Network Analyzer host selection, search and readable details with QUIC evidence;
+- adds RFC 9001 (QUIC v1) and RFC 9369 (QUIC v2) key-vector tests and protected synthetic Client Initial tests.
 
-## Compatibility
+## Evidence boundary
 
-The Inno Setup AppId is preserved so the renamed application upgrades the existing installation. Capture/runtime behavior and forensic evidence formats are unchanged.
+UDP/443 alone is not treated as proof of QUIC. Initial packet analysis is passive and does not use MITM. Handshake and 1-RTT application payloads remain encrypted and are not claimed as decoded.
+
+Raw PCAP, socket/package ownership attribution, canonical flow IDs, Timeline temporal-only action correlation and the validated v0.10.5 Android runtime/clean-launch path are unchanged.

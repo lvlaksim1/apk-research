@@ -1,5 +1,13 @@
 # apk-research
 
+## v0.16.0 — QUIC / HTTP/3 Network Intelligence
+
+v0.16.0 расширяет post-capture Network Analyzer поддержкой QUIC v1/v2 и HTTP/3. Для UDP-трафика parser распознаёт QUIC long headers, а для Initial-пакетов использует публично выводимые Initial secrets стандарта QUIC, чтобы извлечь TLS ClientHello metadata: SNI и ALPN. ALPN `h3` / `h3-*` маркируется как HTTP/3.
+
+`02_normalized/network-flows.json` обновлён до schema `0.3` и хранит `application_protocols`, `quic_versions`, `quic_packet_types`, `quic_sni`, `quic_alpn` и признак успешного Initial decode. Network Analyzer показывает эту evidence отдельно и использует QUIC SNI как наиболее прямое имя host для такого flow.
+
+Граница доказательств строгая: UDP/443 сам по себе не считается QUIC; Initial decode не является MITM и не даёт ключей Handshake/1-RTT. Raw PCAP, socket attribution, Timeline temporal-only semantics и проверенный v0.10.5 runtime/clean-launch path не меняются.
+
 ## v0.15.0 — Product rename to apk-research
 
 Начиная с v0.15.0 программа, репозиторий, Python distribution/namespace, GUI, CLI, EXE, installer, release assets, каталоги установки и техническая документация используют единое имя `apk-research`.

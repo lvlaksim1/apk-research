@@ -2,6 +2,20 @@
 
 All notable apk-research changes are recorded here.
 
+## [0.16.0] - 2026-09-17
+
+### QUIC / HTTP/3 network intelligence
+
+- Adds passive QUIC v1 and QUIC v2 long-header recognition to PCAP post-processing.
+- Derives only standards-defined public Initial protection material and decrypts QUIC Initial packets; Handshake and 1-RTT application traffic remain encrypted and are not claimed as decoded.
+- Reassembles client CRYPTO frames sufficiently to parse TLS ClientHello SNI and ALPN.
+- Classifies ALPN `h3` / `h3-*` as HTTP/3 and preserves generic QUIC when HTTP/3 is not evidenced.
+- Upgrades `02_normalized/network-flows.json` to schema `0.3` with explicit QUIC/application-protocol evidence and QUIC/HTTP3 summary counters.
+- Extends Network Analyzer host selection, search and flow details with QUIC version, packet types, Initial-decode status, SNI and ALPN.
+- Adds RFC 9001 QUIC v1 and RFC 9369 QUIC v2 initial-key regression vectors plus protected synthetic Initial packet tests.
+- Keeps raw PCAP, Android socket ownership attribution, Timeline `temporal-only` action correlation, capture collectors and the validated v0.10.5 runtime/clean-launch sequence unchanged.
+- Does not infer QUIC merely from UDP/443 and does not perform MITM or decrypt Handshake/1-RTT traffic.
+
 ## [0.15.0] - 2026-09-17
 
 ### Product rename

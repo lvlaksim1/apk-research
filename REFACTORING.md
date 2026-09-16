@@ -1,5 +1,28 @@
 # Refactoring and Architecture Log
 
+## v0.16.0 — QUIC / HTTP/3 Network Intelligence
+
+### Scope
+
+Post-capture protocol intelligence only. Android runtime, clean launch, tcpdump capture, socket attribution and raw evidence collection are unchanged.
+
+### QUIC evidence model
+
+- QUIC is asserted only after a syntactically valid QUIC long header is recognized; UDP/443 alone is not sufficient evidence.
+- QUIC v1 (`0x00000001`) and QUIC v2 (`0x6b3343cf`) Initial protection are supported.
+- Initial keys are derived from the standards-defined version salt and the client's initial Destination Connection ID. This is passive analysis of public Initial protection, not MITM.
+- Client Initial CRYPTO frames are reassembled and TLS ClientHello SNI/ALPN are extracted when present.
+- ALPN `h3` or `h3-*` establishes HTTP/3 application-protocol evidence.
+- Handshake and 1-RTT payloads remain encrypted; apk-research does not claim application-content decryption.
+
+### Normalized evidence
+
+`network-flows.json` schema is `0.3`. Canonical bidirectional 5-tuple `flow_id` identity and ownership attribution are unchanged. QUIC metadata is additive: application protocols, QUIC versions/types, Initial-decode state, SNI and ALPN.
+
+### Validation boundary
+
+The available real v0.13 Research ZIP contains UDP traffic but no UDP/443 flow, so it cannot validate a live QUIC session. Protocol correctness is covered by RFC 9001/RFC 9369 initial-key vectors and protected synthetic QUIC v1/v2 Client Initial packets. Future real archives containing QUIC will be evaluated without changing this evidence contract.
+
 ## v0.15.0 — Product identity: apk-research
 
 ### Scope
@@ -58,7 +81,7 @@ Network inspection теперь одновременно читает `research-
 
 ## Текущее состояние
 
-**Этап:** v0.14.0 — Host Intelligence: Service vs DNS.
+**Этап:** v0.16.0 — QUIC / HTTP/3 Network Intelligence.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
