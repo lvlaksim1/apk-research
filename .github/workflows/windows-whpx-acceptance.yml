@@ -7,7 +7,7 @@ on:
       - main
     paths:
       - "pyproject.toml"
-      - "src/mobile_research/__init__.py"
+      - "src/apk_research/__init__.py"
 
 permissions:
   contents: read
@@ -61,7 +61,6 @@ jobs:
       - self-hosted
       - Windows
       - X64
-      - mobile-research-whpx
     timeout-minutes: 90
 
     steps:
@@ -72,7 +71,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = "Stop"
-          $target = Join-Path $env:RUNNER_TEMP "MobileResearchWHPXInstaller"
+          $target = Join-Path $env:RUNNER_TEMP "apk-research-whpx-installer"
           New-Item -ItemType Directory -Force $target | Out-Null
 
           $headers = @{
@@ -84,7 +83,7 @@ jobs:
           $release = Invoke-RestMethod -Headers $headers -Uri $releaseUri
 
           $version = $env:RELEASE_TAG.TrimStart("v")
-          $installerName = "MobileResearchSetup_v$version.exe"
+          $installerName = "apk-research-setup_v$version.exe"
           foreach ($name in @($installerName, "SHA256SUMS.txt")) {
             $asset = $release.assets | Where-Object { $_.name -eq $name } | Select-Object -First 1
             if (-not $asset) { throw "Release asset is missing: $name" }
@@ -100,8 +99,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $artifact = Join-Path $env:RUNNER_TEMP "MobileResearchWHPXInstaller"
-          $installer = Get-ChildItem -Path $artifact -Filter "MobileResearchSetup_v*.exe" | Select-Object -First 1
+          $artifact = Join-Path $env:RUNNER_TEMP "apk-research-whpx-installer"
+          $installer = Get-ChildItem -Path $artifact -Filter "apk-research-setup_v*.exe" | Select-Object -First 1
           if (-not $installer) { throw "Versioned installer artifact is missing" }
           $installer = $installer.FullName
           $checksums = Join-Path $artifact "SHA256SUMS.txt"
@@ -118,7 +117,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $programDir = Join-Path $env:LOCALAPPDATA "Programs\MobileResearch"
+          $programDir = Join-Path $env:LOCALAPPDATA "Programs\apk-research"
           $uninstaller = Join-Path $programDir "unins000.exe"
           if (Test-Path $uninstaller) {
             $process = Start-Process -FilePath $uninstaller -ArgumentList @(
@@ -127,11 +126,11 @@ jobs:
               "/NORESTART"
             ) -Wait -PassThru
             if ($process.ExitCode -ne 0) {
-              throw "Previous Mobile Research uninstall failed: $($process.ExitCode)"
+              throw "Previous apk-research uninstall failed: $($process.ExitCode)"
             }
           }
 
-          $stateRoot = Join-Path $env:LOCALAPPDATA "MobileResearch"
+          $stateRoot = Join-Path $env:LOCALAPPDATA "apk-research"
           Remove-Item $programDir -Recurse -Force -ErrorAction SilentlyContinue
           Remove-Item $stateRoot -Recurse -Force -ErrorAction SilentlyContinue
 
@@ -140,16 +139,16 @@ jobs:
             throw "TCP port 5554 is already in use; runner is not clean"
           }
 
-          $acceptanceRoot = Join-Path $env:RUNNER_TEMP "MobileResearchWHPX"
+          $acceptanceRoot = Join-Path $env:RUNNER_TEMP "apk-research-whpx"
           Remove-Item $acceptanceRoot -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force $acceptanceRoot | Out-Null
 
-      - name: Install Mobile Research as a user would
+      - name: Install apk-research as a user would
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $artifact = Join-Path $env:RUNNER_TEMP "MobileResearchWHPXInstaller"
-          $installerFile = Get-ChildItem -Path $artifact -Filter "MobileResearchSetup_v*.exe" | Select-Object -First 1
+          $artifact = Join-Path $env:RUNNER_TEMP "apk-research-whpx-installer"
+          $installerFile = Get-ChildItem -Path $artifact -Filter "apk-research-setup_v*.exe" | Select-Object -First 1
           if (-not $installerFile) { throw "Versioned installer artifact is missing" }
           $installer = $installerFile.FullName
           $process = Start-Process -FilePath $installer -ArgumentList @(
@@ -159,19 +158,19 @@ jobs:
             "/SP-"
           ) -Wait -PassThru
           if ($process.ExitCode -ne 0) {
-            throw "Versioned Mobile Research installer failed: $($process.ExitCode)"
+            throw "Versioned apk-research installer failed: $($process.ExitCode)"
           }
 
-          $exe = Join-Path $env:LOCALAPPDATA "Programs\MobileResearch\MobileResearch.exe"
+          $exe = Join-Path $env:LOCALAPPDATA "Programs\apk-research\apk-research.exe"
           if (-not (Test-Path $exe)) {
-            throw "Installed MobileResearch.exe was not found"
+            throw "Installed apk-research.exe was not found"
           }
 
       - name: Download pinned acceptance APK
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $acceptanceRoot = Join-Path $env:RUNNER_TEMP "MobileResearchWHPX"
+          $acceptanceRoot = Join-Path $env:RUNNER_TEMP "apk-research-whpx"
           $apk = Join-Path $acceptanceRoot "ApiDemos-debug-v6.0.17.apk"
           $url = "https://github.com/appium/android-apidemos/releases/download/v6.0.17/ApiDemos-debug.apk"
           $expected = "90cc1041c063a7fb68889143250fefa3139ef0c81e4208f67dbaafe8f15c8be9"
@@ -190,23 +189,23 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $acceptanceRoot = Join-Path $env:RUNNER_TEMP "MobileResearchWHPX"
+          $acceptanceRoot = Join-Path $env:RUNNER_TEMP "apk-research-whpx"
           $resultPath = Join-Path $acceptanceRoot "result.json"
           $stdoutPath = Join-Path $acceptanceRoot "stdout.txt"
           $stderrPath = Join-Path $acceptanceRoot "stderr.txt"
-          $exe = Join-Path $env:LOCALAPPDATA "Programs\MobileResearch\MobileResearch.exe"
+          $exe = Join-Path $env:LOCALAPPDATA "Programs\apk-research\apk-research.exe"
 
-          $env:MOBILE_RESEARCH_ACCEPTANCE_ROOT = $acceptanceRoot
-          $env:MOBILE_RESEARCH_ACCEPTANCE_RESULT = $resultPath
-          $env:MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_WINDOWS = "1"
-          $env:MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_FROZEN = "1"
-          $env:MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_WHPX = "1"
-          $env:MOBILE_RESEARCH_ACCEPTANCE_REQUIRE_CLEAN_COMPONENTS = "1"
-          $env:MOBILE_RESEARCH_ACCEPTANCE_EXPECT_EXECUTABLE = $exe
-          $env:MOBILE_RESEARCH_ACCEPTANCE_APK = Join-Path $acceptanceRoot "ApiDemos-debug-v6.0.17.apk"
-          $env:MOBILE_RESEARCH_ACCEPTANCE_EXPECT_PACKAGE = "io.appium.android.apis"
-          Remove-Item Env:MOBILE_RESEARCH_COMPONENT_ROOT -ErrorAction SilentlyContinue
-          Remove-Item Env:MOBILE_RESEARCH_SOFTWARE_EMULATOR -ErrorAction SilentlyContinue
+          $env:APK_RESEARCH_ACCEPTANCE_ROOT = $acceptanceRoot
+          $env:APK_RESEARCH_ACCEPTANCE_RESULT = $resultPath
+          $env:APK_RESEARCH_ACCEPTANCE_REQUIRE_WINDOWS = "1"
+          $env:APK_RESEARCH_ACCEPTANCE_REQUIRE_FROZEN = "1"
+          $env:APK_RESEARCH_ACCEPTANCE_REQUIRE_WHPX = "1"
+          $env:APK_RESEARCH_ACCEPTANCE_REQUIRE_CLEAN_COMPONENTS = "1"
+          $env:APK_RESEARCH_ACCEPTANCE_EXPECT_EXECUTABLE = $exe
+          $env:APK_RESEARCH_ACCEPTANCE_APK = Join-Path $acceptanceRoot "ApiDemos-debug-v6.0.17.apk"
+          $env:APK_RESEARCH_ACCEPTANCE_EXPECT_PACKAGE = "io.appium.android.apis"
+          Remove-Item Env:APK_RESEARCH_COMPONENT_ROOT -ErrorAction SilentlyContinue
+          Remove-Item Env:APK_RESEARCH_SOFTWARE_EMULATOR -ErrorAction SilentlyContinue
 
           $process = Start-Process -FilePath $exe -ArgumentList "--runtime-acceptance" -Wait -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
 
@@ -215,7 +214,7 @@ jobs:
           if (Test-Path $resultPath) { Get-Content $resultPath }
 
           if ($process.ExitCode -ne 0) {
-            throw "Installed MobileResearch.exe runtime acceptance failed: $($process.ExitCode)"
+            throw "Installed apk-research.exe runtime acceptance failed: $($process.ExitCode)"
           }
           if (-not (Test-Path $resultPath)) {
             throw "Runtime acceptance did not create result.json"
@@ -238,7 +237,7 @@ jobs:
             throw "tcpdump was not proven"
           }
           if ($result.acceptance_apk.package -ne "io.appium.android.apis") {
-            throw "Pinned acceptance APK was not installed through Mobile Research"
+            throw "Pinned acceptance APK was not installed through apk-research"
           }
           if ($result.session.package -ne "io.appium.android.apis") {
             throw "Research session did not target the installed acceptance APK"
@@ -250,7 +249,7 @@ jobs:
             throw "Research ZIP verification failed"
           }
 
-          $componentRoot = Join-Path $env:LOCALAPPDATA "MobileResearch\components"
+          $componentRoot = Join-Path $env:LOCALAPPDATA "apk-research\components"
           foreach ($name in @("components.json", "emulator.log")) {
             $source = Join-Path $componentRoot $name
             if (Test-Path $source) {
@@ -262,17 +261,17 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: mobile-research-windows-whpx-failure-${{ needs.resolve-release.outputs.target_sha }}
+          name: apk-research-windows-whpx-failure-${{ needs.resolve-release.outputs.target_sha }}
           retention-days: 3
           if-no-files-found: warn
           path: |
-            ${{ runner.temp }}/MobileResearchWHPX/**
+            ${{ runner.temp }}/apk-research-whpx/**
 
       - name: Clean dedicated runner state
         if: always()
         shell: pwsh
         run: |
-          $programDir = Join-Path $env:LOCALAPPDATA "Programs\MobileResearch"
+          $programDir = Join-Path $env:LOCALAPPDATA "Programs\apk-research"
           $uninstaller = Join-Path $programDir "unins000.exe"
           if (Test-Path $uninstaller) {
             Start-Process -FilePath $uninstaller -ArgumentList @(
@@ -282,4 +281,4 @@ jobs:
             ) -Wait | Out-Null
           }
           Remove-Item $programDir -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item (Join-Path $env:LOCALAPPDATA "MobileResearch") -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item (Join-Path $env:LOCALAPPDATA "apk-research") -Recurse -Force -ErrorAction SilentlyContinue
