@@ -2,6 +2,17 @@
 
 All notable Mobile Research changes are recorded here.
 
+## [0.10.2] - 2026-09-16
+
+### Seamless clean launch
+
+- Replaces the separate `force-stop → pidof polling → launch` host sequence with one Android shell stop/start transaction after all collectors are armed.
+- Uses `FLAG_ACTIVITY_NO_ANIMATION` for the new Activity task transition so the managed Android view no longer intentionally plays a second launch animation during clean restart.
+- Removes the host-side stopped-process polling gap that exposed Launcher between the old task and the cold start.
+- Strengthens the clean-launch invariant: `am start -W` must report `LaunchState: COLD`; an existing-activity reuse or WARM/HOT state aborts the session.
+- Real AVD acceptance now prewarms the target app and then proves that Mobile Research converts it into a verified COLD launch.
+- Continue-current-state mode is unchanged.
+
 ## [0.10.1] - 2026-09-16
 
 ### Process attribution hardening

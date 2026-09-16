@@ -61,6 +61,26 @@ def main() -> int:
     client = AdbClient.from_environment()
     package_name = select_package(client)
 
+    prewarm_output = client.launch_package(
+        SERIAL,
+        package_name,
+    )
+    time.sleep(0.5)
+    prewarm_pids = client.get_process_ids(
+        SERIAL,
+        package_name,
+    )
+    if not prewarm_pids:
+        raise RuntimeError(
+            "Unable to prewarm acceptance package before clean launch"
+        )
+    print(json.dumps({
+        "event": "acceptance_target_prewarmed",
+        "package": package_name,
+        "pids": prewarm_pids,
+        "launch": prewarm_output[-1000:],
+    }, ensure_ascii=False))
+
     orchestrator = ResearchOrchestrator(
         client,
         SERIAL,
@@ -69,6 +89,7 @@ def main() -> int:
         output_path=ARCHIVE,
         overwrite_output=True,
         screen_chunk_seconds=30,
+        launch_mode="clean",
     )
 
     try:
@@ -138,10 +159,21 @@ def main() -> int:
             raise RuntimeError("Research ZIP verification failed")
 
         with zipfile.ZipFile(result.archive) as archive:
+            launch_evidence = archive.read(
+                "01_raw/device/package-launch.txt"
+            ).decode("utf-8", errors="replace")
             archived_timeline = json.loads(
                 archive.read(
                     "02_normalized/research-timeline.json"
                 )
+            )
+        if "LaunchState: COLD" not in launch_evidence:
+            raise RuntimeError(
+                "Clean launch did not produce LaunchState: COLD"
+            )
+        if "Activity not started" in launch_evidence:
+            raise RuntimeError(
+                "Clean launch reused an existing activity instance"
             )
         if archived_timeline.get("schema_version") != "0.3":
             raise RuntimeError(

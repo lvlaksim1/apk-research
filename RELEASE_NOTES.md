@@ -1,15 +1,16 @@
-# Mobile Research v0.10.1
+# Mobile Research v0.10.2
 
-v0.10.1 hardens the package-aware network attribution introduced in v0.10.0 after validation on a real Windows Research ZIP.
+v0.10.2 fixes the visible minimize/reopen transition reported on real Windows hardware when starting research in «Чистый запуск» mode.
 
 ## Changes
 
-- Fixes target process/PID discovery in the Android socket sampler. `/proc/<pid>/status` uses TAB-separated `Uid:` fields; the previous custom shell IFS did not contain a real TAB, so process observations could remain empty even while UID-owned sockets were collected.
-- Restores the complete ownership chain `package → UID → PID/process → FD → socket inode → 5-tuple → PCAP`.
-- Preserves unique-UID attribution semantics from v0.10.0 while making shared-UID PID/socket disambiguation operational on real Android.
-- Real AVD release acceptance now fails if no process observations are captured or if the launched target package process is absent from normalized socket snapshots.
-- Adds a regression test for the generated remote shell parser.
-- No change to the validated Windows runtime: hidden Emulator, top-down gRPC/MMAP framebuffer and persistent gRPC input remain the only interactive path.
-- Installer asset: `MobileResearchSetup_v0.10.1.exe`.
+- Clean mode no longer performs separate host-side `force-stop`, process polling and later Activity launch commands.
+- The stop and cold start are issued in one Android shell transaction immediately after all collectors are armed.
+- The launched Activity carries `FLAG_ACTIVITY_NO_ANIMATION`, suppressing the redundant task entrance animation without changing application-internal animations.
+- Clean launch is accepted only when Android `am start -W` reports `LaunchState: COLD`; reuse or WARM/HOT launch fails the invariant.
+- Real AVD acceptance first prewarms the target package and then verifies that the exported Research ZIP records a COLD launch.
+- «Продолжить текущее состояние» behavior is unchanged.
+- Package-aware PID/socket attribution from v0.10.1 is unchanged.
+- Installer asset: `MobileResearchSetup_v0.10.2.exe`.
 
-Raw `traffic.pcap` remains the source of truth; socket/process attribution is additive forensic evidence.
+The clean-launch boundary remains after collector startup, so raw screen/logcat/PCAP evidence still covers the cold-start itself.

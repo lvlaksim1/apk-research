@@ -521,6 +521,59 @@ def test_resolve_and_launch_package() -> None:
     assert "Status: ok" in output
 
 
+def test_clean_launch_package_uses_one_shell_transaction() -> None:
+    command = (
+        "am force-stop com.example.app && "
+        "am start -W --activity-no-animation -n "
+        "com.example.app/.MainActivity"
+    )
+    responses = {
+        ("devices", "-l"): _completed(
+            "List of devices attached\n"
+            "emulator-5554 device model:sdk_gphone transport_id:1\n"
+        ),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            "cmd",
+            "package",
+            "resolve-activity",
+            "--brief",
+            "-a",
+            "android.intent.action.MAIN",
+            "-c",
+            "android.intent.category.LAUNCHER",
+            "com.example.app",
+        ): _completed("com.example.app/.MainActivity\n"),
+        (
+            "-s",
+            "emulator-5554",
+            "shell",
+            command,
+        ): _completed(
+            "Starting: Intent { cmp=com.example.app/.MainActivity }\n"
+            "Status: ok\n"
+            "LaunchState: COLD\n"
+            "Activity: com.example.app/.MainActivity\n"
+        ),
+    }
+
+    def runner(
+        arguments: Sequence[str],
+        timeout: float,
+    ) -> subprocess.CompletedProcess[str]:
+        return responses[tuple(arguments)]
+
+    client = AdbClient(Path("adb"), runner=runner)
+    output = client.clean_launch_package(
+        "emulator-5554",
+        "com.example.app",
+    )
+
+    assert "LaunchState: COLD" in output
+
+
 def test_launch_package_rejects_missing_launcher() -> None:
     responses = {
         ("devices", "-l"): _completed(

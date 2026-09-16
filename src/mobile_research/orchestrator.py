@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import statistics
 import time
 import threading
@@ -166,6 +167,14 @@ def _launch_reused_existing_instance(output: str) -> bool:
             and "running" in normalized
         )
     )
+
+
+def _launch_state(output: str) -> str | None:
+    match = re.search(
+        r"(?im)^LaunchState:\\s*([A-Za-z_]+)\\s*$",
+        output,
+    )
+    return match.group(1).upper() if match else None
 
 
 def _metadata_factory(
@@ -374,47 +383,44 @@ class ResearchOrchestrator:
 
             if self.launch_mode == "clean":
                 self._event(
-                    "package_force_stop_requested",
+                    "package_clean_restart_requested",
                     target_utc=self._target_time_best_effort(),
-                )
-                self.adb.force_stop_package(
-                    self.serial,
-                    self.package_name,
-                )
-                if not self.adb.wait_for_package_stopped(
-                    self.serial,
-                    self.package_name,
-                    timeout=3.0,
-                ):
-                    raise OrchestratorError(
-                        "Clean launch invariant failed: target package "
-                        "is still running after force-stop"
-                    )
-                self._event(
-                    "package_force_stopped",
-                    target_utc=self._target_time_best_effort(),
-                    details={"verified": True},
+                    details={
+                        "strategy": "single-adb-shell-stop-start",
+                        "activity_transition_animation": "disabled",
+                    },
                 )
 
             self._event(
                 "package_launch_requested",
                 target_utc=self._target_time_best_effort(),
+                details={"launch_mode": self.launch_mode},
             )
-            launch_output = self.adb.launch_package(
-                self.serial,
-                self.package_name,
-            )
+            if self.launch_mode == "clean":
+                launch_output = self.adb.clean_launch_package(
+                    self.serial,
+                    self.package_name,
+                )
+            else:
+                launch_output = self.adb.launch_package(
+                    self.serial,
+                    self.package_name,
+                )
             self._write_launch_output(launch_output)
-            if (
-                self.launch_mode == "clean"
-                and _launch_reused_existing_instance(
+            if self.launch_mode == "clean":
+                if _launch_reused_existing_instance(
                     launch_output
-                )
-            ):
-                raise OrchestratorError(
-                    "Clean launch invariant failed: Android reused "
-                    "an already-running activity instance"
-                )
+                ):
+                    raise OrchestratorError(
+                        "Clean launch invariant failed: Android reused "
+                        "an already-running activity instance"
+                    )
+                launch_state = _launch_state(launch_output)
+                if launch_state != "COLD":
+                    raise OrchestratorError(
+                        "Clean launch invariant failed: Android did not "
+                        f"report a COLD launch (LaunchState={launch_state!r})"
+                    )
             self._event(
                 "package_launched",
                 target_utc=self._target_time_best_effort(),

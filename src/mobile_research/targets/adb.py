@@ -600,6 +600,41 @@ class AdbClient:
             )
         return output
 
+    def clean_launch_package(
+        self,
+        serial: str,
+        package_name: str,
+    ) -> str:
+        """Force-stop and cold-start a package in one Android shell transaction."""
+
+        package_name = validate_package_name(package_name)
+        component = self.resolve_launch_activity(
+            serial,
+            package_name,
+        )
+        remote_command = (
+            "am force-stop "
+            + shlex.quote(package_name)
+            + " && am start -W --activity-no-animation -n "
+            + shlex.quote(component)
+        )
+        result = self._run_checked(
+            [
+                "-s",
+                serial,
+                "shell",
+                remote_command,
+            ],
+            timeout=30.0,
+        )
+        output = (result.stdout or "") + (result.stderr or "")
+        if "Error:" in output:
+            raise AdbError(
+                f"Unable to clean-launch package {package_name}: "
+                f"{output.strip()}"
+            )
+        return output
+
     def get_utc_time(self, serial: str) -> str:
         self.ensure_ready(serial)
         return self._shell_value(

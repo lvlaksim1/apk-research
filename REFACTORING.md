@@ -4,7 +4,7 @@
 
 ## Текущее состояние
 
-**Этап:** v0.10.1 — Package process/socket attribution hardening on the validated single-path runtime.
+**Этап:** v0.10.2 — Clean-launch transition hardening on the validated single-path runtime.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
@@ -373,4 +373,7 @@ Socket attribution may prove that a flow belongs to the target package, but it d
 
 ### ADR-100 — Real release acceptance must prove target process attribution
 A real Windows v0.10.0 Research ZIP showed valid target-UID socket observations but zero `process_observations` and zero `pid_socket_links`. The cause was shell tokenization, not Android permissions: procfs emits `Uid:` values separated by actual TAB characters, while `IFS=" \\t"` supplies literal backslash/`t` characters rather than a TAB. v0.10.1 returns the sampler to the shell default whitespace IFS. Real AVD acceptance must now prove that normalized socket snapshots contain the launched target package process, so a release cannot pass with a silently broken PID/process layer. Unique-UID socket evidence remains valid independently, but shared-UID `EXACT` attribution requires the restored direct process → FD → inode link.
+
+### ADR-101 — Clean restart is one Android-side stop/start transaction
+A real v0.10.1 Windows archive showed that clean mode was forensically correct but visually noisy: after collectors were armed, separate host commands `am force-stop`, repeated `pidof` verification and a later `am start -W` let Launcher become a visible intermediate task and Android played close/open transitions. v0.10.2 keeps the ADR-087 boundary after collectors, but collapses stop and start into one Android shell transaction with no host polling gap and applies `FLAG_ACTIVITY_NO_ANIMATION` to the new Activity. The clean invariant is verified from the launch result itself: `LaunchState: COLD` is mandatory and existing-instance reuse is forbidden. Real AVD acceptance prewarms the package before the research session and requires the exported launch evidence to prove COLD start.
 

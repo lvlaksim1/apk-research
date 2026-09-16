@@ -1,5 +1,11 @@
 # Mobile Research
 
+## v0.10.2 — Seamless clean launch
+
+Реальный Windows-тест выявил видимый Android task transition в режиме «Чистый запуск»: после arm collectors Mobile Research выполняла отдельные host round-trips `force-stop → pidof verification → am start`, поэтому на встроенном экране успевал появиться Launcher и проигрывались close/open-анимации.
+
+v0.10.2 сохраняет forensic-границу после arm collectors, но выполняет clean restart одной Android shell-транзакцией: `am force-stop <package> && am start -W --activity-no-animation ...`. Отдельная пауза/poll между stop и start удалена. Clean invariant теперь подтверждается самим `am start -W`: релиз требует `LaunchState: COLD` и запрещает reuse уже работающего Activity. Режим «Продолжить текущее состояние» не меняется.
+
 ## v0.10.1 — Process attribution hardening
 
 Реальный Windows Research ZIP v0.10.0 выявил, что socket sampler корректно собирал target-UID sockets, но не фиксировал процессы/PID: в Android `/proc/<pid>/status` поле `Uid:` разделено TAB, а sampler задавал строковый `IFS=" \\t"`, который не содержит настоящий TAB. v0.10.1 использует штатный shell IFS, поэтому снова работает цепочка `package → UID → PID/process → FD → socket inode → 5-tuple → PCAP`.

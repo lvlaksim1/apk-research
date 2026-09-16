@@ -1,6 +1,6 @@
 """Mobile Research core package."""
 
-__version__ = "0.10.1"
+__version__ = "0.10.2"
 
-# v0.10.0 release candidate: package-aware attribution with PID/socket disambiguation.
+# v0.10.2 uses a single Android clean-restart transaction.
 __all__ = ["__version__"]
