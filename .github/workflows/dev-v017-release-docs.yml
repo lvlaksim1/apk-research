@@ -1,0 +1,73 @@
+name: v0.17 release documentation
+
+on:
+  push:
+    branches:
+      - dev-v017-evidence-explorer-final
+
+permissions:
+  contents: write
+
+jobs:
+  docs:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Preserve history and add v0.17.0 sections
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def insert_after(path: str, prefix: str, marker: str, section: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              if marker in text:
+                  return
+              if not text.startswith(prefix):
+                  raise SystemExit(f"Unexpected header in {path}")
+              file.write_text(prefix + section + text[len(prefix):], encoding="utf-8")
+
+          insert_after(
+              "README.md",
+              "# apk-research\n\n",
+              "## v0.17.0 — Unified Evidence Explorer",
+              """## v0.17.0 — Unified Evidence Explorer\n\nv0.17.0 добавляет единый Evidence Explorer поверх уже существующих Timeline, Network Analyzer и socket attribution. Новый экран позволяет пройти цепочку `Action → Host → Flow → Process/Socket → Raw evidence` и выполнить обратные переходы от host/flow к связанным действиям.\n\nExplorer не создаёт новый forensic schema и не переписывает evidence. Он читает `research-timeline.json`, `network-flows.json` и `socket-attribution.json`, а для raw evidence показывает проверяемые locator'ы обратно к `traffic.pcap` и `socket-snapshots.txt`. Связь Action ↔ Flow по-прежнему остаётся `temporal-only` с `causal_claim=false`.\n\nGUI поддерживает Timeline → Evidence, Network → Evidence, Evidence → Timeline и Evidence → Network, а также поиск по actions, hosts, flow IDs, process/PID/socket evidence, endpoint и protocol. Runtime/capture path и Research ZIP schemas не меняются.\n\n""",
+          )
+
+          insert_after(
+              "REFACTORING.md",
+              "# Refactoring and Architecture Log\n\n",
+              "## v0.17.0 — Unified Evidence Explorer",
+              """## v0.17.0 — Unified Evidence Explorer\n\n### Scope\n\nPresentation-only объединение уже существующей forensic-модели. Android runtime, clean launch, collectors, PCAP capture, socket attribution и Research ZIP schemas не изменяются.\n\n### Evidence graph\n\nExplorer строит два представления одной и той же evidence-модели:\n\n- `Action → Host → Flow → Process/Socket → Raw`;\n- `Host → Flow → Action / Process/Socket / Raw`.\n\nCanonical `flow_id`, `correlated_action_ids` и owner evidence переиспользуются без изменения. Action ↔ Flow остаётся временной корреляцией, а не утверждением причинности.\n\n### Raw provenance\n\nДля flow формируется locator к `01_raw/network/traffic.pcap`: canonical flow id, target-time interval и bidirectional 5-tuple. Для process/socket attribution формируется locator к `01_raw/network/socket-snapshots.txt` и `02_normalized/socket-attribution.json` с PID/process/UID/inode/confidence evidence. Locator является указателем на источник и не заменяет RAW artifact.\n\n### GUI navigation\n\nДобавлена отдельная вкладка Evidence и двусторонние переходы Timeline ↔ Evidence ↔ Network. Поиск охватывает action, host, flow, process/PID/socket evidence, IP/port и protocol.\n\n### Validation boundary\n\nDev verification: 178 tests passed; отдельный offscreen GUI construction smoke для `UnifiedEvidenceMainWindow` прошёл. Stable runtime остаётся hidden Emulator → gRPC/MMAP → AndroidView с persistent gRPC input, startup baseline остаётся v0.10.5.\n\n""",
+          )
+
+          insert_after(
+              "CHANGELOG.md",
+              "# Changelog\n\nAll notable apk-research changes are recorded here.\n\n",
+              "## [0.17.0] - 2026-09-17",
+              """## [0.17.0] - 2026-09-17\n\n### Unified Evidence Explorer\n\n- Adds a dedicated Evidence tab to the desktop GUI.\n- Adds forward evidence navigation: Action → Host → Flow → Process/Socket → Raw.\n- Adds reverse host-centric navigation: Host → Flow → Action / Process/Socket / Raw.\n- Adds Timeline → Evidence, Network → Evidence, Evidence → Timeline and Evidence → Network transitions.\n- Adds presentation-only evidence graph/search without changing existing forensic schemas.\n- Adds raw PCAP locators based on canonical flow ID, target time interval and bidirectional 5-tuple.\n- Adds socket provenance locators with process/PID/UID/inode/confidence evidence.\n- Preserves temporal-only Action ↔ Flow semantics and does not infer causality.\n- Adds five Evidence Explorer model tests and dedicated GUI construction smoke validation.\n- Keeps Android runtime, v0.10.5 clean-launch sequencing, collectors, raw PCAP, socket attribution, QUIC/HTTP3 and Research ZIP schemas unchanged.\n\n""",
+          )
+
+          doc = Path("docs/V0.17_EVIDENCE_EXPLORER.md")
+          if not doc.exists():
+              doc.write_text(
+                  """# v0.17 — Unified Evidence Explorer\n\n## Purpose\n\nUnified Evidence Explorer provides one GUI path through evidence already captured by apk-research. It is a presentation/index layer, not a new evidence source.\n\n## Evidence paths\n\nForward view:\n\n`Action → Host → Flow → Process/Socket → Raw evidence`\n\nReverse view:\n\n`Host → Flow → Action / Process/Socket / Raw evidence`\n\n## Source artifacts\n\nThe Explorer consumes existing normalized evidence:\n\n- `02_normalized/research-timeline.json`;\n- `02_normalized/network-flows.json`;\n- `02_normalized/socket-attribution.json`.\n\nIt points back to raw sources:\n\n- `01_raw/network/traffic.pcap`;\n- `01_raw/network/socket-snapshots.txt`.\n\n## Provenance rules\n\nA flow raw locator includes canonical flow ID, target-time interval, transport and bidirectional endpoint tuple. A socket locator includes process/PID/UID/inode/confidence evidence and the time interval of the associated flow.\n\nThe locator is not a copied or transformed replacement for raw evidence. The raw artifact remains authoritative.\n\nAction ↔ Flow correlation remains `temporal-only` and `causal_claim=false`. The Explorer must never present temporal adjacency as demonstrated causality.\n\n## Navigation\n\nThe GUI supports direct transitions in both directions among Timeline, Network Analyzer and Evidence Explorer. Free-text search spans actions, hosts, flow IDs, process/PID/socket evidence, endpoints and protocols.\n\n## Compatibility boundary\n\nNo Research ZIP schema change is introduced by v0.17.0. Android runtime, collectors, v0.10.5 clean-launch sequencing and hidden Emulator → gRPC/MMAP architecture are unchanged.\n""",
+                  encoding="utf-8",
+              )
+          PY
+      - name: Commit documentation when changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet && [[ -z "$(git status --porcelain)" ]]; then
+            echo "Documentation already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md REFACTORING.md CHANGELOG.md docs/V0.17_EVIDENCE_EXPLORER.md
+          git commit -m "Document v0.17.0 Unified Evidence Explorer"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
