@@ -304,3 +304,97 @@ def test_flow_inventory_and_view_keep_quic_evidence_explicit() -> None:
     assert "QUIC / HTTP/3" in details
     assert "Initial decrypted: yes" in details
     assert "ALPN: h3" in details
+
+
+def test_unknown_long_header_is_not_confirmed_as_quic() -> None:
+    inspector = quic.QuicFlowInspector()
+    payload = (
+        b"\xc0"
+        + bytes.fromhex("80010000")
+        + b"\x00"
+        + b"\x00"
+        + b"\x00" * 24
+    )
+    assert inspector.inspect(
+        payload,
+        direction="outbound",
+    ) is None
+    assert inspector.confirmed is False
+    assert inspector.version is None
+
+
+def test_dns_shaped_udp_payload_is_not_quic() -> None:
+    inspector = quic.QuicFlowInspector()
+    # A DNS transaction ID can set the QUIC long-header/fixed bits by chance.
+    # The following payload is a valid DNS-shaped header/question prefix whose
+    # bytes 1..4 look like an unsupported QUIC version.
+    payload = (
+        b"\xc0\x01"
+        + b"\x00\x00"
+        + b"\x00\x01"
+        + b"\x00\x00"
+        + b"\x00\x00"
+        + b"\x00\x00"
+        + b"\x07example\x03com\x00"
+        + b"\x00\x01\x00\x01"
+    )
+    assert inspector.inspect(
+        payload,
+        direction="outbound",
+    ) is None
+    assert inspector.confirmed is False
+
+
+def test_version_negotiation_needs_confirmed_quic_context() -> None:
+    inspector = quic.QuicFlowInspector()
+    payload = (
+        b"\x80"
+        + b"\x00\x00\x00\x00"
+        + b"\x00"
+        + b"\x00"
+        + quic.QUIC_VERSION_1.to_bytes(4, "big")
+    )
+    assert inspector.inspect(
+        payload,
+        direction="inbound",
+    ) is None
+
+
+def test_corrupt_initial_does_not_establish_quic_context() -> None:
+    inspector = quic.QuicFlowInspector()
+    packet = bytearray(
+        _protected_initial(
+            quic.QUIC_VERSION_1
+        )
+    )
+    packet[-1] ^= 0x01
+    assert inspector.inspect(
+        bytes(packet),
+        direction="outbound",
+    ) is None
+    assert inspector.confirmed is False
+    assert inspector.version is None
+    assert inspector.inspect(
+        b"\x40" + b"\x00" * 31,
+        direction="outbound",
+    ) is None
+
+
+def test_authenticated_initial_establishes_short_header_context() -> None:
+    inspector = quic.QuicFlowInspector()
+    result = inspector.inspect(
+        _protected_initial(
+            quic.QUIC_VERSION_1
+        ),
+        direction="outbound",
+    )
+    assert result is not None
+    assert result["initial_decrypted"] is True
+    assert inspector.confirmed is True
+    short = inspector.inspect(
+        b"\x40" + b"\x00" * 31,
+        direction="outbound",
+    )
+    assert short is not None
+    assert short["version"] == "v1"
+    assert short["packet_type"] == "1-rtt"
