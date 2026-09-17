@@ -1,5 +1,13 @@
 # apk-research
 
+## v0.16.1 — QUIC evidence hardening
+
+v0.16.1 исправляет ложную QUIC-классификацию, выявленную на реальном Research ZIP v0.16.0: обычные DNS UDP/53 пакеты могли случайно совпасть с формой QUIC long header и попадали в QUIC summary.
+
+Теперь неподдерживаемая/неизвестная версия long header сама по себе не является QUIC evidence. Контекст QUIC v1/v2 устанавливается только после успешной аутентифицированной расшифровки поддерживаемого Initial-пакета. Version Negotiation, Handshake/0-RTT/Retry и short-header 1-RTT учитываются как QUIC только внутри уже подтверждённого QUIC flow.
+
+Добавлены регрессионные тесты на восемь реальных DNS-префиксов из проблемного архива. Raw PCAP, socket/package attribution, canonical flow IDs, Timeline, Android runtime, clean-launch и capture path не меняются.
+
 ## v0.16.0 — QUIC / HTTP/3 Network Intelligence
 
 v0.16.0 расширяет post-capture Network Analyzer поддержкой QUIC v1/v2 и HTTP/3. Для UDP-трафика parser распознаёт QUIC long headers, а для Initial-пакетов использует публично выводимые Initial secrets стандарта QUIC, чтобы извлечь TLS ClientHello metadata: SNI и ALPN. ALPN `h3` / `h3-*` маркируется как HTTP/3.

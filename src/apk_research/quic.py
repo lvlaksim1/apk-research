@@ -156,15 +156,26 @@ def _parse_long_header(
         return None
 
     version = int.from_bytes(data[1:5], "big")
+    config = _VERSION_CONFIG.get(version)
     cursor = 5
     dcid_length = data[cursor]
     cursor += 1
+    if (
+        config is not None
+        and dcid_length > 20
+    ):
+        return None
     if cursor + dcid_length + 1 > len(data):
         return None
     dcid = data[cursor : cursor + dcid_length]
     cursor += dcid_length
     scid_length = data[cursor]
     cursor += 1
+    if (
+        config is not None
+        and scid_length > 20
+    ):
+        return None
     if cursor + scid_length > len(data):
         return None
     scid = data[cursor : cursor + scid_length]
@@ -181,7 +192,6 @@ def _parse_long_header(
             "packet_end": len(data),
         }
 
-    config = _VERSION_CONFIG.get(version)
     type_bits = (data[0] >> 4) & 0x03
     packet_type = (
         config["types"].get(type_bits)
@@ -532,6 +542,7 @@ class QuicFlowInspector:
     )
     sni: str | None = None
     alpn: list[str] = field(default_factory=list)
+    confirmed: bool = False
 
     def inspect(
         self,
@@ -542,18 +553,15 @@ class QuicFlowInspector:
         header = _parse_long_header(payload)
         if header is None:
             if (
-                self.version is not None
+                self.confirmed
+                and self.version is not None
                 and payload
                 and not (payload[0] & 0x80)
             ):
                 return {
-                    "version": _VERSION_CONFIG.get(
-                        self.version,
-                        {},
-                    ).get(
-                        "name",
-                        f"0x{self.version:08x}",
-                    ),
+                    "version": _VERSION_CONFIG[
+                        self.version
+                    ]["name"],
                     "version_number": self.version,
                     "packet_type": "1-rtt",
                     "initial_decrypted": False,
@@ -569,26 +577,26 @@ class QuicFlowInspector:
             return None
 
         version = int(header["version"])
+
+        # v0.16.1 evidence boundary:
+        # an arbitrary long-header-shaped UDP payload is not proof of QUIC.
+        # We only establish a flow from versions whose packet protection we
+        # actually implement and can authenticate (v1/v2 Initial).
         if version not in _VERSION_CONFIG and version != 0:
-            return {
-                "version": header["version_name"],
-                "version_number": version,
-                "packet_type": header["packet_type"],
-                "initial_decrypted": False,
-                "sni": None,
-                "alpn": [],
-            }
+            return None
+
         if version == 0:
+            if not self.confirmed:
+                return None
             return {
                 "version": "negotiation",
                 "version_number": 0,
                 "packet_type": "version-negotiation",
                 "initial_decrypted": False,
-                "sni": None,
-                "alpn": [],
+                "sni": self.sni,
+                "alpn": list(self.alpn),
             }
 
-        self.version = version
         result: dict[str, Any] = {
             "version": header["version_name"],
             "version_number": version,
@@ -604,17 +612,27 @@ class QuicFlowInspector:
             "alpn": list(self.alpn),
         }
         if header["packet_type"] != "initial":
-            return result
+            if (
+                self.confirmed
+                and self.version == version
+            ):
+                return result
+            return None
 
+        # RFC 9000 requires every client UDP datagram carrying an Initial
+        # packet to be padded/coalesced to at least 1200 bytes. A smaller
+        # outbound datagram therefore cannot establish a confirmed flow.
         if (
             direction == "outbound"
-            and self.client_initial_dcid is None
+            and len(payload) < 1200
         ):
-            self.client_initial_dcid = header["dcid"]
-        initial_dcid = (
+            return None
+
+        candidate_initial_dcid = (
             self.client_initial_dcid
             or header["dcid"]
         )
+        initial_dcid = candidate_initial_dcid
         senders = (
             ["client"]
             if direction == "outbound"
@@ -636,6 +654,15 @@ class QuicFlowInspector:
             result["packet_number"] = decrypted[
                 "packet_number"
             ]
+            self.confirmed = True
+            self.version = version
+            if (
+                sender == "client"
+                and self.client_initial_dcid is None
+            ):
+                self.client_initial_dcid = (
+                    candidate_initial_dcid
+                )
 
             if sender == "client":
                 for offset, data in _crypto_fragments(
@@ -666,4 +693,11 @@ class QuicFlowInspector:
                     result["alpn"] = list(self.alpn)
             break
 
+        if not result["initial_decrypted"]:
+            if (
+                self.confirmed
+                and self.version == version
+            ):
+                return result
+            return None
         return result

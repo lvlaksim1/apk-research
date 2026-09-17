@@ -2,6 +2,18 @@
 
 All notable apk-research changes are recorded here.
 
+## [0.16.1] - 2026-09-17
+
+### QUIC evidence hardening
+
+- Fixes false-positive QUIC classification discovered in a real v0.16.0 Research ZIP where ordinary DNS UDP/53 payloads accidentally resembled QUIC long headers.
+- Unknown long-header version values are no longer treated as confirmed QUIC evidence.
+- QUIC v1/v2 flow context is established only after a supported Initial packet is successfully authenticated/decrypted with the standards-defined public Initial keys.
+- Version Negotiation, Handshake/0-RTT/Retry and short-header 1-RTT packets are reported as QUIC only after the flow already has confirmed QUIC context.
+- Outbound client Initial packets smaller than the RFC 9000 1200-byte minimum cannot establish confirmed QUIC context.
+- Adds regression coverage for the eight real DNS request/response prefixes that triggered v0.16.0 false positives.
+- Preserves raw PCAP, socket attribution, normalized 5-tuple flow identity, Timeline semantics, Android runtime and capture path unchanged.
+
 ## [0.16.0] - 2026-09-17
 
 ### QUIC / HTTP/3 network intelligence
