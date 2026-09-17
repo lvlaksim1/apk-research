@@ -1,6 +1,6 @@
 """apk-research core package."""
 
-__version__ = "0.16.1"
+__version__ = "0.17.0"
 
-# v0.16.1 hardens QUIC evidence classification against false positives.
+# v0.17.0 adds the Unified Evidence Explorer presentation layer.
 __all__ = ["__version__"]
