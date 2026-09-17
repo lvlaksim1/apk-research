@@ -1,21 +1,23 @@
-# apk-research v0.16.0
+# apk-research v0.16.1
 
-v0.16.0 adds passive **QUIC v1/v2 and HTTP/3 network intelligence** to post-capture analysis.
+v0.16.1 hardens passive QUIC evidence classification after a real v0.16.0 Research ZIP exposed false positives in ordinary DNS UDP/53 traffic.
 
-## Added
+## Fixed
 
-- recognizes QUIC v1 and QUIC v2 long-header traffic from captured UDP payloads;
-- derives standards-defined public QUIC Initial protection material and decrypts Initial packets only;
-- reassembles client Initial CRYPTO evidence and extracts TLS ClientHello SNI and ALPN;
-- classifies ALPN `h3` / `h3-*` as HTTP/3;
-- upgrades `02_normalized/network-flows.json` to schema `0.3`;
-- records application protocols, QUIC versions, packet types, SNI, ALPN and Initial-decode status per normalized flow;
-- adds QUIC/HTTP3 summary counters;
-- extends Network Analyzer host selection, search and readable details with QUIC evidence;
-- adds RFC 9001 (QUIC v1) and RFC 9369 (QUIC v2) key-vector tests and protected synthetic Client Initial tests.
+- unknown/unsupported QUIC-looking long-header version values are no longer treated as confirmed QUIC;
+- QUIC v1/v2 flow context is established only after a supported Initial packet is successfully authenticated/decrypted;
+- Version Negotiation, Handshake/0-RTT/Retry and short-header 1-RTT packets require an already confirmed QUIC flow before they are labelled as QUIC;
+- outbound client Initial packets below the RFC 9000 1200-byte minimum cannot establish confirmed QUIC context;
+- eight real DNS request/response byte prefixes from the failing v0.16.0 archive are covered by permanent regression tests.
+
+## Validation
+
+- full Windows dev suite passes with the new regressions;
+- the affected real archive contains no UDP/443 flow, so its previous QUIC count was false evidence;
+- the corrected classifier maps those captured DNS prefixes to non-QUIC.
 
 ## Evidence boundary
 
-UDP/443 alone is not treated as proof of QUIC. Initial packet analysis is passive and does not use MITM. Handshake and 1-RTT application payloads remain encrypted and are not claimed as decoded.
+The release remains passive post-capture analysis. Raw PCAP is unchanged and remains the source of truth. QUIC Initial analysis uses only standards-defined public Initial protection material; apk-research does not perform MITM and does not decrypt QUIC Handshake or 1-RTT application content.
 
-Raw PCAP, socket/package ownership attribution, canonical flow IDs, Timeline temporal-only action correlation and the validated v0.10.5 Android runtime/clean-launch path are unchanged.
+Android runtime, v0.10.5 clean-launch sequencing, collectors, socket/package attribution, canonical bidirectional flow identity and Timeline temporal-only correlation are unchanged.
