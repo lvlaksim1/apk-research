@@ -88,10 +88,11 @@ def _nonce(
 def _protected_initial(
     version: int,
     host: str = "example.com",
+    *,
+    packet_number: int = 2,
+    packet_number_length: int = 4,
 ) -> bytes:
     dcid = bytes.fromhex("8394c8f03e515708")
-    packet_number = 2
-    packet_number_length = 4
     hello = _client_hello(
         host,
         ["h3", "h3-29"],
@@ -129,9 +130,15 @@ def _protected_initial(
     header_prefix += _encode_varint(
         protected_length
     )
-    packet_number_bytes = packet_number.to_bytes(
-        packet_number_length,
-        "big",
+    truncated_packet_number = (
+        packet_number
+        & ((1 << (packet_number_length * 8)) - 1)
+    )
+    packet_number_bytes = (
+        truncated_packet_number.to_bytes(
+            packet_number_length,
+            "big",
+        )
     )
     associated_data = (
         header_prefix
@@ -251,6 +258,42 @@ def test_quic_v2_client_initial_exposes_sni_and_http3_alpn() -> None:
     assert result["initial_decrypted"] is True
     assert result["sni"] == "v2.example"
     assert "h3" in result["alpn"]
+
+
+def test_flow_inspector_reconstructs_truncated_initial_packet_number() -> None:
+    inspector = quic.QuicFlowInspector()
+
+    first = inspector.inspect(
+        _protected_initial(
+            quic.QUIC_VERSION_1,
+            "pn.example",
+            packet_number=259,
+            packet_number_length=2,
+        ),
+        direction="outbound",
+    )
+    assert first is not None
+    assert first["initial_decrypted"] is True
+    assert first["packet_number"] == 259
+
+    second = inspector.inspect(
+        _protected_initial(
+            quic.QUIC_VERSION_1,
+            "pn.example",
+            packet_number=260,
+            packet_number_length=1,
+        ),
+        direction="outbound",
+    )
+    assert second is not None
+    assert second["initial_decrypted"] is True
+    assert second["packet_number"] == 260
+    assert (
+        inspector.largest_initial_packet_number[
+            "client"
+        ]
+        == 260
+    )
 
 
 def test_flow_inventory_and_view_keep_quic_evidence_explicit() -> None:
