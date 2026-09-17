@@ -2,6 +2,21 @@
 
 All notable apk-research changes are recorded here.
 
+## [0.17.0] - 2026-09-17
+
+### Unified Evidence Explorer
+
+- Adds a dedicated Evidence tab to the desktop GUI.
+- Adds forward evidence navigation: Action → Host → Flow → Process/Socket → Raw.
+- Adds reverse host-centric navigation: Host → Flow → Action / Process/Socket / Raw.
+- Adds Timeline → Evidence, Network → Evidence, Evidence → Timeline and Evidence → Network transitions.
+- Adds presentation-only evidence graph/search without changing existing forensic schemas.
+- Adds raw PCAP locators based on canonical flow ID, target time interval and bidirectional 5-tuple.
+- Adds socket provenance locators with process/PID/UID/inode/confidence evidence.
+- Preserves temporal-only Action ↔ Flow semantics and does not infer causality.
+- Adds five Evidence Explorer model tests and dedicated GUI construction smoke validation.
+- Keeps Android runtime, v0.10.5 clean-launch sequencing, collectors, raw PCAP, socket attribution, QUIC/HTTP3 and Research ZIP schemas unchanged.
+
 ## [0.16.1] - 2026-09-17
 
 ### QUIC evidence hardening

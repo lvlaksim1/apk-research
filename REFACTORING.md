@@ -1,5 +1,32 @@
 # Refactoring and Architecture Log
 
+## v0.17.0 — Unified Evidence Explorer
+
+### Scope
+
+Presentation-only объединение уже существующей forensic-модели. Android runtime, clean launch, collectors, PCAP capture, socket attribution и Research ZIP schemas не изменяются.
+
+### Evidence graph
+
+Explorer строит два представления одной и той же evidence-модели:
+
+- `Action → Host → Flow → Process/Socket → Raw`;
+- `Host → Flow → Action / Process/Socket / Raw`.
+
+Canonical `flow_id`, `correlated_action_ids` и owner evidence переиспользуются без изменения. Action ↔ Flow остаётся временной корреляцией, а не утверждением причинности.
+
+### Raw provenance
+
+Для flow формируется locator к `01_raw/network/traffic.pcap`: canonical flow id, target-time interval и bidirectional 5-tuple. Для process/socket attribution формируется locator к `01_raw/network/socket-snapshots.txt` и `02_normalized/socket-attribution.json` с PID/process/UID/inode/confidence evidence. Locator является указателем на источник и не заменяет RAW artifact.
+
+### GUI navigation
+
+Добавлена отдельная вкладка Evidence и двусторонние переходы Timeline ↔ Evidence ↔ Network. Поиск охватывает action, host, flow, process/PID/socket evidence, IP/port и protocol.
+
+### Validation boundary
+
+Dev verification: 178 tests passed; отдельный offscreen GUI construction smoke для `UnifiedEvidenceMainWindow` прошёл. Stable runtime остаётся hidden Emulator → gRPC/MMAP → AndroidView с persistent gRPC input, startup baseline остаётся v0.10.5.
+
 ## v0.16.1 — QUIC evidence hardening
 
 ### Trigger

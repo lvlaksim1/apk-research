@@ -1,5 +1,13 @@
 # apk-research
 
+## v0.17.0 — Unified Evidence Explorer
+
+v0.17.0 добавляет единый Evidence Explorer поверх уже существующих Timeline, Network Analyzer и socket attribution. Новый экран позволяет пройти цепочку `Action → Host → Flow → Process/Socket → Raw evidence` и выполнить обратные переходы от host/flow к связанным действиям.
+
+Explorer не создаёт новый forensic schema и не переписывает evidence. Он читает `research-timeline.json`, `network-flows.json` и `socket-attribution.json`, а для raw evidence показывает проверяемые locator'ы обратно к `traffic.pcap` и `socket-snapshots.txt`. Связь Action ↔ Flow по-прежнему остаётся `temporal-only` с `causal_claim=false`.
+
+GUI поддерживает Timeline → Evidence, Network → Evidence, Evidence → Timeline и Evidence → Network, а также поиск по actions, hosts, flow IDs, process/PID/socket evidence, endpoint и protocol. Runtime/capture path и Research ZIP schemas не меняются.
+
 ## v0.16.1 — QUIC evidence hardening
 
 v0.16.1 исправляет ложную QUIC-классификацию, выявленную на реальном Research ZIP v0.16.0: обычные DNS UDP/53 пакеты могли случайно совпасть с формой QUIC long header и попадали в QUIC summary.
