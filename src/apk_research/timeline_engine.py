@@ -151,10 +151,16 @@ def _flow_summary(
     new_flow_ids_seen: set[str] = set()
     dns: list[str] = []
     sni: list[str] = []
+    quic_versions: list[str] = []
+    quic_alpn: list[str] = []
+    application_protocols: list[str] = []
     package_dns: list[str] = []
     package_sni: list[str] = []
     dns_seen: set[str] = set()
     sni_seen: set[str] = set()
+    quic_versions_seen: set[str] = set()
+    quic_alpn_seen: set[str] = set()
+    application_protocols_seen: set[str] = set()
     package_dns_seen: set[str] = set()
     package_sni_seen: set[str] = set()
     total_bytes = 0
@@ -245,6 +251,40 @@ def _flow_summary(
                 package_sni_seen.add(server_name)
                 package_sni.append(server_name)
 
+        quic_version = packet.get("quic_version")
+        if (
+            isinstance(quic_version, str)
+            and quic_version
+            and quic_version not in quic_versions_seen
+        ):
+            quic_versions_seen.add(quic_version)
+            quic_versions.append(quic_version)
+
+        for alpn in packet.get("quic_alpn") or []:
+            alpn_text = str(alpn or "").strip()
+            if (
+                alpn_text
+                and alpn_text not in quic_alpn_seen
+            ):
+                quic_alpn_seen.add(alpn_text)
+                quic_alpn.append(alpn_text)
+
+        application_protocol = packet.get(
+            "application_protocol"
+        )
+        if (
+            isinstance(application_protocol, str)
+            and application_protocol
+            and application_protocol
+            not in application_protocols_seen
+        ):
+            application_protocols_seen.add(
+                application_protocol
+            )
+            application_protocols.append(
+                application_protocol
+            )
+
     flows: list[dict[str, Any]] = []
     for flow_id, count in flow_counts.most_common(
         MAX_FLOW_SAMPLE
@@ -266,6 +306,31 @@ def _flow_summary(
                 or [],
                 "tls_sni": flow.get("tls_sni")
                 or [],
+                "application_protocols": (
+                    flow.get("application_protocols")
+                    or []
+                ),
+                "quic_versions": (
+                    flow.get("quic_versions")
+                    or []
+                ),
+                "quic_packet_types": (
+                    flow.get("quic_packet_types")
+                    or []
+                ),
+                "quic_sni": (
+                    flow.get("quic_sni")
+                    or []
+                ),
+                "quic_alpn": (
+                    flow.get("quic_alpn")
+                    or []
+                ),
+                "quic_initial_decrypted": bool(
+                    flow.get(
+                        "quic_initial_decrypted"
+                    )
+                ),
             }
         )
 
@@ -289,6 +354,9 @@ def _flow_summary(
         ],
         "dns_queries": dns,
         "tls_sni": sni,
+        "quic_versions": quic_versions,
+        "quic_alpn": quic_alpn,
+        "application_protocols": application_protocols,
         "package_dns_queries": package_dns,
         "package_tls_sni": package_sni,
         "package_attribution": {
@@ -633,7 +701,7 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
     events.extend(network_markers)
     events.sort(key=lambda item: str(item.get("host_utc") or ""))
 
-    timeline["schema_version"] = "0.4"
+    timeline["schema_version"] = "0.5"
     timeline["clock_alignment"] = alignment
     timeline["network_attribution"] = (
         attribution_index.summarize_packets(packets)
@@ -669,6 +737,12 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
             "non_tcp_udp_packet_count"
         )
         or 0
+    )
+    summary["network_quic_flows"] = int(
+        flow_summary.get("quic_flow_count") or 0
+    )
+    summary["network_http3_flows"] = int(
+        flow_summary.get("http3_flow_count") or 0
     )
     summary["timeline_events"] = len(events)
 
