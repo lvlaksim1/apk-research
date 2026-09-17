@@ -134,7 +134,7 @@ class ResearchMainWindow(TimelineMainWindow):
         )
         self.network_search = QLineEdit()
         self.network_search.setPlaceholderText(
-            "Host / IP / process / DNS / SNI / action"
+            "Host / IP / process / DNS / SNI / QUIC / ALPN / action"
         )
         controls.addWidget(
             self.network_load_selected
@@ -167,7 +167,7 @@ class ResearchMainWindow(TimelineMainWindow):
             [
                 "Host / Flow",
                 "Owner",
-                "Protocol",
+                "Transport / App",
                 "Local",
                 "Remote",
                 "↑",
