@@ -1,5 +1,23 @@
 # Refactoring and Architecture Log
 
+## v0.16.1 — QUIC evidence hardening
+
+### Trigger
+
+Реальный v0.16.0 Research ZIP выявил четыре ложных QUIC flow: восемь DNS UDP/53 request/response packets случайно удовлетворяли форме long header и попадали в QUIC summary, хотя UDP/443 в сессии отсутствовал.
+
+### Corrected evidence contract
+
+- unknown/unsupported long-header version is not sufficient evidence of QUIC;
+- supported QUIC v1/v2 context becomes confirmed only after successful Initial authentication/decryption;
+- Version Negotiation and later long/short-header packets are accepted as QUIC only for an already confirmed flow;
+- outbound client Initial smaller than 1200 bytes cannot establish a flow;
+- real DNS prefixes from the failing archive are permanent regression fixtures.
+
+### Boundary
+
+Изменение только post-capture classifier. Raw PCAP, collectors, socket attribution, canonical flow identity, Timeline correlation, hidden Emulator → gRPC/MMAP runtime и v0.10.5 clean-launch sequencing не меняются.
+
 ## v0.16.0 — QUIC / HTTP/3 Network Intelligence
 
 ### Scope
@@ -81,7 +99,7 @@ Network inspection теперь одновременно читает `research-
 
 ## Текущее состояние
 
-**Этап:** v0.16.0 — QUIC / HTTP/3 Network Intelligence.
+**Этап:** v0.16.1 — QUIC evidence hardening.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
