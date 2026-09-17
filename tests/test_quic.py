@@ -398,3 +398,25 @@ def test_authenticated_initial_establishes_short_header_context() -> None:
     assert short is not None
     assert short["version"] == "v1"
     assert short["packet_type"] == "1-rtt"
+
+
+def test_real_dns_false_positive_prefixes_from_v016_archive() -> None:
+    prefixes = [
+        "c780010000010000",
+        "c78081800001000100000000",
+        "cdd6010000010000",
+        "cdd681800001000800000000",
+        "ccb6010000010000",
+        "ccb681800001000000010000",
+        "dd65010000010000",
+        "dd6581800001000800000000",
+    ]
+    for value in prefixes:
+        inspector = quic.QuicFlowInspector()
+        result = inspector.inspect(
+            bytes.fromhex(value),
+            direction="outbound",
+        )
+        assert result is None
+        assert inspector.confirmed is False
+        assert inspector.version is None
