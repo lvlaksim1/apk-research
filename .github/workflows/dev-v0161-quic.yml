@@ -1,0 +1,21 @@
+name: Dev v0.16.1 QUIC hardening
+
+on:
+  push:
+    branches:
+      - dev-v0161-quic-hardening
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: python -m pip install -e ".[desktop]" pytest
+      - name: Compile
+        run: python -m compileall -q src tests tools
+      - name: Test
+        run: python -m pytest -q
