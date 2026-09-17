@@ -246,11 +246,39 @@ def _packet_nonce(
     )
 
 
+def _decode_packet_number(
+    truncated: int,
+    packet_number_length: int,
+    largest_packet_number: int | None,
+) -> int:
+    """Recover the full QUIC packet number from its truncated encoding."""
+
+    if largest_packet_number is None:
+        return truncated
+    expected = largest_packet_number + 1
+    window = 1 << (packet_number_length * 8)
+    half_window = window // 2
+    mask = window - 1
+    candidate = (expected & ~mask) | truncated
+    if (
+        candidate <= expected - half_window
+        and candidate < (1 << 62) - window
+    ):
+        return candidate + window
+    if (
+        candidate > expected + half_window
+        and candidate >= window
+    ):
+        return candidate - window
+    return candidate
+
+
 def decrypt_initial(
     data: bytes,
     *,
     initial_dcid: bytes,
     sender: str,
+    largest_packet_number: int | None = None,
 ) -> dict[str, Any] | None:
     header = _parse_long_header(data)
     if (
@@ -299,9 +327,14 @@ def decrypt_initial(
         ^ mask[index + 1]
         for index in range(packet_number_length)
     )
-    packet_number = int.from_bytes(
+    truncated_packet_number = int.from_bytes(
         packet_number_bytes,
         "big",
+    )
+    packet_number = _decode_packet_number(
+        truncated_packet_number,
+        packet_number_length,
+        largest_packet_number,
     )
     associated_data = (
         bytes([first])
@@ -532,6 +565,10 @@ class QuicFlowInspector:
     )
     sni: str | None = None
     alpn: list[str] = field(default_factory=list)
+    largest_initial_packet_number: dict[
+        str,
+        int,
+    ] = field(default_factory=dict)
 
     def inspect(
         self,
@@ -628,6 +665,11 @@ class QuicFlowInspector:
                 payload,
                 initial_dcid=initial_dcid,
                 sender=sender,
+                largest_packet_number=(
+                    self.largest_initial_packet_number.get(
+                        sender
+                    )
+                ),
             )
             if decrypted is None:
                 continue
@@ -636,6 +678,22 @@ class QuicFlowInspector:
             result["packet_number"] = decrypted[
                 "packet_number"
             ]
+            packet_number = int(
+                decrypted["packet_number"]
+            )
+            previous_packet_number = (
+                self.largest_initial_packet_number.get(
+                    sender
+                )
+            )
+            if (
+                previous_packet_number is None
+                or packet_number
+                > previous_packet_number
+            ):
+                self.largest_initial_packet_number[
+                    sender
+                ] = packet_number
 
             if sender == "client":
                 for offset, data in _crypto_fragments(
