@@ -134,7 +134,7 @@ class ResearchMainWindow(TimelineMainWindow):
         )
         self.network_search = QLineEdit()
         self.network_search.setPlaceholderText(
-            "Host / IP / process / DNS / SNI / action"
+            "Host / IP / process / DNS / SNI / QUIC / ALPN / action"
         )
         controls.addWidget(
             self.network_load_selected
@@ -144,7 +144,7 @@ class ResearchMainWindow(TimelineMainWindow):
         controls.addWidget(
             self.network_owner_filter
         )
-        controls.addWidget(QLabel("Protocol"))
+        controls.addWidget(QLabel("Transport"))
         controls.addWidget(
             self.network_protocol_filter
         )
@@ -167,7 +167,7 @@ class ResearchMainWindow(TimelineMainWindow):
             [
                 "Host / Flow",
                 "Owner",
-                "Protocol",
+                "Transport / App",
                 "Local",
                 "Remote",
                 "↑",
@@ -437,13 +437,37 @@ class ResearchMainWindow(TimelineMainWindow):
                 )
             )
         )
-        values = [
-            str(group.get("host") or "unknown-host"),
-            str(summary.get("owner_text") or "Unknown"),
+        application_protocols = [
+            (
+                "HTTP/3"
+                if str(value).upper() == "HTTP3"
+                else str(value).upper()
+            )
+            for value in (
+                summary.get(
+                    "application_protocols"
+                )
+                or []
+            )
+            if value
+        ]
+        transport_text = (
             " + ".join(
                 summary.get("protocols") or []
             )
-            or "—",
+            or "—"
+        )
+        if application_protocols:
+            transport_text += (
+                " • "
+                + " + ".join(
+                    application_protocols
+                )
+            )
+        values = [
+            str(group.get("host") or "unknown-host"),
+            str(summary.get("owner_text") or "Unknown"),
+            transport_text,
             _count_text(
                 summary.get("flow_count") or 0,
                 "соединений",
@@ -501,12 +525,34 @@ class ResearchMainWindow(TimelineMainWindow):
             f"{time_text(flow.get('first_target_utc'))}"
             f" • {flow.get('flow_id') or 'flow'}"
         )
+        application_protocols = [
+            (
+                "HTTP/3"
+                if str(value).lower() == "http3"
+                else str(value).upper()
+            )
+            for value in (
+                flow.get(
+                    "application_protocols"
+                )
+                or []
+            )
+            if value
+        ]
+        transport_text = str(
+            flow.get("protocol") or ""
+        ).upper()
+        if application_protocols:
+            transport_text += (
+                " • "
+                + " + ".join(
+                    application_protocols
+                )
+            )
         values = [
             label,
             flow_owner(flow),
-            str(
-                flow.get("protocol") or ""
-            ).upper(),
+            transport_text,
             endpoint_text(
                 flow.get("local_ip"),
                 flow.get("local_port"),
