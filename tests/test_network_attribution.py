@@ -277,7 +277,7 @@ def test_refined_timeline_exposes_exact_package_flow_owner(
 
     timeline = build_research_timeline(session)
 
-    assert timeline["schema_version"] == "0.4"
+    assert timeline["schema_version"] == "0.5"
     assert timeline["network_attribution"][
         "packet_counts"
     ]["EXACT"] == 1
