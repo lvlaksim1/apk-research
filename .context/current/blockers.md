@@ -1,15 +1,27 @@
 # Current Blockers and Unknowns
 
-Last reconciled: 2026-10-05.
+Last reconciled: 2026-10-06.
 
 ## Product blockers
 
-No known product-code blocker is active at bootstrap.
+No known product-code blocker is active. v0.18.0 is published and all publication gates passed.
 
-## Pending evidence
+## Stage B unknowns to prove
 
-A real owner-side v0.17.0 Research ZIP has not yet been recorded as accepted. This is useful validation for the new Evidence Explorer but is not a blocker for the already published v0.17.0 release.
+The Android sidecar design is not yet validated in apk-research. Stage B must prove on the managed real AVD:
+- `app_process` execution of the project-owned payload under shell;
+- deterministic host-listen + `adb reverse` connection establishment;
+- exact version/protocol handshake;
+- bounded startup and failure behavior;
+- reliable teardown and removal;
+- no interference with the existing Emulator gRPC/MMAP runtime.
+
+These are implementation/acceptance questions, not current product defects.
+
+## Owner-side evidence
+
+A real owner-side v0.18.0 Research ZIP is not yet recorded as accepted. This is useful confirmation of Packet Inspector and Evidence Explorer UX, but it does not block Stage B because v0.18.0 already passed exact-SHA real-AVD release acceptance.
 
 ## WHPX
 
-The separate v0.17.0 WHPX run #112 was cancelled after queueing and was not a release gate. Treat WHPX as unproven for v0.17.0 unless it is explicitly re-run; do not misclassify the cancellation as a product defect.
+WHPX acceptance is advisory/non-publication-gating. Treat cancellation or queue behavior as infrastructure evidence only, not as a product defect, unless a future claim explicitly requires WHPX.

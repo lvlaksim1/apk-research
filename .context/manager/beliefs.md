@@ -2,10 +2,21 @@
 
 ## Product baseline and latest release
 
-The product authority is `main`. At manager bootstrap, the product code baseline and latest published release are `apk-research v0.17.0` at commit `202d42fcfcccf03e0a9189a1a97f6e57be3578b8`. Release asset `apk-research-setup_v0.17.0.exe` has SHA-256 `cdf5b5697f2c5af4d64d6d47f5c81326115b898929c4708e55082d68dce65b67`.
+The product authority is `main`. The current verified product baseline and latest published release are `apk-research v0.18.0` at commit `4d9f3097406502ec397416ea3e7ce07264e74814`. Release asset `apk-research-setup_v0.18.0.exe` has SHA-256 `dcae7555a407ba840577e22e4447d20e4afc44804582e8ab8954d40406d9f2a9`.
 
-- source: GitHub repository main and GitHub Release v0.17.0, reconciled 2026-10-05
-- authority: verified-repository
+Main pipeline #120 (`37390818056`) completed successfully for the exact release SHA. It passed CI, real AVD research acceptance, generated Research ZIP verification, Windows standalone/self-test/GUI smoke, installer build/install/smoke, clean-Windows managed Android provisioning and release publication.
+
+- source: GitHub repository main, main pipeline #120 and GitHub Release v0.18.0, reconciled 2026-10-06
+- authority: verified-repository + verified-ci
+
+## v0.18.0 Raw / Packet Inspector evidence boundary
+
+v0.18.0 closes the in-app raw-network inspection gap without changing capture. A selected normalized TCP/UDP flow is resolved against the original `01_raw/network/traffic.pcap` using the same direction-independent canonical flow identity as the normalized inventory. Packet presentation retains the original PCAP packet index, record/frame byte offsets, target timestamp, endpoints and lengths; raw hex preview is bounded and encrypted payload is not represented as plaintext.
+
+The release real-AVD gate additionally validated Packet Inspector against a genuinely generated Research ZIP: the selected packet count had to equal the normalized flow packet count and raw PCAP offsets had to be valid.
+
+- source: release commit `4d9f3097406502ec397416ea3e7ce07264e74814` and pipeline #120
+- authority: verified-repository + verified-ci
 
 ## v0.16.1 real-world acceptance
 
@@ -23,7 +34,7 @@ The validated runtime path is hidden Android Emulator (`-qt-hide-window`) → Em
 
 ## Evidence semantics
 
-Raw PCAP remains the primary network source of truth. Package ownership attribution, normalized flows, Timeline correlation, QUIC/HTTP3 metadata and the Unified Evidence Explorer are derived evidence. Action ↔ Flow correlation is temporal-only and must not be promoted into a causal claim.
+Raw PCAP remains the primary network source of truth. Package ownership attribution, normalized flows, Timeline correlation, QUIC/HTTP3 metadata, Unified Evidence Explorer and Packet Inspector are derived/presentation evidence. Action ↔ Flow correlation is temporal-only and must not be promoted into a causal claim.
 
 - source: repository README.md, RELEASE_NOTES.md and normalized-evidence implementation
 - authority: verified-repository
@@ -49,16 +60,16 @@ The durable Project Manager state authority is branch `context`; product baselin
 - source: owner authorization on 2026-10-05 and canonical Context Capsule permanent-authority protocol
 - authority: owner-directive
 
-## WHPX acceptance status for v0.17.0
+## WHPX acceptance status
 
-The separate WHPX acceptance run #112 (`35174782512`) finished `cancelled` after having been non-gating for release publication. This is not evidence of a v0.17.0 product failure. Re-run WHPX only if a future claim specifically requires that environment.
+Separate WHPX acceptance remains advisory/non-publication-gating. A cancelled or delayed WHPX run is not evidence of product failure unless a specific WHPX claim is being evaluated.
 
-- source: GitHub Actions run 35174782512 reconciled 2026-10-05
-- authority: verified-ci
+- source: repository release workflow and prior reconciled WHPX behavior
+- authority: verified-repository + verified-ci
 
 ## scrcpy-derived scope decision
 
-The owner accepted the useful scrcpy-derived directions except Audio Evidence and Virtual Display. Those two areas are explicitly out of the current apk-research roadmap. Retained candidates are: a bounded Android-side app_process sidecar, continuous device-PTS screen evidence, richer multi-touch/control, geometry-generation protection for input, and later opt-in keyboard/clipboard improvements. The proven gRPC/MMAP live display/input path remains authoritative and is not to be replaced by scrcpy-style encoded mirroring.
+The owner accepted the useful scrcpy-derived directions except Audio Evidence and Virtual Display. Those two areas are explicitly out of the current apk-research roadmap. Retained directions are: a bounded Android-side app_process sidecar, continuous device-PTS screen evidence, richer multi-touch/control, geometry-generation protection for input, and later opt-in keyboard/clipboard improvements. The proven gRPC/MMAP live display/input path remains authoritative and is not to be replaced by scrcpy-style encoded mirroring.
 
 - source: explicit owner directive in project dialogue on 2026-10-06 following scrcpy v5.0 review
 - authority: owner-directive

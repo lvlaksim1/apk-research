@@ -1,10 +1,10 @@
 # Next Actions
 
-1. Treat Audio Evidence and Virtual Display as out of scope unless the owner later explicitly reopens them.
-2. Keep the current hidden Emulator → gRPC/MMAP → AndroidView path and v0.10.5 startup/clean-launch sequencing unchanged.
-3. First product stage: design and implement a Raw/Packet Inspector under Unified Evidence Explorer so a flow locator can be resolved to concrete PCAP packets inside the GUI.
-4. Second stage: introduce a version-pinned project-owned Android-side `app_process` sidecar with deterministic handshake/lifecycle and long-lived transport, without taking over display/input.
-5. Third stage: use that sidecar for an experimental continuous screen evidence collector with device PTS; retain current chunked screenrecord until real A/B evidence proves the new collector.
-6. Fourth stage: add multi-touch over the existing gRPC input stream and bind input events to display-geometry generation so stale rotation/resize events are rejected.
-7. Keep v0.17.0 real-world owner ZIP validation available as a parallel acceptance task; it is useful but not a blocker for starting Stage 1.
-8. For every release-bound stage, preserve RAW-first provenance, add regression tests, pass main release gates and verify with real Research ZIP evidence when applicable.
+1. Treat v0.18.0 Raw / Packet Inspector as the verified product baseline.
+2. Keep Audio Evidence and Virtual Display out of scope unless the owner explicitly reopens them.
+3. Start Stage B from current `main`: create a dedicated sidecar feature branch and introduce the minimum project-owned Android `app_process` agent plus host lifecycle/transport abstraction.
+4. Implement exact client/agent protocol-version handshake, host-listen + `adb reverse` connection establishment, bounded timeout/error reporting and deterministic guest/host cleanup.
+5. Add unit/protocol tests first, then a dedicated real-AVD acceptance proving start → handshake → request/response → stop/cleanup without changing display/input or the v0.10.5 launch sequence.
+6. Do not migrate screen recording onto the sidecar during Stage B. Continuous screen evidence is Stage C and begins only after the sidecar foundation itself is verified.
+7. Keep owner-side v0.18.0 Research ZIP validation available in parallel; it is not a blocker for Stage B.
+8. Persist any verified Stage B architecture finding and reseal manager state before moving to Stage C.

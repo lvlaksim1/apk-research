@@ -10,21 +10,32 @@
 6. For evidence/network changes, verify with a real Research ZIP when owner evidence is available.
 7. After verified durable findings, persist semantic changes to the authoritative `context` branch and reseal manager state.
 
-## Product roadmap after v0.17.0
+## Product roadmap from v0.18.0
 
-### Stage A — close the RAW inspection gap
+### Stage A — Raw / Packet Inspector — COMPLETE
 
-Extend Unified Evidence Explorer from raw locators to an in-app Raw/Packet Inspector. A selected flow should resolve to concrete PCAP packet records with timestamp, direction, endpoints, protocol, packet/frame length and safe bounded payload/hex visibility where meaningful. Preserve raw PCAP as authority and do not infer plaintext that is not present.
+Released as v0.18.0. Unified Evidence Explorer can resolve a normalized flow to concrete packet records in the original PCAP with reproducible packet index/byte-offset locators and bounded raw preview. Real-AVD release acceptance verifies packet count and locator integrity against a generated Research ZIP.
 
-This stage directly advances the core product goal: from an observed user action to a host/flow/process and finally to inspectable raw evidence without leaving the application.
+### Stage B — Android sidecar foundation — ACTIVE
 
-### Stage B — Android sidecar foundation
+Introduce a project-owned, version-pinned temporary Android-side `app_process` agent as an experimental infrastructure component.
 
-Introduce a project-owned, version-pinned temporary Android-side `app_process` agent as an experimental infrastructure component. Use a long-lived local transport, exact client/agent version handshake and deterministic cleanup. Prefer host-listen + `adb reverse` startup to avoid polling races. The sidecar must not replace the Emulator gRPC/MMAP display/input path.
+Required design:
+- no installed Android APK/service and no persistent guest modification;
+- host deploys a versioned jar/dex payload to a private path under `/data/local/tmp`;
+- execute as Android shell via `app_process`;
+- exact client/agent protocol/version handshake before use;
+- one long-lived local transport instead of repeated short-lived `adb shell` commands for sidecar functions;
+- prefer host-listen + `adb reverse` so host readiness precedes guest connection and polling races are avoided;
+- bounded startup timeout, explicit failure reason and deterministic teardown/removal;
+- sidecar diagnostics are observable but do not weaken existing research completeness semantics until a specific collector adopts it;
+- no display/input responsibility: Emulator gRPC/MMAP remains authoritative.
+
+Initial Stage B completion should prove lifecycle/handshake/transport on real AVD before any collector is migrated onto it.
 
 ### Stage C — continuous screen evidence
 
-Build an experimental continuous screen evidence collector on the sidecar using Android Surface/MediaCodec concepts and device-generated presentation timestamps. Keep the accepted chunked `screenrecord` collector as the baseline during A/B verification. Promotion requires real Research ZIP evidence showing no coverage regression, stable timing/provenance and cleaner session continuity.
+Build an experimental continuous screen evidence collector on the verified sidecar foundation using Android Surface/MediaCodec concepts and device-generated presentation timestamps. Keep the accepted chunked `screenrecord` collector as the baseline during A/B verification. Promotion requires real Research ZIP evidence showing no coverage regression, stable timing/provenance and cleaner session continuity.
 
 Audio capture is excluded.
 
@@ -38,11 +49,11 @@ Virtual Display is excluded.
 
 ### Stage E — deeper evidence intelligence
 
-After RAW packet inspection and continuous media evidence are stable, extend analyzers only where raw evidence can support stronger conclusions: richer packet/session drill-down, protocol metadata and cross-links among Timeline, process/socket evidence, screen timing and network evidence. Preserve explicit confidence/provenance and avoid causal overclaim.
+After continuous media evidence is stable, extend analyzers only where raw evidence can support stronger conclusions: richer packet/session drill-down, protocol metadata and cross-links among Timeline, process/socket evidence, screen timing and network evidence. Preserve explicit confidence/provenance and avoid causal overclaim.
 
 ## Context maintenance plan
 
-- Keep `main` discovery-only for Context Capsule bootstrap.
+- Keep `main` discovery-only for Context Capsule bootstrap outside product release changes.
 - Persist manager identity, BDI state, memory and current working views only on `context`.
 - Never let a temporary feature branch become manager-state authority.
 - Keep secrets, transient runtime state and hidden reasoning out of the capsule.
