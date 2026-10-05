@@ -9,12 +9,16 @@ def _gui_smoke_test() -> int:
 
     from PySide6.QtWidgets import QApplication
 
-    from apk_research.desktop.network_window import ResearchMainWindow
+    from apk_research.desktop.packet_window import (
+        PacketInspectorMainWindow,
+    )
 
     app = QApplication.instance() or QApplication([])
-    window = ResearchMainWindow()
+    window = PacketInspectorMainWindow()
     window.show()
     app.processEvents()
+    assert hasattr(window, "evidence_tab_index")
+    assert hasattr(window, "packet_tab_index")
     window.close()
     app.processEvents()
     return 0

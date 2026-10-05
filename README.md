@@ -1,5 +1,13 @@
 # apk-research
 
+## v0.18.0 — Raw / Packet Inspector
+
+v0.18.0 closes the last gap in the Unified Evidence Explorer chain: a normalized flow can now be opened as the concrete packets that form it inside the original `01_raw/network/traffic.pcap`.
+
+The new `Packets` tab reads the PCAP directly from the selected Research ZIP and filters packets using the same canonical bidirectional TCP/UDP flow identity as Network Analyzer. Each row preserves a reproducible raw locator: original PCAP packet index, record/frame byte offsets, target timestamp, direction, endpoints and captured/original lengths. A bounded raw-frame hex preview is available without creating a replacement evidence artifact.
+
+Evidence semantics remain strict: packet inspection is presentation-only, encrypted payload is not represented as plaintext, Action ↔ Flow remains `temporal-only`, and the raw PCAP remains the network source of truth. Runtime, collectors, Research ZIP schemas and the v0.10.5 clean-launch baseline are unchanged.
+
 ## v0.17.0 — Unified Evidence Explorer
 
 v0.17.0 добавляет единый Evidence Explorer поверх уже существующих Timeline, Network Analyzer и socket attribution. Новый экран позволяет пройти цепочку `Action → Host → Flow → Process/Socket → Raw evidence` и выполнить обратные переходы от host/flow к связанным действиям.
