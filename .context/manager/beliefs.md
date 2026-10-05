@@ -55,3 +55,10 @@ The separate WHPX acceptance run #112 (`35174782512`) finished `cancelled` after
 
 - source: GitHub Actions run 35174782512 reconciled 2026-10-05
 - authority: verified-ci
+
+## scrcpy-derived scope decision
+
+The owner accepted the useful scrcpy-derived directions except Audio Evidence and Virtual Display. Those two areas are explicitly out of the current apk-research roadmap. Retained candidates are: a bounded Android-side app_process sidecar, continuous device-PTS screen evidence, richer multi-touch/control, geometry-generation protection for input, and later opt-in keyboard/clipboard improvements. The proven gRPC/MMAP live display/input path remains authoritative and is not to be replaced by scrcpy-style encoded mirroring.
+
+- source: explicit owner directive in project dialogue on 2026-10-06 following scrcpy v5.0 review
+- authority: owner-directive

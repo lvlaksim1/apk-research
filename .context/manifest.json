@@ -46,7 +46,8 @@
     ".context/rules/project-rules.md"
   ],
   "decisions": [
-    ".context/decisions/DEC-20261005-project-manager-bootstrap.md"
+    ".context/decisions/DEC-20261005-project-manager-bootstrap.md",
+    ".context/decisions/DEC-20261006-scrcpy-derived-scope.md"
   ],
   "dialogues": [
     ".context/dialogues/20261006-scrcpy-v5-applicability.md"

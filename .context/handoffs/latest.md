@@ -1,15 +1,17 @@
 # Latest Handoff
 
-Bootstrap generation: 1
-Date: 2026-10-05
+Generation: 2
+Date: 2026-10-06
 
-The persistent Project Manager for apk-research is established as `apk-research-project-manager`.
+The persistent Project Manager `apk-research-project-manager` is active.
 
 Authority split:
 - manager state: `context`;
 - product baseline: `main`;
 - discovery: `main`.
 
-Product baseline at bootstrap is apk-research v0.17.0 / `202d42fcfcccf03e0a9189a1a97f6e57be3578b8`. The release pipeline is green. v0.16.1 has real owner-side archive acceptance; v0.17.0 has release-gate validation but no recorded later real owner ZIP acceptance.
+Current product baseline remains apk-research v0.17.0 / `202d42fcfcccf03e0a9189a1a97f6e57be3578b8`; the later main commit only adds Project Manager discovery files. Release pipeline #118 and context-bootstrap pipeline #119 are green.
 
-No product implementation task is currently active. On the next substantive directive, reconcile live repository/release/CI evidence, continue from the current product baseline, and preserve the runtime/evidence constraints recorded in project rules.
+The owner reviewed the scrcpy-derived development directions and explicitly excluded Audio Evidence and Virtual Display. The accepted direction preserves the current gRPC/MMAP runtime and prioritizes: in-app raw packet inspection, a bounded Android-side app_process sidecar, continuous device-PTS screen evidence after A/B validation, and richer multi-touch/geometry-safe input.
+
+No new product-code branch has been started for this roadmap yet.

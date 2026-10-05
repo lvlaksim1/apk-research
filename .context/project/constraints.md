@@ -15,6 +15,9 @@
 - Keep temporary verification workflows/artifacts out of the final product tree.
 - Product authority is `main`; persistent manager state is `context`; feature branches do not inherit either authority.
 - Do not persist credentials, tokens, cookies, private keys, hidden reasoning or unnecessary sensitive data in repository context.
+- Audio Evidence is outside the current product roadmap unless the owner explicitly reopens it.
+- Virtual Display is outside the current product roadmap unless the owner explicitly reopens it.
+- A future Android-side sidecar must remain a bounded research/evidence component and must not silently replace the proven Emulator gRPC/MMAP live display/input transport.
 
 ## Working preferences derived from owner directives
 
