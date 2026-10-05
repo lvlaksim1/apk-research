@@ -6,6 +6,10 @@ import time
 import zipfile
 from pathlib import Path
 
+from apk_research.desktop.packet_inspector import (
+    RAW_PCAP_ARTIFACT,
+    inspect_archive_flow,
+)
 from apk_research.export import (
     audit_complete_research_zip,
     verify_research_zip,
@@ -300,6 +304,54 @@ def main() -> int:
                 raise RuntimeError(
                     "Normalized network flow direction counts are inconsistent"
                 )
+
+        flow_records = [
+            flow
+            for flow in flow_inventory.get("flows") or []
+            if isinstance(flow, dict)
+        ]
+        if not flow_records:
+            raise RuntimeError(
+                "Packet Inspector acceptance has no normalized flow"
+            )
+        inspected_flow = flow_records[0]
+        packet_report = inspect_archive_flow(
+            Path(result.archive),
+            inspected_flow,
+        )
+        if packet_report.get("artifact") != RAW_PCAP_ARTIFACT:
+            raise RuntimeError(
+                "Packet Inspector did not preserve raw PCAP provenance"
+            )
+        if int(
+            packet_report.get("selected_packet_count") or 0
+        ) != int(inspected_flow.get("packet_count") or 0):
+            raise RuntimeError(
+                "Packet Inspector packet count does not match normalized flow"
+            )
+        inspected_packets = packet_report.get("packets") or []
+        if not inspected_packets:
+            raise RuntimeError(
+                "Packet Inspector returned no packet records"
+            )
+        first_packet = inspected_packets[0]
+        if int(first_packet.get("pcap_record_offset") or -1) < 24:
+            raise RuntimeError(
+                "Packet Inspector raw record offset is invalid"
+            )
+        if int(first_packet.get("pcap_frame_offset") or -1) <= int(
+            first_packet.get("pcap_record_offset") or -1
+        ):
+            raise RuntimeError(
+                "Packet Inspector frame offset is not after record header"
+            )
+        print(json.dumps({
+            "event": "packet_inspector_acceptance",
+            "flow_id": packet_report.get("flow_id"),
+            "selected_packet_count": packet_report.get("selected_packet_count"),
+            "pcap_packet_count": packet_report.get("total_packet_count"),
+            "pcap_crc32": packet_report.get("artifact_crc32"),
+        }, ensure_ascii=False))
 
         if "non_tcp_udp_packet_count" not in flow_summary:
             raise RuntimeError(
