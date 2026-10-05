@@ -1,6 +1,6 @@
 """apk-research core package."""
 
-__version__ = "0.17.0"
+__version__ = "0.18.0"
 
-# v0.17.0 adds the Unified Evidence Explorer presentation layer.
+# v0.18.0 adds in-app Raw / Packet Inspector over the existing PCAP evidence.
 __all__ = ["__version__"]

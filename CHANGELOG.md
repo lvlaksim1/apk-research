@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.18.0] - 2026-10-06
+
+### Raw / Packet Inspector
+
+- Adds a dedicated Packets tab for concrete packet-level inspection of a selected normalized flow.
+- Reads the existing raw `01_raw/network/traffic.pcap` directly from a Research ZIP; no new packet evidence artifact or schema is introduced.
+- Filters packets by the same direction-independent canonical TCP/UDP connection key used by normalized flow inventory.
+- Exposes reproducible per-packet locators: PCAP packet index, record byte offset, frame byte offset, target UTC, endpoints and captured/original length.
+- Adds bounded raw-frame hex previews and searchable packet/protocol evidence.
+- Preserves packet-level DNS/TLS SNI and supported QUIC/HTTP3 metadata without claiming encrypted payload plaintext.
+- Adds Evidence → Packets and Network → Packets navigation and makes double-click on a raw PCAP Evidence node open packet inspection.
+- Updates the packaged GUI smoke test to instantiate the complete v0.18 window including Evidence and Packets.
+- Keeps runtime, collectors, Research ZIP schemas, raw PCAP authority, Action ↔ Flow temporal-only semantics and v0.10.5 launch sequencing unchanged.
+
 All notable apk-research changes are recorded here.
 
 ## [0.17.0] - 2026-09-17

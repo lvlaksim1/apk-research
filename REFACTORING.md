@@ -1,5 +1,27 @@
 # Refactoring and Architecture Log
 
+## v0.18.0 — Raw / Packet Inspector
+
+### Scope
+
+Post-capture/presentation-only packet drill-down. The feature resolves an existing normalized TCP/UDP flow to the concrete records in the original `01_raw/network/traffic.pcap` without changing collectors or Research ZIP schemas.
+
+### Canonical packet resolution
+
+The inspector reuses the same direction-independent canonical connection key as `network-flows.json`. Each matching packet receives a reproducible locator containing its global PCAP packet index, record byte offset, frame byte offset, target UTC timestamp, endpoints and captured/original lengths.
+
+### Raw boundary
+
+The complete packet remains authoritative only in the original PCAP. The GUI shows a bounded raw-frame hex preview and protocol metadata that can be directly supported by packet bytes. Encrypted payload is never presented as decoded application plaintext.
+
+### GUI integration
+
+A dedicated Packets tab is reachable from Evidence and Network. Double-clicking the raw PCAP node in Evidence resolves the selected flow directly to packets.
+
+### Compatibility boundary
+
+No changes to Android runtime, collectors, v0.10.5 clean-launch sequencing, gRPC/MMAP display/input, packet capture, socket attribution or Action ↔ Flow temporal-only semantics.
+
 ## v0.17.0 — Unified Evidence Explorer
 
 ### Scope
@@ -126,7 +148,7 @@ Network inspection теперь одновременно читает `research-
 
 ## Текущее состояние
 
-**Этап:** v0.16.1 — QUIC evidence hardening.
+**Этап:** v0.18.0 — Raw / Packet Inspector.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  

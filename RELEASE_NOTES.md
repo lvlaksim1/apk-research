@@ -1,29 +1,33 @@
-# apk-research v0.17.0
+# apk-research v0.18.0
 
-v0.17.0 adds the **Unified Evidence Explorer**: a single post-capture GUI path through existing forensic evidence without changing the runtime, collectors or archive schemas.
+v0.18.0 adds the **Raw / Packet Inspector** and completes the in-app evidence path from a normalized flow to the concrete packet records in the original Research ZIP PCAP.
 
 ## Added
 
-- a dedicated `Evidence` tab in the desktop GUI;
-- forward navigation `Action → Host → Flow → Process/Socket → Raw evidence`;
-- reverse host-centric navigation `Host → Flow → Action / Process/Socket / Raw`;
-- direct Timeline → Evidence and Network → Evidence transitions;
-- direct Evidence → Timeline and Evidence → Network transitions;
-- free-text search across actions, hosts, flow IDs, processes, PIDs, socket evidence, endpoints and protocols;
-- explicit raw PCAP locators using canonical flow identity, target time interval and bidirectional 5-tuple;
-- explicit raw socket locators using process/PID/UID/inode attribution evidence;
-- human-readable provenance/details for each evidence node.
+- a dedicated `Packets` tab in the desktop GUI;
+- Evidence → Packets and Network → Packets navigation for a selected normalized flow;
+- direct sequential reading of `01_raw/network/traffic.pcap` from the Research ZIP;
+- bidirectional packet filtering using the same canonical TCP/UDP flow identity used by Network Analyzer;
+- per-packet target timestamp, direction, protocol, source/destination endpoints and captured/original lengths;
+- reproducible raw locators containing the original PCAP packet index plus record/frame byte offsets;
+- bounded raw-frame hex previews;
+- packet-level DNS/TLS SNI and already-supported QUIC/HTTP3 metadata where the bytes provide that evidence;
+- free-text packet search across IDs, timestamps, endpoints and protocol evidence.
 
 ## Evidence semantics
 
-Unified Evidence Explorer is presentation-only. It reads the existing `research-timeline.json`, `network-flows.json` and `socket-attribution.json` artifacts and does not create a new forensic source of truth.
+Packet Inspector is presentation-only. It does not rewrite, extract or replace the PCAP as a new source of truth.
 
-Action ↔ Flow relationships retain the existing `temporal-only` semantics and `causal_claim=false`; the Explorer does not upgrade temporal correlation into causality. Raw locators point back to `01_raw/network/traffic.pcap` and `01_raw/network/socket-snapshots.txt` rather than replacing those artifacts.
+Encrypted payload is never presented as decoded plaintext. Existing Action ↔ Flow relationships remain `temporal-only` with `causal_claim=false`.
+
+## Compatibility boundary
+
+- no Research ZIP schema change;
+- no collector change;
+- no Android runtime change;
+- no change to v0.10.5 startup/clean-launch sequencing;
+- hidden Emulator → gRPC/MMAP → AndroidView remains the only supported live display path.
 
 ## Validation
 
-- full Windows development suite: 178 tests passed;
-- dedicated offscreen GUI construction smoke passed for `UnifiedEvidenceMainWindow` and the Evidence tab;
-- existing Timeline and Network Analyzer remain available and are cross-linked with the new Explorer.
-
-Android runtime, v0.10.5 clean-launch sequencing, gRPC/MMAP display/input path, collectors, raw PCAP capture, socket/package attribution, QUIC/HTTP3 parsing and Research ZIP schemas are unchanged.
+Release validation requires the normal test suite, Windows GUI/package smoke, real AVD acceptance and the commit-triggered release pipeline.

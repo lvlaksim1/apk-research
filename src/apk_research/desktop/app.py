@@ -7,8 +7,8 @@ from PySide6.QtWidgets import QApplication
 from apk_research.desktop.android_runtime import (
     AndroidRuntime,
 )
-from apk_research.desktop.evidence_navigation_window import (
-    UnifiedEvidenceMainWindow,
+from apk_research.desktop.packet_window import (
+    PacketInspectorMainWindow,
 )
 
 
@@ -30,6 +30,6 @@ def main() -> int:
     )
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    window = UnifiedEvidenceMainWindow()
+    window = PacketInspectorMainWindow()
     window.show()
     return app.exec()
