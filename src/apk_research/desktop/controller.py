@@ -60,9 +60,12 @@ class DesktopController(QObject):
             threading.Thread | None
         ) = None
         self._clean_launch = True
-        self._gesture_start_point: (
-            tuple[int, int] | None
-        ) = None
+        self._gesture_start_points: tuple[
+            tuple[int, int],
+            ...,
+        ] = ()
+        self._gesture_mode = "single"
+        self._gesture_generation = 0
         self._gesture_started_utc: str | None = None
         self._gesture_started_ns = 0
         self._input_queue: queue.Queue[
@@ -187,39 +190,97 @@ class DesktopController(QObject):
         )
 
     def touch_down(self, x: int, y: int) -> None:
-        self._gesture_start_point = (
-            int(x),
-            int(y),
-        )
-        self._gesture_started_utc = (
-            self._host_utc_now()
-        )
-        self._gesture_started_ns = (
-            time.monotonic_ns()
-        )
-        self._queue_input(
-            "touch_down",
-            x,
-            y,
+        self.touch_state(
+            "down",
+            "single",
+            ((int(x), int(y)),),
+            0,
         )
 
     def touch_move(self, x: int, y: int) -> None:
-        self._queue_input(
-            "touch_move",
-            x,
-            y,
+        self.touch_state(
+            "move",
+            "single",
+            ((int(x), int(y)),),
+            self._gesture_generation,
         )
 
     def touch_up(self, x: int, y: int) -> None:
-        self._queue_input(
-            "touch_up",
-            x,
-            y,
+        self.touch_state(
+            "up",
+            "single",
+            ((int(x), int(y)),),
+            self._gesture_generation,
         )
+
+    def touch_state(
+        self,
+        phase: str,
+        mode: str,
+        points,
+        geometry_generation: int,
+    ) -> None:
+        normalized = tuple(
+            (int(point[0]), int(point[1]))
+            for point in points
+        )
+        if not normalized:
+            return
+        if phase not in {
+            "down",
+            "move",
+            "up",
+            "cancel",
+        }:
+            raise ValueError(
+                f"Unsupported touch phase: {phase}"
+            )
+
+        generation = int(geometry_generation)
+        if phase == "down":
+            self._gesture_start_points = normalized
+            self._gesture_mode = str(mode or "single")
+            self._gesture_generation = generation
+            self._gesture_started_utc = (
+                self._host_utc_now()
+            )
+            self._gesture_started_ns = (
+                time.monotonic_ns()
+            )
+        elif (
+            self._gesture_start_points
+            and generation != self._gesture_generation
+        ):
+            return
+
+        pressure = (
+            0
+            if phase in {"up", "cancel"}
+            else 1
+        )
+        transport_points = tuple(
+            (
+                index,
+                point[0],
+                point[1],
+                pressure,
+            )
+            for index, point in enumerate(
+                normalized
+            )
+        )
+        self._queue_input(
+            "touch_points",
+            transport_points,
+        )
+
+        if phase not in {"up", "cancel"}:
+            return
+
         ended_utc = self._host_utc_now()
-        started = (
-            self._gesture_start_point
-            or (int(x), int(y))
+        started_points = (
+            self._gesture_start_points
+            or normalized
         )
         started_utc = (
             self._gesture_started_utc
@@ -237,34 +298,85 @@ class DesktopController(QObject):
                     / 1_000_000
                 ),
             )
-        distance = math.hypot(
-            int(x) - started[0],
-            int(y) - started[1],
+        distances = [
+            math.hypot(
+                end[0] - start[0],
+                end[1] - start[1],
+            )
+            for start, end in zip(
+                started_points,
+                normalized,
+            )
+        ]
+        max_distance = max(
+            distances,
+            default=0.0,
         )
-        action = (
-            "tap"
-            if distance <= 12
-            and duration_ms <= 750
-            else "swipe"
-        )
-        self._record_user_action(
-            action,
-            {
+        completed = phase == "up"
+
+        if len(normalized) == 1:
+            start = started_points[0]
+            end = normalized[0]
+            action = (
+                "gesture_cancelled"
+                if not completed
+                else "tap"
+                if max_distance <= 12
+                and duration_ms <= 750
+                else "swipe"
+            )
+            details = {
                 "source": "pointer",
-                "start_x": started[0],
-                "start_y": started[1],
-                "end_x": int(x),
-                "end_y": int(y),
+                "mode": "single",
+                "start_x": start[0],
+                "start_y": start[1],
+                "end_x": end[0],
+                "end_y": end[1],
                 "duration_ms": duration_ms,
                 "distance_px": round(
-                    distance,
+                    max_distance,
                     2,
                 ),
-            },
+                "geometry_generation": generation,
+                "completed": completed,
+            }
+        else:
+            action = "multi_touch"
+            details = {
+                "source": "pointer",
+                "mode": self._gesture_mode,
+                "pointer_count": len(normalized),
+                "start_points": [
+                    [point[0], point[1]]
+                    for point in started_points
+                ],
+                "end_points": [
+                    [point[0], point[1]]
+                    for point in normalized
+                ],
+                "duration_ms": duration_ms,
+                "max_pointer_distance_px": round(
+                    max_distance,
+                    2,
+                ),
+                "geometry_generation": generation,
+                "completed": completed,
+            }
+
+        if not completed:
+            details["cancel_reason"] = (
+                "display_geometry_changed"
+            )
+
+        self._record_user_action(
+            action,
+            details,
             host_started_utc=started_utc,
             host_utc=ended_utc,
         )
-        self._gesture_start_point = None
+        self._gesture_start_points = ()
+        self._gesture_mode = "single"
+        self._gesture_generation = 0
         self._gesture_started_utc = None
         self._gesture_started_ns = 0
 
