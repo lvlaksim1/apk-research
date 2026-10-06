@@ -1,6 +1,6 @@
 """apk-research core package."""
 
-__version__ = "0.18.0"
+__version__ = "0.19.0"
 
-# v0.18.0 adds in-app Raw / Packet Inspector over the existing PCAP evidence.
+# v0.19.0 adds a bounded temporary Android app_process sidecar foundation.
 __all__ = ["__version__"]

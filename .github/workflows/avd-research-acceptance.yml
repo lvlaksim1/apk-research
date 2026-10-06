@@ -24,6 +24,12 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      - name: Set up Java for Android sidecar
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: Install apk-research
         run: python -m pip install -e ".[dev,transport]"
 
@@ -34,9 +40,12 @@ jobs:
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n 1)"
           test -n "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platform-tools" "emulator" "system-images;android-35;default;x86_64"
+          "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-35" "build-tools;35.0.0" "system-images;android-35;default;x86_64"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           echo "$ANDROID_HOME/emulator" >> "$GITHUB_PATH"
+
+      - name: Build Android sidecar
+        run: python tools/build_android_sidecar.py
 
       - name: Check KVM
         shell: bash
@@ -119,6 +128,12 @@ jobs:
           adb -s emulator-5554 shell 'tcpdump --version || /system/bin/tcpdump --version || /system/xbin/tcpdump --version || /data/local/tmp/tcpdump --version'
 
       - name: Validate live Emulator gRPC transport
+        run: python tools/check_emulator_grpc.py --port 8554
+
+      - name: Validate Android sidecar foundation
+        run: python tools/acceptance_sidecar.py
+
+      - name: Validate live Emulator gRPC transport after sidecar
         run: python tools/check_emulator_grpc.py --port 8554
 
       - name: Run real AVD acceptance

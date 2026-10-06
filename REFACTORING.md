@@ -1,5 +1,39 @@
 # Refactoring and Architecture Log
 
+## v0.19.0 — Android Sidecar Foundation
+
+### Scope
+
+A bounded infrastructure layer only. v0.19 does not migrate collectors and does not alter the established Emulator display/input or clean-launch runtime.
+
+### Agent lifecycle
+
+The repository owns the Java source. Release builds compile it to Java 8 bytecode, convert it with Android D8 into `classes.dex`, and package that DEX as `apk-research-agent.jar`. The JAR is included in the PyInstaller distribution.
+
+At runtime the host:
+1. verifies the ADB target and pushes the JAR under the private apk-research temporary root;
+2. opens a localhost listening socket first;
+3. installs `adb reverse tcp:<device-port> tcp:<host-port>`;
+4. starts `app_process` with the temporary JAR on `CLASSPATH`;
+5. accepts the agent connection and requires exact protocol/agent version agreement;
+6. uses the same socket for bounded commands;
+7. sends graceful STOP, waits for process exit, removes the reverse mapping and deletes the temporary JAR.
+
+### Protocol
+
+Protocol v1 is intentionally minimal:
+- agent banner: exact protocol and agent version;
+- `HELLO → READY` handshake;
+- `PING <token> → PONG <token> <monotonic-ms>`;
+- `STOP → BYE`;
+- bounded UTF-8 line length and restricted ping token alphabet.
+
+### Acceptance boundary
+
+Real AVD acceptance must prove lifecycle and cleanup, then immediately re-run the required Emulator gRPC/MMAP check. This guards against the sidecar silently becoming or disturbing the display/input path.
+
+No evidence schema or collector contract changes in this release.
+
 ## v0.18.0 — Raw / Packet Inspector
 
 ### Scope
@@ -148,7 +182,7 @@ Network inspection теперь одновременно читает `research-
 
 ## Текущее состояние
 
-**Этап:** v0.18.0 — Raw / Packet Inspector.
+**Этап:** v0.19.0 — Android Sidecar Foundation.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  

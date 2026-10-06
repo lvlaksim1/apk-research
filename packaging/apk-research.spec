@@ -5,12 +5,28 @@ from pathlib import Path
 project_root = Path(SPECPATH).parent
 source_root = project_root / "src"
 entry_script = source_root / "apk_research" / "desktop_entry.py"
+agent_jar = (
+    project_root
+    / "build"
+    / "android-sidecar"
+    / "apk-research-agent.jar"
+)
+if not agent_jar.is_file():
+    raise RuntimeError(
+        "Android sidecar agent was not built: "
+        + str(agent_jar)
+    )
 
 a = Analysis(
     [str(entry_script)],
     pathex=[str(source_root)],
     binaries=[],
-    datas=[],
+    datas=[
+        (
+            str(agent_jar),
+            "apk_research/resources",
+        ),
+    ],
     hiddenimports=[
         "grpc",
         "grpc._cython.cygrpc",

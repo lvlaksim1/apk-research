@@ -796,3 +796,87 @@ def test_package_uid_and_uid_package_resolution() -> None:
         "com.example.app",
         "com.example.shared",
     ]
+
+
+def test_sidecar_adb_helpers_use_explicit_safe_arguments(
+    tmp_path: Path,
+) -> None:
+    local = tmp_path / "agent.jar"
+    local.write_bytes(b"agent")
+    remote = (
+        "/data/local/tmp/apk-research/"
+        "sidecar/apk-research-agent-0.1.0.jar"
+    )
+    calls: list[tuple[str, ...]] = []
+
+    def runner(
+        arguments: Sequence[str],
+        timeout: float,
+    ) -> subprocess.CompletedProcess[str]:
+        key = tuple(arguments)
+        calls.append(key)
+        if key == ("devices", "-l"):
+            return _completed(
+                "List of devices attached\n"
+                "emulator-5554 device model:sdk_gphone transport_id:1\n"
+            )
+        return _completed()
+
+    client = AdbClient(Path("adb"), runner=runner)
+    client.push_file(
+        "emulator-5554",
+        local,
+        remote,
+    )
+    client.reverse_tcp(
+        "emulator-5554",
+        device_port=50123,
+        host_port=50123,
+    )
+    client.remove_reverse_tcp(
+        "emulator-5554",
+        50123,
+    )
+
+    assert (
+        "-s",
+        "emulator-5554",
+        "push",
+        str(local),
+        remote,
+    ) in calls
+    assert (
+        "-s",
+        "emulator-5554",
+        "reverse",
+        "tcp:50123",
+        "tcp:50123",
+    ) in calls
+    assert (
+        "-s",
+        "emulator-5554",
+        "reverse",
+        "--remove",
+        "tcp:50123",
+    ) in calls
+
+
+def test_sidecar_adb_helpers_reject_invalid_ports(
+    tmp_path: Path,
+) -> None:
+    client = AdbClient(
+        Path("adb"),
+        runner=lambda args, timeout: _completed(),
+    )
+
+    with pytest.raises(ValueError):
+        client.reverse_tcp(
+            "emulator-5554",
+            device_port=0,
+            host_port=50000,
+        )
+    with pytest.raises(ValueError):
+        client.remove_reverse_tcp(
+            "emulator-5554",
+            70000,
+        )
