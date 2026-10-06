@@ -1,5 +1,13 @@
 # apk-research
 
+## v0.20.0 — Continuous Screen Evidence
+
+v0.20.0 turns the v0.19 Android sidecar into an **experimental parallel screen-evidence collector** while keeping the established Android `screenrecord` collector canonical and required.
+
+The sidecar now uses a dedicated binary `adb reverse` media socket and Android `MediaCodec` to stream exact H.264 encoder packets together with device-generated presentation timestamps. The Research ZIP stores the exact encoded bytes in `01_raw/screen/continuous-screen.h264`, a packet/PTS/raw-offset index in `02_normalized/continuous-screen-packets.jsonl`, collector provenance in `continuous-screen.json`, and an explicit `screen-ab-comparison.json` against canonical screenrecord evidence.
+
+This is deliberately an A/B stage: failure of the experimental collector does not degrade otherwise valid canonical evidence, and the A/B report sets `promotion_decision=not-automatic`. The hidden Emulator → gRPC/MMAP → AndroidView live path, persistent gRPC input, v0.10.5 clean-launch sequence and raw network collectors are unchanged. Audio Evidence and a user-facing Virtual Display research mode remain out of scope.
+
 ## v0.19.0 — Android Sidecar Foundation
 
 v0.19.0 introduces a project-owned temporary Android-side `app_process` agent as infrastructure for future collectors. The sidecar is built from repository Java source into a DEX/JAR during the release build, bundled inside the standalone Windows application, pushed only to `/data/local/tmp/apk-research/sidecar` when explicitly used, and removed during teardown.
