@@ -2,79 +2,65 @@
 
 ## Product baseline and latest release
 
-The product authority is `main`. The current verified product baseline and latest published release are `apk-research v0.21.0` at commit `250c507ca3302558ba11d5df57d3129a38ad6fbe`. Release asset `apk-research-setup_v0.21.0.exe` has SHA-256 `2d655d007b67f5d1c6f866505b9865d300caa6f951e5c90f53af83d7c862d648`.
+The product authority is `main`. The current verified product baseline and latest published release are `apk-research v0.22.0` at commit `d58265584223246974fb641f02e0dd3fb8d3f4f1`.
 
-Main pipeline #124 (`37403912914`) completed successfully for the exact release SHA and published v0.21.0. The separate WHPX acceptance run is advisory and does not gate the release.
+Release asset `apk-research-setup_v0.22.0.exe` has SHA-256 `d6f7ae647d755455a374189a3731e15057fc74ec88c4b9a846143145ebb0ae8a`. Main pipeline #125 (`37406246024`) completed successfully for the exact release SHA, including CI, real AVD Research ZIP acceptance, Windows standalone/GUI/installer smoke, clean-Windows managed Android provisioning, checksum verification and GitHub Release publication.
 
-- source: GitHub repository main, main pipeline #124 and GitHub Release v0.21.0, reconciled 2026-10-06
+- source: GitHub repository main, pipeline #125 and GitHub Release v0.22.0, reconciled 2026-10-06
 - authority: verified-repository + verified-ci
 
-## v0.18.0 Raw / Packet Inspector
+## Stage A-D baseline
 
-v0.18.0 closed the in-app raw-network inspection gap. A selected normalized TCP/UDP flow is resolved against the original `01_raw/network/traffic.pcap` using the same direction-independent canonical flow identity as the normalized inventory. Packet presentation retains original PCAP packet index, record/frame offsets, target timestamp, endpoints and lengths; raw preview is bounded and encrypted payload is not represented as plaintext.
+- v0.18.0: Raw / Packet Inspector.
+- v0.19.0: project-owned temporary Android app_process sidecar foundation.
+- v0.20.0: experimental continuous-screen MediaCodec/device-PTS evidence; canonical screenrecord retained.
+- v0.21.0: geometry-safe two-pointer interaction completeness over existing Emulator gRPC input.
 
-- source: verified v0.18 release and real-AVD release acceptance
+- source: verified repository/release lineage
 - authority: verified-repository + verified-ci
 
-## v0.19.0 Android sidecar foundation
+## v0.22.0 Packet ↔ Action Evidence
 
-v0.19.0 established the project-owned temporary Android `app_process` sidecar with exact protocol/version handshake, host-listen + `adb reverse` startup, long-lived bounded transport and deterministic cleanup. It does not own display/input.
+Packet Inspector now resolves concrete packets back to existing archived Research Timeline action windows. A relation is emitted only when the action already references the same canonical `flow_id` and the packet target timestamp lies inside that action's exported target-time window.
 
-- source: verified v0.19 release
-- authority: verified-repository + verified-ci
+The relation reuses the archived window rather than recalculating or widening it. Every packet/action relation remains `temporal-only` and `causal_claim=false`. If the Timeline artifact is missing/invalid, raw packet inspection continues without guessed action links.
 
-## v0.20.0 continuous screen evidence
+Real AVD release acceptance proved the correlation against a genuinely generated Research ZIP and validated that emitted action IDs exist in both the selected flow correlation and archived Timeline.
 
-v0.20.0 added a non-canonical experimental MediaCodec H.264 screen collector over the sidecar with exact encoded bytes, packet/raw-offset index and device-generated presentation timestamps. Canonical Android `screenrecord` remains required until a separate owner-side A/B promotion decision.
-
-- source: verified v0.20 release
-- authority: verified-repository + verified-ci
-
-## v0.21.0 interaction completeness
-
-v0.21.0 added geometry-safe two-pointer gestures over the established Emulator gRPC input stream and semantic `multi_touch` evidence. Input is bound to the framebuffer/display geometry generation on which the gesture began; a geometry change terminates stale input rather than remapping it.
-
-- source: verified v0.21 release
+- source: release commit `d58265584223246974fb641f02e0dd3fb8d3f4f1` and pipeline #125
 - authority: verified-repository + verified-ci
 
 ## Proven Android runtime baseline
 
-The validated runtime path remains hidden Android Emulator (`-qt-hide-window`) → Emulator gRPC → MMAP framebuffer → AndroidView, with input through persistent gRPC events. v0.10.5 remains the proven clean-launch sequencing baseline.
+The validated runtime remains hidden Android Emulator (`-qt-hide-window`) → Emulator gRPC → MMAP framebuffer → AndroidView, with persistent geometry-safe gRPC input. v0.10.5 remains the proven startup/clean-launch sequencing baseline.
 
-- source: repository release lineage and acceptance gates
+- source: verified release lineage
 - authority: verified-repository
 
 ## Evidence semantics
 
-Raw PCAP remains the primary network source of truth. Package ownership attribution, normalized flows, Timeline correlation, QUIC/HTTP3 metadata, Unified Evidence Explorer and Packet Inspector are derived/presentation evidence. Action ↔ Flow correlation is temporal-only and must not be promoted into a causal claim.
+Raw PCAP remains the primary network source of truth. Package/socket ownership, normalized flows, Timeline correlation, QUIC/HTTP3 metadata, Evidence Explorer, Packet Inspector and packet/action links are derived/presentation evidence. Temporal adjacency must never be promoted to proven causality.
 
-- source: repository implementation and release documentation
+- source: verified repository implementation
 - authority: verified-repository
 
-## Product UX contract
+## Product UX and release contract
 
-apk-research is a standalone Windows GUI application. Normal use must not require Python or command-line operation; Android runtime is managed by the application. Stable installer filenames include the version.
+apk-research is a standalone Windows GUI with managed Android runtime; normal use does not require Python or CLI. Stable releases are commit-triggered through the repository pipeline and installers include the version.
 
-- source: explicit owner directives
-- authority: owner-directive
-
-## Repository release contract
-
-Stable releases are produced by the commit-triggered main pipeline. Temporary verification workflows/artifacts must not remain in the final product tree.
-
-- source: owner directives and repository workflows
-- authority: owner-directive
-
-## Manager and product authority split
-
-Persistent manager-state authority is branch `context`; product authority is `main`.
-
-- source: owner authorization and Context Capsule protocol
-- authority: owner-directive
-
-## scrcpy-derived scope decision
-
-Audio Evidence and Virtual Display are explicitly out of scope. Retained directions were sidecar, continuous screen evidence, richer multi-touch/control, geometry-generation protection and later optional keyboard/clipboard UX. Stages B-D are now implemented through v0.21.0. The gRPC/MMAP live display/input path remains authoritative.
-
-- source: owner directive on 2026-10-06 plus verified v0.19-v0.21 releases
+- source: explicit owner directives and repository workflows
 - authority: owner-directive + verified-repository
+
+## Scope decisions
+
+Audio Evidence and Virtual Display remain explicitly out of scope. scrcpy-style encoded mirroring must not replace the proven gRPC/MMAP live display path.
+
+- source: explicit owner directive 2026-10-06
+- authority: owner-directive
+
+## WHPX
+
+WHPX acceptance remains advisory/non-publication-gating. v0.22 WHPX run #118 was queued at the time of the release checkpoint; this does not affect the verified v0.22 publication result.
+
+- source: repository workflow and GitHub Actions
+- authority: verified-repository + verified-ci

@@ -1,6 +1,6 @@
 # Latest Handoff
 
-Generation: 4
+Generation: 5
 Date: 2026-10-06
 
 Persistent manager: `apk-research-project-manager`.
@@ -9,14 +9,13 @@ Authority:
 - manager state: `context`;
 - product: `main`.
 
-Verified product baseline is apk-research v0.21.0 at `250c507ca3302558ba11d5df57d3129a38ad6fbe`. Main pipeline #124 completed SUCCESS and GitHub Release v0.21.0 is published. Installer SHA-256: `2d655d007b67f5d1c6f866505b9865d300caa6f951e5c90f53af83d7c862d648`.
+Verified product baseline is **apk-research v0.22.0** at `d58265584223246974fb641f02e0dd3fb8d3f4f1`. Main pipeline #125 (`37406246024`) completed SUCCESS and GitHub Release v0.22.0 was published.
 
-Roadmap stages A-D are implemented:
-- v0.18 Raw / Packet Inspector;
-- v0.19 Android sidecar foundation;
-- v0.20 experimental Continuous Screen Evidence;
-- v0.21 Interaction Completeness.
+Installer: `apk-research-setup_v0.22.0.exe`.
+SHA-256: `d6f7ae647d755455a374189a3731e15057fc74ec88c4b9a846143145ebb0ae8a`.
 
-Stage E is active. Immediate v0.22 work is Packet ↔ Action temporal evidence: annotate inspected packets using existing archived Timeline action windows and selected-flow references, keep `causal_claim=false`, and add direct Packet → Timeline navigation.
+Stage E increment 1 is complete: concrete raw PCAP packets now link back to existing archived Timeline action windows only when both canonical flow identity and target-time window membership match. GUI provides Packet → Timeline navigation. Semantics remain `temporal-only`, `causal_claim=false`.
 
-Audio Evidence and Virtual Display remain excluded. Canonical screenrecord remains authoritative pending explicit promotion decision for the experimental continuous-screen collector.
+Stages A-D also remain complete; continuous-screen evidence remains experimental and canonical screenrecord is unchanged. Audio Evidence and Virtual Display remain excluded.
+
+No v0.23 implementation is active at this checkpoint.
