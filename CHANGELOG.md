@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.23.1] - 2026-10-06
+
+### Sidecar evidence isolation and idle stability
+
+- Classifies Sidecar control/media `adb reverse` loopback packets from exact dynamic ports recorded in continuous-screen provenance.
+- Preserves all Sidecar packets in raw PCAP while excluding them from ordinary app flow inventory, Timeline markers and action correlations.
+- Adds explicit infrastructure packet/byte accounting to derived network evidence.
+- Clears the inherited short socket timeout once the binary media stream is established, so static-screen silence is not treated as failure.
+- Adds a real-AVD 10-second idle-screen regression and asserts that Sidecar infrastructure cannot leak into normalized application flows.
+- Adds unit coverage for exact port-based classification and blocking long-lived media reception.
+- Keeps canonical screenrecord, gRPC/MMAP runtime, v0.10.5 launch sequencing and RAW-first semantics unchanged.
+
 ## [0.23.0] - 2026-10-06
 
 ### Transport Session Evidence
