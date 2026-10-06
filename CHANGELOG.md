@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.22.0] - 2026-10-06
+
+### Packet ↔ Action Evidence
+
+- Extends Raw / Packet Inspector with packet-level links to existing exported Research Timeline action windows.
+- Requires both the same canonical `flow_id` and packet timestamp membership in the archived action window before a packet/action relation is shown.
+- Keeps every packet/action relation explicitly `temporal-only` with `causal_claim=false`.
+- Adds Action-window presentation, search and details to the Packets tab.
+- Adds direct Packet → Timeline navigation by the archived `action_id`.
+- Reads the existing `research-timeline.json` from the selected Research ZIP; no new evidence artifact or schema is introduced.
+- Extends real-AVD acceptance so correlated flows must resolve at least one packet inside their archived action window and all emitted relations must reference valid archived actions.
+- Leaves the gRPC/MMAP runtime, v0.10.5 launch sequence, sidecar, continuous-screen A/B collector and existing raw evidence sources unchanged.
+
 ## [0.21.0] - 2026-10-06
 
 ### Interaction completeness

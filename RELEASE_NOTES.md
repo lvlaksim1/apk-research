@@ -1,34 +1,29 @@
-# apk-research v0.21.0
+# apk-research v0.22.0
 
-v0.21.0 adds **Interaction Completeness** without changing the established Emulator display/runtime architecture.
+v0.22.0 adds **Packet ↔ Action Evidence** to the Raw / Packet Inspector without changing capture or runtime behavior.
 
 ## Added
 
-- two-pointer Emulator gRPC input through the existing persistent `streamInputEvent`;
-- Ctrl+drag symmetric pinch/rotate gesture;
-- Shift+drag vertical tilt gesture;
-- Ctrl+Shift+drag horizontal tilt gesture;
-- one semantic `multi_touch` Timeline action per completed gesture;
-- explicit pointer count, gesture mode, start/end points, duration and display-geometry generation in user-action evidence;
-- display geometry generations derived from framebuffer size, input size and rotation;
-- stale-geometry gesture cancellation instead of remapping old pointer motion onto a new display geometry;
-- real-AVD gRPC acceptance that sends a two-pointer TouchEvent.
+- packet-level correlation to existing exported Research Timeline action windows;
+- a strict two-part match: the action must reference the same canonical `flow_id` and the packet target timestamp must fall inside that action's exported target-time window;
+- Action-window column in the Packets tab;
+- action ID/label search inside Packet Inspector;
+- packet details showing the exact temporal window, Timeline confidence label and explicit non-causality;
+- direct Packet → Timeline action navigation;
+- real-AVD acceptance of packet/action correlation invariants on a generated Research ZIP.
 
 ## Evidence boundary
 
-Multi-touch records what apk-research injected. It does not claim that the target application consumed or causally reacted to the gesture. Existing Action ↔ Flow relationships remain `temporal-only` with `causal_claim=false`.
+Packet ↔ Action is derived only from evidence already stored in the Research ZIP. v0.22 does not invent a new window, widen an existing window or infer that an action caused a packet.
 
-A gesture interrupted by a display geometry change is recorded explicitly as incomplete rather than silently translated to new coordinates.
+Every packet/action relation is explicitly `temporal-only` and `causal_claim=false`. Raw `01_raw/network/traffic.pcap` remains the network source of truth and the archived Research Timeline remains the source of the action windows used by this view.
 
 ## Unchanged
 
 - hidden Emulator → gRPC/MMAP → AndroidView live display;
+- persistent geometry-safe gRPC input;
 - v0.10.5 startup/clean-launch sequencing;
-- Android sidecar and continuous-screen A/B collector;
+- Android sidecar and experimental continuous-screen A/B collector;
 - canonical screenrecord evidence;
-- raw PCAP and package/socket attribution;
+- packet/socket attribution and QUIC/HTTP3 boundaries;
 - Audio Evidence and Virtual Display remain out of scope.
-
-## Validation
-
-Release validation includes unit coverage for multi-pointer wire encoding, display-generation tracking, synthetic second-pointer geometry and semantic action recording, plus real-AVD transmission of a two-pointer gRPC TouchEvent.
