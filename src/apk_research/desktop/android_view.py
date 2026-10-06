@@ -14,7 +14,9 @@ from PySide6.QtWidgets import QLabel
 
 from apk_research.desktop.emulator_grpc import (
     FRAME_ROWS_TOP_DOWN,
+    DisplayGeometryTracker,
     map_display_ratio_to_input,
+    secondary_touch_point,
 )
 
 
@@ -31,6 +33,12 @@ class AndroidView(QLabel):
     touchDownRequested = Signal(int, int)
     touchMoveRequested = Signal(int, int)
     touchUpRequested = Signal(int, int)
+    touchStateRequested = Signal(
+        str,
+        str,
+        object,
+        int,
+    )
     keyRequested = Signal(int)
     textRequested = Signal(str)
 
@@ -57,7 +65,15 @@ class AndroidView(QLabel):
         self._display_rect = QRect()
         self._drag_active = False
         self._last_drag_point: tuple[int, int] | None = None
+        self._last_touch_points: tuple[
+            tuple[int, int],
+            ...,
+        ] = ()
         self._last_drag_emit_ns = 0
+        self._drag_geometry_generation = 0
+        self._gesture_mode = "single"
+        self._geometry_tracker = DisplayGeometryTracker()
+        self._geometry_generation = 0
         self._source_width = 0
         self._source_height = 0
         self._input_width = 0
@@ -95,19 +111,34 @@ class AndroidView(QLabel):
             width * 4,
             QImage.Format.Format_RGBA8888,
         )
-        self._frame_owner = frame
-        self._rotation = int(
+        rotation = int(
             getattr(frame, "rotation", 0)
             or 0
         )
-        self._input_width = int(
+        input_width = int(
             getattr(frame, "input_width", width)
             or width
         )
-        self._input_height = int(
+        input_height = int(
             getattr(frame, "input_height", height)
             or height
         )
+        generation, geometry_changed = (
+            self._geometry_tracker.update(
+                frame_width=width,
+                frame_height=height,
+                input_width=input_width,
+                input_height=input_height,
+                rotation=rotation,
+            )
+        )
+        if geometry_changed and self._drag_active:
+            self._cancel_active_gesture()
+        self._geometry_generation = generation
+        self._frame_owner = frame
+        self._rotation = rotation
+        self._input_width = input_width
+        self._input_height = input_height
         self._source_image = image
         self._source_width = image.width()
         self._source_height = image.height()
@@ -166,16 +197,31 @@ class AndroidView(QLabel):
             android = self._map_to_android(point)
             if android is not None:
                 self._drag_active = True
+                self._drag_geometry_generation = (
+                    self._geometry_generation
+                )
+                self._gesture_mode = (
+                    self._gesture_mode_for_modifiers(
+                        event.modifiers()
+                    )
+                )
+                points = self._touch_points_for(
+                    android,
+                    self._gesture_mode,
+                )
                 self._last_drag_point = android
+                self._last_touch_points = points
                 self._last_drag_emit_ns = (
                     time.monotonic_ns()
                 )
                 self.setFocus(
                     Qt.FocusReason.MouseFocusReason
                 )
-                self.touchDownRequested.emit(
-                    android[0],
-                    android[1],
+                self.touchStateRequested.emit(
+                    "down",
+                    self._gesture_mode,
+                    points,
+                    self._drag_geometry_generation,
                 )
                 event.accept()
                 return
@@ -189,24 +235,39 @@ class AndroidView(QLabel):
             super().mouseMoveEvent(event)
             return
 
+        if (
+            self._drag_geometry_generation
+            != self._geometry_generation
+        ):
+            self._cancel_active_gesture()
+            event.accept()
+            return
+
         android = self._map_to_android_clamped(
             event.position().toPoint()
         )
         if android is None:
             return
 
+        points = self._touch_points_for(
+            android,
+            self._gesture_mode,
+        )
         now_ns = time.monotonic_ns()
-        changed = android != self._last_drag_point
+        changed = points != self._last_touch_points
         elapsed_ns = now_ns - self._last_drag_emit_ns
         if (
             changed
             and elapsed_ns >= 12_000_000
         ):
             self._last_drag_point = android
+            self._last_touch_points = points
             self._last_drag_emit_ns = now_ns
-            self.touchMoveRequested.emit(
-                android[0],
-                android[1],
+            self.touchStateRequested.emit(
+                "move",
+                self._gesture_mode,
+                points,
+                self._drag_geometry_generation,
             )
         event.accept()
 
@@ -222,24 +283,95 @@ class AndroidView(QLabel):
             super().mouseReleaseEvent(event)
             return
 
+        if (
+            self._drag_geometry_generation
+            != self._geometry_generation
+        ):
+            self._cancel_active_gesture()
+            event.accept()
+            return
+
         android = self._map_to_android_clamped(
             event.position().toPoint()
         )
-        self._drag_active = False
         if android is None:
             android = self._last_drag_point
         if android is not None:
-            if android != self._last_drag_point:
-                self.touchMoveRequested.emit(
-                    android[0],
-                    android[1],
-                )
-            self.touchUpRequested.emit(
-                android[0],
-                android[1],
+            points = self._touch_points_for(
+                android,
+                self._gesture_mode,
             )
-        self._last_drag_point = None
+            if points != self._last_touch_points:
+                self.touchStateRequested.emit(
+                    "move",
+                    self._gesture_mode,
+                    points,
+                    self._drag_geometry_generation,
+                )
+            self.touchStateRequested.emit(
+                "up",
+                self._gesture_mode,
+                points,
+                self._drag_geometry_generation,
+            )
+        self._reset_active_gesture()
         event.accept()
+
+    @staticmethod
+    def _gesture_mode_for_modifiers(
+        modifiers,
+    ) -> str:
+        ctrl = bool(
+            modifiers
+            & Qt.KeyboardModifier.ControlModifier
+        )
+        shift = bool(
+            modifiers
+            & Qt.KeyboardModifier.ShiftModifier
+        )
+        if ctrl and shift:
+            return "horizontal_tilt"
+        if ctrl:
+            return "pinch_rotate"
+        if shift:
+            return "vertical_tilt"
+        return "single"
+
+    def _touch_points_for(
+        self,
+        primary: tuple[int, int],
+        mode: str,
+    ) -> tuple[tuple[int, int], ...]:
+        if mode == "single":
+            return (primary,)
+        secondary = secondary_touch_point(
+            primary[0],
+            primary[1],
+            self._input_width,
+            self._input_height,
+            mode,
+        )
+        return primary, secondary
+
+    def _cancel_active_gesture(self) -> None:
+        if (
+            self._drag_active
+            and self._last_touch_points
+        ):
+            self.touchStateRequested.emit(
+                "cancel",
+                self._gesture_mode,
+                self._last_touch_points,
+                self._drag_geometry_generation,
+            )
+        self._reset_active_gesture()
+
+    def _reset_active_gesture(self) -> None:
+        self._drag_active = False
+        self._last_drag_point = None
+        self._last_touch_points = ()
+        self._drag_geometry_generation = 0
+        self._gesture_mode = "single"
 
     def wheelEvent(
         self,

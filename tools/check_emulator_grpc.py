@@ -48,6 +48,37 @@ def main() -> int:
                 100,
             ),
         )
+
+        center_x = frame.input_width // 2
+        center_y = frame.input_height // 2
+        spread_x = max(20, frame.input_width // 8)
+        two_finger = (
+            (
+                0,
+                max(0, center_x - spread_x),
+                center_y,
+            ),
+            (
+                1,
+                min(
+                    frame.input_width - 1,
+                    center_x + spread_x,
+                ),
+                center_y,
+            ),
+        )
+        client.touch_points(
+            tuple(
+                (identifier, x, y, 1)
+                for identifier, x, y in two_finger
+            )
+        )
+        client.touch_points(
+            tuple(
+                (identifier, x, y, 0)
+                for identifier, x, y in two_finger
+            )
+        )
         client.send_key("GoHome")
 
         print(

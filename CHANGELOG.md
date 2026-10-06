@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.21.0] - 2026-10-06
+
+### Interaction completeness
+
+- Adds two-pointer input over the existing persistent Emulator gRPC `streamInputEvent`; no ADB or sidecar input fallback is introduced.
+- Adds Ctrl+drag pinch/rotate, Shift+drag vertical tilt and Ctrl+Shift+drag horizontal tilt gestures in the embedded Android view.
+- Sends all active pointers in one `TouchEvent` with stable identifiers.
+- Records each completed two-pointer gesture as one semantic `multi_touch` user action with mode, pointer count, start/end coordinates, duration and display-geometry generation.
+- Assigns generations to distinct framebuffer/input/rotation geometries and cancels an active gesture if geometry changes instead of remapping stale movement.
+- Records geometry-change cancellation explicitly as incomplete user-action evidence.
+- Extends the real Emulator gRPC acceptance probe with a two-pointer event.
+- Leaves the hidden Emulator → gRPC/MMAP display, v0.10.5 clean-launch sequencing, sidecar, continuous-screen A/B collector and forensic semantics unchanged.
+
+
 ## [0.20.0] - 2026-10-06
 
 ### Continuous Screen Evidence

@@ -1,5 +1,15 @@
 # apk-research
 
+## v0.21.0 — Interaction Completeness
+
+v0.21.0 extends the proven persistent Emulator gRPC input path with **two-pointer gestures** and an explicit display-geometry generation invariant.
+
+The embedded Android view now supports Ctrl+drag for symmetric pinch/rotate, Shift+drag for vertical tilt and Ctrl+Shift+drag for horizontal tilt. All active pointers are sent together in one Emulator `TouchEvent`, preserving the existing `streamInputEvent` transport rather than adding ADB or sidecar input fallbacks.
+
+Every pointer gesture is bound to the framebuffer geometry generation on which it began. If frame dimensions, input dimensions or rotation change during an active gesture, apk-research terminates that gesture without remapping subsequent movement onto the new geometry and records the cancellation explicitly. Completed two-pointer interactions are stored as one semantic `multi_touch` user action with mode, pointer count, start/end points, duration and geometry generation.
+
+The hidden Emulator → gRPC/MMAP → AndroidView display path, v0.10.5 startup/clean-launch sequencing, collectors, sidecar, continuous-screen A/B path and Research ZIP evidence semantics are unchanged.
+
 ## v0.20.0 — Continuous Screen Evidence
 
 v0.20.0 turns the v0.19 Android sidecar into an **experimental parallel screen-evidence collector** while keeping the established Android `screenrecord` collector canonical and required.

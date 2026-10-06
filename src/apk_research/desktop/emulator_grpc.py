@@ -7,7 +7,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Sequence
 
 import grpc
 from google.protobuf import (
@@ -51,6 +51,72 @@ def map_display_ratio_to_input(
         max(0, int(y_ratio * input_height)),
     )
     return x, y
+
+
+@dataclass(frozen=True)
+class DisplayGeometry:
+    frame_width: int
+    frame_height: int
+    input_width: int
+    input_height: int
+    rotation: int
+
+
+class DisplayGeometryTracker:
+    """Assign a generation to each distinct live-display geometry."""
+
+    def __init__(self) -> None:
+        self.generation = 0
+        self.current: DisplayGeometry | None = None
+
+    def update(
+        self,
+        *,
+        frame_width: int,
+        frame_height: int,
+        input_width: int,
+        input_height: int,
+        rotation: int,
+    ) -> tuple[int, bool]:
+        geometry = DisplayGeometry(
+            frame_width=int(frame_width),
+            frame_height=int(frame_height),
+            input_width=int(input_width),
+            input_height=int(input_height),
+            rotation=int(rotation),
+        )
+        changed = (
+            self.current is not None
+            and self.current != geometry
+        )
+        if self.current != geometry:
+            self.generation += 1
+            self.current = geometry
+        return self.generation, changed
+
+
+def secondary_touch_point(
+    x: int,
+    y: int,
+    input_width: int,
+    input_height: int,
+    mode: str,
+) -> tuple[int, int]:
+    if input_width <= 0 or input_height <= 0:
+        raise ValueError("input geometry must be positive")
+    max_x = input_width - 1
+    max_y = input_height - 1
+    x = min(max_x, max(0, int(x)))
+    y = min(max_y, max(0, int(y)))
+    if mode == "pinch_rotate":
+        return max_x - x, max_y - y
+    if mode == "vertical_tilt":
+        return max_x - x, y
+    if mode == "horizontal_tilt":
+        return x, max_y - y
+    raise ValueError(
+        f"Unsupported multi-touch mode: {mode}"
+    )
 
 
 @dataclass(frozen=True)
@@ -349,11 +415,40 @@ class EmulatorGrpcClient:
         *,
         pressure: int,
     ) -> None:
-        event = self._touch_event(
-            x,
-            y,
-            pressure=pressure,
+        self.touch_points(
+            ((0, x, y, pressure),)
         )
+
+    def touch_points(
+        self,
+        points: Sequence[
+            tuple[int, int, int, int]
+        ],
+    ) -> None:
+        if not points:
+            raise ValueError(
+                "touch_points requires at least one pointer"
+            )
+        event = TouchEvent(display=0)
+        seen: set[int] = set()
+        for identifier, x, y, pressure in points:
+            pointer_id = int(identifier)
+            if pointer_id in seen:
+                raise ValueError(
+                    f"Duplicate touch identifier: {pointer_id}"
+                )
+            seen.add(pointer_id)
+            active = int(pressure) > 0
+            event.touches.append(
+                Touch(
+                    x=max(0, int(x)),
+                    y=max(0, int(y)),
+                    identifier=pointer_id,
+                    pressure=max(0, int(pressure)),
+                    touch_major=1 if active else 0,
+                    touch_minor=1 if active else 0,
+                )
+            )
         self._queue_input_event(
             self._wrap_touch(event)
         )
