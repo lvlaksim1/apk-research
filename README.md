@@ -1,5 +1,15 @@
 # apk-research
 
+## v0.22.0 — Packet ↔ Action Evidence
+
+v0.22.0 deepens the Raw / Packet Inspector by resolving concrete PCAP packets back to the **existing exported Research Timeline action windows**.
+
+For the selected normalized flow, each inspected packet is linked to an action only when both conditions are already supported by the archive: the action's exported network correlation references the same canonical `flow_id`, and the packet target timestamp falls inside that action's exported target-time window. The relation is presentation-only and remains `temporal-only` with `causal_claim=false`.
+
+The Packets tab now shows matched Action windows, includes action IDs/labels in search and details, and provides direct Packet → Timeline navigation. Raw PCAP remains authoritative; no new evidence artifact or capture schema is introduced.
+
+The hidden Emulator → gRPC/MMAP → AndroidView runtime, v0.10.5 startup/clean-launch sequencing, sidecar, experimental continuous-screen collector and geometry-safe gRPC input remain unchanged. Audio Evidence and Virtual Display remain out of scope.
+
 ## v0.21.0 — Interaction Completeness
 
 v0.21.0 extends the proven persistent Emulator gRPC input path with **two-pointer gestures** and an explicit display-geometry generation invariant.

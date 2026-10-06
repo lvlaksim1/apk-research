@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import struct
 import zipfile
 from pathlib import Path
@@ -9,10 +10,12 @@ from typing import Any, BinaryIO
 from apk_research.network_attribution import canonical_connection_key
 from apk_research.quic import QuicFlowInspector
 from apk_research.timeline import (
+    TIMELINE_ARTIFACT,
     _decode_ip,
     _dns_query_name,
     _iso_epoch,
     _network_payload,
+    _parse_utc,
     _pcap_header,
     _tls_sni,
 )
@@ -56,6 +59,180 @@ def flow_connection_key(flow: dict[str, Any]) -> tuple[Any, ...] | None:
         ),
     )
     return protocol, left, right
+
+
+def _action_display_label(action: dict[str, Any]) -> str:
+    action_id = str(action.get("action_id") or "")
+    action_name = str(action.get("action") or "action")
+    if action_id:
+        return f"{action_id} • {action_name}"
+    return action_name
+
+
+def _timeline_action_windows(
+    timeline: dict[str, Any],
+    flow_id: str,
+) -> list[dict[str, Any]]:
+    """Return canonical temporal-only action windows referencing one flow."""
+
+    windows: list[dict[str, Any]] = []
+    if not flow_id:
+        return windows
+
+    for action in timeline.get("user_actions") or []:
+        if not isinstance(action, dict):
+            continue
+        action_id = str(action.get("action_id") or "")
+        correlation = action.get("correlation")
+        if not action_id or not isinstance(correlation, dict):
+            continue
+        if (
+            correlation.get("causal_claim") is not False
+            or str(correlation.get("attribution") or "")
+            != "temporal-only"
+        ):
+            continue
+
+        network = correlation.get("network")
+        if not isinstance(network, dict):
+            continue
+        flow_ids = {
+            str(value)
+            for value in network.get("flow_ids") or []
+            if value
+        }
+        if flow_id not in flow_ids:
+            continue
+
+        start_text = str(
+            correlation.get("target_started_utc_estimate")
+            or ""
+        )
+        finish_text = str(
+            correlation.get("target_finished_utc_estimate")
+            or ""
+        )
+        if not start_text or not finish_text:
+            continue
+        try:
+            start_epoch = _parse_utc(start_text).timestamp()
+            finish_epoch = _parse_utc(finish_text).timestamp()
+            window = correlation.get("window")
+            if not isinstance(window, dict):
+                window = {}
+            after_seconds = max(
+                0.0,
+                float(window.get("actual_after_seconds") or 0.0),
+            )
+        except (TypeError, ValueError):
+            continue
+        end_epoch = finish_epoch + after_seconds
+        if end_epoch < start_epoch:
+            continue
+
+        windows.append(
+            {
+                "action_id": action_id,
+                "action": str(action.get("action") or ""),
+                "label": _action_display_label(action),
+                "window_started_utc": _iso_epoch(start_epoch),
+                "window_finished_utc": _iso_epoch(end_epoch),
+                "window_start_epoch": start_epoch,
+                "window_end_epoch": end_epoch,
+                "causal_confidence": str(
+                    correlation.get("causal_confidence") or ""
+                ),
+                "attribution": "temporal-only",
+                "causal_claim": False,
+            }
+        )
+
+    windows.sort(
+        key=lambda value: (
+            float(value["window_start_epoch"]),
+            str(value["action_id"]),
+        )
+    )
+    return windows
+
+
+def correlate_packets_with_timeline(
+    report: dict[str, Any],
+    timeline: dict[str, Any],
+) -> dict[str, Any]:
+    """Annotate packet presentation with existing Timeline windows.
+
+    The correlation is derived only from the already exported Timeline:
+    a packet is linked to an action when the selected flow is present in that
+    action's existing network correlation and the packet timestamp falls inside
+    the action's existing target-time window. This never upgrades temporal
+    adjacency into causality.
+    """
+
+    flow_id = str(report.get("flow_id") or "")
+    windows = _timeline_action_windows(
+        timeline,
+        flow_id,
+    )
+    matched_packets = 0
+    matched_relations = 0
+
+    for packet in report.get("packets") or []:
+        if not isinstance(packet, dict):
+            continue
+        try:
+            epoch = float(packet.get("epoch"))
+        except (TypeError, ValueError):
+            epoch = float("nan")
+
+        matches = [
+            {
+                key: window[key]
+                for key in (
+                    "action_id",
+                    "action",
+                    "label",
+                    "window_started_utc",
+                    "window_finished_utc",
+                    "causal_confidence",
+                    "attribution",
+                    "causal_claim",
+                )
+            }
+            for window in windows
+            if (
+                epoch == epoch
+                and float(window["window_start_epoch"])
+                <= epoch
+                <= float(window["window_end_epoch"])
+            )
+        ]
+        packet["temporal_actions"] = matches
+        packet["temporal_action_ids"] = [
+            str(match["action_id"])
+            for match in matches
+        ]
+        packet["temporal_action_labels"] = [
+            str(match["label"])
+            for match in matches
+        ]
+        packet["temporal_relation"] = (
+            "inside-action-window"
+            if matches
+            else "none"
+        )
+        packet["causal_claim"] = False
+        if matches:
+            matched_packets += 1
+            matched_relations += len(matches)
+
+    report["timeline_artifact"] = TIMELINE_ARTIFACT
+    report["timeline_action_window_count"] = len(windows)
+    report["packet_action_match_count"] = matched_packets
+    report["packet_action_relation_count"] = matched_relations
+    report["correlation_type"] = "temporal-only"
+    report["causal_claim"] = False
+    return report
 
 
 def _packet_direction(
@@ -285,6 +462,30 @@ def inspect_archive_flow(
                 flow,
                 hex_preview_bytes=hex_preview_bytes,
             )
+
+        timeline_status = "missing"
+        timeline: dict[str, Any] = {}
+        try:
+            decoded = json.loads(
+                zipped.read(TIMELINE_ARTIFACT).decode(
+                    "utf-8",
+                    errors="strict",
+                )
+            )
+            if isinstance(decoded, dict):
+                timeline = decoded
+                timeline_status = "loaded"
+            else:
+                timeline_status = "invalid"
+        except KeyError:
+            timeline_status = "missing"
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            timeline_status = "invalid"
+
+        correlate_packets_with_timeline(
+            report,
+            timeline,
+        )
         report.update(
             {
                 "archive": str(archive),
@@ -292,6 +493,7 @@ def inspect_archive_flow(
                 "artifact_size": info.file_size,
                 "artifact_compressed_size": info.compress_size,
                 "artifact_crc32": f"{info.CRC:08x}",
+                "timeline_status": timeline_status,
             }
         )
         return report
@@ -317,6 +519,7 @@ def packet_search_text(packet: dict[str, Any]) -> str:
         "quic_version",
         "quic_packet_type",
         "quic_sni",
+        "temporal_relation",
     ):
         value = packet.get(key)
         if value not in {None, ""}:
@@ -326,7 +529,26 @@ def packet_search_text(packet: dict[str, Any]) -> str:
         for item in packet.get("quic_alpn") or []
         if item
     )
+    values.extend(
+        str(item)
+        for item in packet.get("temporal_action_ids") or []
+        if item
+    )
+    values.extend(
+        str(item)
+        for item in packet.get("temporal_action_labels") or []
+        if item
+    )
     return " ".join(values).lower()
+
+
+def packet_action_label(packet: dict[str, Any]) -> str:
+    labels = [
+        str(value)
+        for value in packet.get("temporal_action_labels") or []
+        if value
+    ]
+    return " / ".join(labels)
 
 
 def packet_metadata_label(packet: dict[str, Any]) -> str:
@@ -358,6 +580,28 @@ def format_packet_details(
     if packet.get("hex_preview_truncated"):
         preview += "\n… preview truncated; locator still points to the complete raw packet"
 
+    actions = [
+        value
+        for value in packet.get("temporal_actions") or []
+        if isinstance(value, dict)
+    ]
+    if actions:
+        action_lines = []
+        for relation in actions:
+            action_lines.extend(
+                [
+                    f"  {relation.get('label') or relation.get('action_id') or 'action'}",
+                    "    relation: temporal-only",
+                    "    causal claim: no",
+                    f"    window: {relation.get('window_started_utc') or '—'} .. {relation.get('window_finished_utc') or '—'}",
+                    f"    confidence: {relation.get('causal_confidence') or '—'}",
+                ]
+            )
+    else:
+        action_lines = [
+            "  no exported action window contains this packet for the selected flow"
+        ]
+
     return "\n".join(
         [
             f"Packet: {packet.get('packet_id') or '—'}",
@@ -369,6 +613,9 @@ def format_packet_details(
             f"Captured / original: {packet.get('captured_length') or 0} / {packet.get('original_length') or 0} bytes",
             f"Protocol evidence: {metadata}",
             "",
+            "Timeline relation:",
+            *action_lines,
+            "",
             "Raw PCAP locator:",
             f"  artifact: {artifact}",
             f"  packet index: {packet.get('packet_index') or '—'}",
@@ -378,6 +625,6 @@ def format_packet_details(
             "Bounded raw frame preview:",
             preview or "—",
             "",
-            "Encrypted payload is not presented as plaintext; this view is a locator/inspection layer over the original PCAP.",
+            "Encrypted payload is not presented as plaintext; packet/action links are temporal-only and never claim causality.",
         ]
     )

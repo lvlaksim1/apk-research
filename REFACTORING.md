@@ -1,5 +1,31 @@
 # Refactoring and Architecture Log
 
+## v0.22.0 — Packet ↔ Action Evidence
+
+### Scope
+
+Stage E begins with a presentation-only cross-link between the concrete packets exposed by v0.18 and the action windows already exported by Research Timeline. Capture, attribution and runtime behavior are unchanged.
+
+### Correlation invariant
+
+A packet may reference an action only when:
+1. the action's archived `correlation.network.flow_ids` contains the selected normalized `flow_id`; and
+2. the packet target timestamp lies inside that action's archived target-time correlation window.
+
+The inspector never creates a wider window, substitutes host time for target time, or turns temporal adjacency into a causal claim.
+
+### GUI integration
+
+The Packets tab adds an Action-window column, action-aware search/details and direct Packet → Timeline navigation. The selected packet retains its original raw PCAP packet index and byte offsets.
+
+### Acceptance boundary
+
+Unit tests cover window membership, flow mismatch and non-causality. Real AVD acceptance selects a flow with archived correlated actions when available, resolves its raw packets, requires at least one matching packet/action relation, and checks every emitted action ID against both the selected flow and archived Timeline.
+
+### Compatibility boundary
+
+No new Research ZIP artifact or schema. Raw PCAP remains authoritative. Hidden Emulator → gRPC/MMAP → AndroidView, v0.10.5 startup, Android sidecar, experimental continuous-screen collector and geometry-safe gRPC input remain unchanged. Audio Evidence and Virtual Display remain excluded.
+
 ## v0.21.0 — Interaction Completeness
 
 ### Scope
