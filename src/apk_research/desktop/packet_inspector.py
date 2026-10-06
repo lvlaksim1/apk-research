@@ -256,6 +256,287 @@ def _packet_direction(
     return captured or "unknown"
 
 
+_TCP_FLAG_NAMES = (
+    (0x80, "CWR"),
+    (0x40, "ECE"),
+    (0x20, "URG"),
+    (0x10, "ACK"),
+    (0x08, "PSH"),
+    (0x04, "RST"),
+    (0x02, "SYN"),
+    (0x01, "FIN"),
+)
+
+
+def _transport_header(
+    network_payload: bytes,
+    ethertype: int | None,
+) -> tuple[int | None, bytes]:
+    """Return the transport protocol number and exact transport bytes.
+
+    This intentionally mirrors the IP boundary currently supported by
+    timeline._decode_ip: IPv4 without non-first fragmentation, or the fixed
+    IPv6 header without extension-header traversal.
+    """
+
+    if ethertype == 0x0800:
+        if len(network_payload) < 20:
+            return None, b""
+        ihl = (network_payload[0] & 0x0F) * 4
+        if ihl < 20 or len(network_payload) < ihl:
+            return None, b""
+        fragment_offset = int.from_bytes(
+            network_payload[6:8],
+            "big",
+        ) & 0x1FFF
+        if fragment_offset:
+            return int(network_payload[9]), b""
+        return int(network_payload[9]), network_payload[ihl:]
+
+    if ethertype == 0x86DD:
+        if len(network_payload) < 40:
+            return None, b""
+        return int(network_payload[6]), network_payload[40:]
+
+    return None, b""
+
+
+def _transport_metadata(
+    network_payload: bytes,
+    ethertype: int | None,
+    decoded: dict[str, Any],
+) -> dict[str, Any]:
+    protocol = str(decoded.get("protocol") or "").lower()
+    protocol_number, transport = _transport_header(
+        network_payload,
+        ethertype,
+    )
+
+    if protocol == "tcp":
+        result: dict[str, Any] = {
+            "tcp_header_valid": False,
+            "tcp_sequence": None,
+            "tcp_acknowledgment": None,
+            "tcp_flags": [],
+            "tcp_flags_bits": None,
+            "tcp_header_length": None,
+            "tcp_window": None,
+            "tcp_payload_length": len(
+                decoded.get("payload")
+                if isinstance(decoded.get("payload"), bytes)
+                else b""
+            ),
+        }
+        if protocol_number != 6 or len(transport) < 20:
+            return result
+
+        data_offset = (transport[12] >> 4) * 4
+        if data_offset < 20 or len(transport) < data_offset:
+            return result
+
+        bits = int(transport[13])
+        flags = [
+            name
+            for mask, name in _TCP_FLAG_NAMES
+            if bits & mask
+        ]
+        result.update(
+            {
+                "tcp_header_valid": True,
+                "tcp_sequence": int.from_bytes(
+                    transport[4:8],
+                    "big",
+                ),
+                "tcp_acknowledgment": int.from_bytes(
+                    transport[8:12],
+                    "big",
+                ),
+                "tcp_flags": flags,
+                "tcp_flags_bits": bits,
+                "tcp_header_length": data_offset,
+                "tcp_window": int.from_bytes(
+                    transport[14:16],
+                    "big",
+                ),
+                "tcp_payload_length": len(transport) - data_offset,
+            }
+        )
+        return result
+
+    if protocol == "udp":
+        result = {
+            "udp_header_valid": False,
+            "udp_length": None,
+            "udp_checksum": None,
+        }
+        if protocol_number != 17 or len(transport) < 8:
+            return result
+        result.update(
+            {
+                "udp_header_valid": True,
+                "udp_length": int.from_bytes(
+                    transport[4:6],
+                    "big",
+                ),
+                "udp_checksum": int.from_bytes(
+                    transport[6:8],
+                    "big",
+                ),
+            }
+        )
+        return result
+
+    return {}
+
+
+def _tcp_flag_set(packet: dict[str, Any]) -> set[str]:
+    return {
+        str(value)
+        for value in packet.get("tcp_flags") or []
+        if value
+    }
+
+
+def build_transport_session(
+    packets: list[dict[str, Any]],
+    protocol: str,
+) -> dict[str, Any]:
+    """Summarize only transport lifecycle evidence actually present in PCAP."""
+
+    protocol = str(protocol or "").lower()
+    if protocol != "tcp":
+        return {
+            "protocol": protocol,
+            "applicable": False,
+            "reason": "tcp-only",
+        }
+
+    tcp_packets = [
+        packet
+        for packet in packets
+        if isinstance(packet, dict)
+        and str(packet.get("protocol") or "").lower() == "tcp"
+    ]
+
+    syn = [
+        packet
+        for packet in tcp_packets
+        if "SYN" in _tcp_flag_set(packet)
+        and "ACK" not in _tcp_flag_set(packet)
+    ]
+    syn_ack = [
+        packet
+        for packet in tcp_packets
+        if {"SYN", "ACK"} <= _tcp_flag_set(packet)
+    ]
+    fin = [
+        packet
+        for packet in tcp_packets
+        if "FIN" in _tcp_flag_set(packet)
+    ]
+    rst = [
+        packet
+        for packet in tcp_packets
+        if "RST" in _tcp_flag_set(packet)
+    ]
+
+    handshake: list[dict[str, Any]] = []
+    if syn:
+        first_syn = syn[0]
+        initiator = str(first_syn.get("direction") or "")
+        responder = (
+            "inbound"
+            if initiator == "outbound"
+            else "outbound"
+            if initiator == "inbound"
+            else ""
+        )
+        syn_index = int(first_syn.get("packet_index") or 0)
+
+        second = next(
+            (
+                packet
+                for packet in syn_ack
+                if int(packet.get("packet_index") or 0) > syn_index
+                and (
+                    not responder
+                    or str(packet.get("direction") or "") == responder
+                )
+            ),
+            None,
+        )
+        if second is not None:
+            second_index = int(second.get("packet_index") or 0)
+            third = next(
+                (
+                    packet
+                    for packet in tcp_packets
+                    if int(packet.get("packet_index") or 0) > second_index
+                    and "ACK" in _tcp_flag_set(packet)
+                    and "SYN" not in _tcp_flag_set(packet)
+                    and (
+                        not initiator
+                        or str(packet.get("direction") or "") == initiator
+                    )
+                ),
+                None,
+            )
+            if third is not None:
+                handshake = [first_syn, second, third]
+
+    handshake_observed = len(handshake) == 3
+    if rst:
+        termination = "reset-observed"
+        termination_packets = rst
+    elif fin:
+        termination = "fin-observed"
+        termination_packets = fin
+    else:
+        termination = "not-observed-in-capture"
+        termination_packets = []
+
+    return {
+        "protocol": "tcp",
+        "applicable": True,
+        "packet_count": len(tcp_packets),
+        "handshake_status": (
+            "complete-three-way-observed"
+            if handshake_observed
+            else "partial-or-not-observed-in-capture"
+        ),
+        "handshake_observed": handshake_observed,
+        "handshake_packet_ids": [
+            str(packet.get("packet_id") or "")
+            for packet in handshake
+        ],
+        "syn_packet_ids": [
+            str(packet.get("packet_id") or "")
+            for packet in syn
+        ],
+        "syn_ack_packet_ids": [
+            str(packet.get("packet_id") or "")
+            for packet in syn_ack
+        ],
+        "termination_status": termination,
+        "termination_packet_ids": [
+            str(packet.get("packet_id") or "")
+            for packet in termination_packets
+        ],
+        "rst_packet_ids": [
+            str(packet.get("packet_id") or "")
+            for packet in rst
+        ],
+        "fin_packet_ids": [
+            str(packet.get("packet_id") or "")
+            for packet in fin
+        ],
+        "absence_semantics": (
+            "not-observed means only that the event is absent from this "
+            "capture; it does not prove that it did not occur"
+        ),
+    }
+
+
 def _format_hex_preview(data: bytes, limit: int) -> tuple[str, bool]:
     bounded = data[: max(0, int(limit))]
     lines: list[str] = []
@@ -405,6 +686,11 @@ def inspect_pcap_flow(
         direction = _packet_direction(packet, flow)
         epoch = seconds + fraction / scale
         metadata = _packet_metadata(decoded, direction, quic)
+        transport_metadata = _transport_metadata(
+            network_payload,
+            ethertype,
+            decoded,
+        )
         preview, truncated = _format_hex_preview(
             raw_frame,
             hex_preview_bytes,
@@ -434,13 +720,19 @@ def inspect_pcap_flow(
                 ),
                 "hex_preview_truncated": truncated,
                 **metadata,
+                **transport_metadata,
             }
         )
 
+    transport_session = build_transport_session(
+        selected,
+        target_key[0],
+    )
     return {
         "flow_id": str(flow.get("flow_id") or ""),
         "protocol": target_key[0],
         "packets": selected,
+        "transport_session": transport_session,
         "selected_packet_count": len(selected),
         "total_packet_count": total_packets,
         "linktype": linktype,
@@ -520,6 +812,10 @@ def packet_search_text(packet: dict[str, Any]) -> str:
         "quic_packet_type",
         "quic_sni",
         "temporal_relation",
+        "tcp_sequence",
+        "tcp_acknowledgment",
+        "tcp_payload_length",
+        "udp_length",
     ):
         value = packet.get(key)
         if value not in {None, ""}:
@@ -527,6 +823,11 @@ def packet_search_text(packet: dict[str, Any]) -> str:
     values.extend(
         str(item)
         for item in packet.get("quic_alpn") or []
+        if item
+    )
+    values.extend(
+        str(item)
+        for item in packet.get("tcp_flags") or []
         if item
     )
     values.extend(
@@ -551,8 +852,32 @@ def packet_action_label(packet: dict[str, Any]) -> str:
     return " / ".join(labels)
 
 
+def packet_transport_label(packet: dict[str, Any]) -> str:
+    protocol = str(packet.get("protocol") or "").lower()
+    if protocol == "tcp":
+        flags = [
+            str(value)
+            for value in packet.get("tcp_flags") or []
+            if value
+        ]
+        if flags:
+            return "TCP:" + ",".join(flags)
+        return "TCP"
+    if protocol == "udp":
+        length = packet.get("udp_length")
+        return (
+            f"UDP:len={length}"
+            if length not in {None, ""}
+            else "UDP"
+        )
+    return protocol.upper()
+
+
 def packet_metadata_label(packet: dict[str, Any]) -> str:
     parts: list[str] = []
+    transport = packet_transport_label(packet)
+    if transport:
+        parts.append(transport)
     for key, label in (
         ("dns_query", "DNS"),
         ("tls_sni", "SNI"),
@@ -577,6 +902,25 @@ def format_packet_details(
     dst = f"{packet.get('dst') or '—'}:{packet.get('dst_port') if packet.get('dst_port') is not None else '—'}"
     metadata = packet_metadata_label(packet) or "—"
     preview = str(packet.get("hex_preview") or "")
+    protocol = str(packet.get("protocol") or "").lower()
+    transport_lines: list[str] = []
+    if protocol == "tcp":
+        flags = ", ".join(
+            str(value)
+            for value in packet.get("tcp_flags") or []
+            if value
+        ) or "none"
+        transport_lines = [
+            f"TCP flags: {flags}",
+            f"Sequence / ACK: {packet.get('tcp_sequence') if packet.get('tcp_sequence') is not None else '—'} / {packet.get('tcp_acknowledgment') if packet.get('tcp_acknowledgment') is not None else '—'}",
+            f"TCP header / payload: {packet.get('tcp_header_length') if packet.get('tcp_header_length') is not None else '—'} / {packet.get('tcp_payload_length') if packet.get('tcp_payload_length') is not None else '—'} bytes",
+            f"TCP window: {packet.get('tcp_window') if packet.get('tcp_window') is not None else '—'}",
+        ]
+    elif protocol == "udp":
+        transport_lines = [
+            f"UDP length: {packet.get('udp_length') if packet.get('udp_length') is not None else '—'}",
+            f"UDP checksum: {packet.get('udp_checksum') if packet.get('udp_checksum') is not None else '—'}",
+        ]
     if packet.get("hex_preview_truncated"):
         preview += "\n… preview truncated; locator still points to the complete raw packet"
 
@@ -612,6 +956,7 @@ def format_packet_details(
             f"Destination: {dst}",
             f"Captured / original: {packet.get('captured_length') or 0} / {packet.get('original_length') or 0} bytes",
             f"Protocol evidence: {metadata}",
+            *transport_lines,
             "",
             "Timeline relation:",
             *action_lines,
