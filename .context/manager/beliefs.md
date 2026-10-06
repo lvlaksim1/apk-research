@@ -55,7 +55,7 @@ Owner-provided archive `20261006T230500.602195Z-1206ec46.research.zip` verifies 
 - Continuous H.264 decodes cleanly end-to-end. Time-aligned visual samples, including the first frame after the long idle interval, match canonical screenrecord.
 - Continuous presentation span is 1.475888 s shorter than canonical, but the first continuous frame still precedes target package launch and the last extends beyond the owner stop request; no target-interaction loss is observed in this session.
 
-Conclusion: the two owner-proven v0.23.0 Sidecar defects are closed in v0.23.1. Continuous Screen remains experimental only because its main architectural benefit—continuity across canonical screenrecord chunk rotation—has not yet been owner-validated beyond the configured 170 s chunk boundary, and promotion still requires an explicit owner decision.
+Conclusion: the two owner-proven v0.23.0 Sidecar defects are closed in v0.23.1.
 
 - source: owner-provided v0.23.1 Research ZIP `20261006T230500.602195Z-1206ec46.research.zip`, inspected 2026-10-07
 - authority: owner-evidence + verified-archive-analysis
@@ -87,3 +87,23 @@ WHPX acceptance remains advisory/non-publication-gating.
 
 - source: repository workflow
 - authority: verified-repository
+
+
+### Owner-side long-session / rollover validation
+
+Owner-provided archive `20261006T231833.446176Z-710dfbe4.research.zip` closes the remaining continuity experiment.
+
+- 33/33 checksummed artifacts verified; session `complete`, `degraded=false`.
+- Canonical screenrecord rotated from chunk 1 to chunk 2 with a 1.965848 s frame gap.
+- Continuous Screen remained one clean stream with 6,970 frames / 256.466399 s and no receiver error.
+- 66 Continuous Screen frames lie inside the canonical rollover gap; the largest adjacent PTS gap there is 0.100000 s.
+- Owner action `action-000166` occurred entirely inside the canonical rollover gap, and Continuous Screen contains a frame about 2.179 ms after its target-estimated start.
+- The complete continuous H.264 stream decodes without error.
+- 93,556 Sidecar infrastructure packets / 65,433,681 bytes remain preserved in RAW PCAP but zero Sidecar-port flows leak into the 82 ordinary normalized flows.
+
+This proves idle resilience, long-session operation and continuity through canonical chunk rotation.
+
+A separate quality boundary remains: Continuous Screen is currently 540×960 at 2 Mbit/s, while canonical screenrecord is 1080×1920. The mechanism can therefore be considered technically validated as a continuous evidence source, but replacing canonical high-resolution screenrecord outright would reduce spatial evidence detail unless the Sidecar quality profile is raised and revalidated.
+
+- source: owner-provided v0.23.1 Research ZIP `20261006T231833.446176Z-710dfbe4.research.zip`, inspected 2026-10-07
+- authority: owner-evidence + verified-archive-analysis

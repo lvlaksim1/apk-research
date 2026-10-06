@@ -8,23 +8,31 @@ The two owner-proven v0.23.0 Sidecar defects were corrected without changing RAW
 - Sidecar loopback traffic remains in raw PCAP but is excluded from ordinary app derived evidence using exact archived dynamic ports;
 - long-lived media reception no longer inherits the short handshake timeout.
 
-PR #14 and main pipeline #127 both passed real-AVD idle/infrastructure regressions.
+PR #14, main pipeline #127 and two real owner-side v0.23.1 archives validate the correction.
 
-## Completed — owner-side v0.23.1 defect revalidation
+## Completed — Continuous Screen technical validation
 
 Status: completed.
 
-Archive `20261006T230500.602195Z-1206ec46.research.zip` proves that Continuous Screen survives and resumes after a 59.005 s no-frame interval, Sidecar traffic remains preserved only as RAW/infrastructure evidence, canonical screenrecord remains complete, and post-idle interaction is captured normally.
+Owner archives prove:
+- resume after a 59.005 s no-frame static interval;
+- one uninterrupted Sidecar stream through a canonical 170 s screenrecord rollover;
+- 66 continuous frames inside the 1.965848 s canonical rollover frame gap;
+- capture of an owner action during that canonical gap;
+- clean H.264 decode/collector shutdown;
+- Sidecar infrastructure isolation from ordinary derived app network evidence.
 
-## Active — Continuous Screen promotion gate
+## Proposed — Continuous Screen product-role decision
 
-Status: active.
+Status: proposed; owner decision required.
 
-Before recommending promotion from experimental/non-canonical status, obtain one owner-side session that crosses at least one canonical `screenrecord` 170 s chunk boundary. Compare coverage around rollover, Sidecar continuity, frame/timestamp consistency and clean completion. Promotion then requires an explicit owner decision.
+The mechanism is technically validated, but the current Sidecar capture profile is 540×960 / 2 Mbit/s versus canonical screenrecord at 1080×1920. Recommend either:
+- stable continuous/timeline evidence with canonical high-resolution screenrecord retained; or
+- raise Sidecar resolution/quality and revalidate performance/storage before replacing screenrecord as sole canonical screen evidence.
 
 ## Active — evidence-preserving Stage E continuation
 
-Status: active after owner-side revalidation or in parallel for low-risk presentation work.
+Status: active after the owner resolves the Continuous Screen product role.
 
 Continue deeper evidence intelligence from the verified v0.23.1 baseline, preserving RAW-first provenance, capture-bounded semantics and explicit confidence boundaries.
 

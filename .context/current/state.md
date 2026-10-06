@@ -44,12 +44,27 @@ Main pipeline #127 (`37460233667`) completed SUCCESS for exact SHA `39e483ee03d5
 - release documentation and installer checksum passed;
 - GitHub Release v0.23.1 was published.
 
+## Long-session Continuous Screen validation
+
+Archive `20261006T231833.446176Z-710dfbe4.research.zip` passes the previously open 170 s rollover gate:
+- 33/33 checksums; complete/non-degraded session;
+- two canonical screenrecord chunks;
+- 1.965848 s canonical frame gap at rollover;
+- one Continuous Screen stream, 6,970 frames / 256.466399 s, clean decode and shutdown;
+- 66 continuous frames inside the canonical rollover gap;
+- owner action 166 occurs inside that gap and is covered by continuous frames;
+- 93,556 Sidecar packets are preserved/accounted as infrastructure and zero exact Sidecar-port flows leak into 82 ordinary normalized flows.
+
+Technical continuity validation is complete.
+
 ## Runtime/evidence baseline
 
-Hidden Emulator → gRPC/MMAP → AndroidView and v0.10.5 clean-launch sequencing remain unchanged. Canonical screenrecord remains authoritative. Continuous Screen remains experimental/non-canonical pending one owner-side session that crosses the 170 s screenrecord chunk boundary and an explicit promotion decision.
+Hidden Emulator → gRPC/MMAP → AndroidView and v0.10.5 clean-launch sequencing remain unchanged.
+
+Canonical screenrecord remains authoritative for high-resolution screen evidence pending an explicit owner product-role decision. Continuous Screen is technically validated for stability/continuity but currently records 540×960 / 2 Mbit/s versus canonical 1080×1920, so sole-source promotion would reduce spatial detail.
 
 ## Development status
 
-v0.23.1 is complete, published and owner-revalidated for the two corrective defects. No v0.24 implementation is active. The immediate open item is the final Continuous Screen promotion gate across a canonical screenrecord chunk rollover.
+v0.23.1 is complete, published and owner-revalidated. No v0.24 implementation is active. The remaining Continuous Screen item is a product-role/quality decision, not another continuity test.
 
 Audio Evidence and Virtual Display remain out of scope.

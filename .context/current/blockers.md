@@ -4,19 +4,22 @@ Last reconciled: 2026-10-07.
 
 ## Product blockers
 
-No known release-blocking product defect is active. v0.23.1 is published, all publication gates passed, and the two owner-proven v0.23.0 Sidecar defects are owner-revalidated as corrected.
+No known release-blocking product defect is active. v0.23.1 is published and the Sidecar corrective behavior is owner-revalidated.
 
-## Continuous Screen promotion
+## Continuous Screen product role
 
-Continuous Screen remains experimental/non-canonical for one narrow reason: the supplied owner-side v0.23.1 session lasted about 138 s and did not cross the canonical `screenrecord` 170 s chunk boundary.
+There is no remaining stability/continuity blocker. Owner-side validation proves:
+- 59.005 s idle/no-frame survival and resume;
+- successful >170 s operation;
+- uninterrupted evidence through canonical screenrecord chunk rotation;
+- clean decode/shutdown;
+- Sidecar infrastructure isolation from ordinary derived network evidence.
 
-The real archive already proves:
-- survival and resume after a 59.005 s no-frame interval;
-- no Sidecar leakage into ordinary app flow/action evidence;
-- clean completion;
-- close visual/timing equivalence with canonical screenrecord during the tested interval.
+The remaining issue is evidence quality/role, not reliability. Current Continuous Screen capture is 540×960 / 2 Mbit/s; canonical screenrecord is 1080×1920. Replacing canonical screenrecord outright at the current profile would reduce spatial evidence detail by 4× in pixel count.
 
-The remaining promotion gate is long-session continuity across at least one canonical chunk rollover, followed by an explicit owner promotion decision.
+An explicit owner decision is required:
+- retain screenrecord as canonical high-resolution evidence and promote Continuous Screen as a stable continuous/timeline source; or
+- raise/revalidate Continuous Screen quality before considering sole canonical replacement.
 
 ## WHPX
 

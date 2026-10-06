@@ -53,7 +53,8 @@
   ],
   "dialogues": [
     ".context/dialogues/20261006-scrcpy-v5-applicability.md",
-    ".context/dialogues/20261006-v023-owner-archive-acceptance.md"
+    ".context/dialogues/20261006-v023-owner-archive-acceptance.md",
+    ".context/dialogues/20261007-v0231-long-screen-acceptance.md"
   ],
   "history": [],
   "runtime": {
