@@ -1,59 +1,45 @@
 # Manager plans
 
-## Default plan for product changes
+## Default product-change plan
 
-1. Reinstate from `context` and reconcile live `main`, latest release and relevant CI.
-2. Preserve the current product baseline; use a dedicated feature/fix branch for substantive work.
-3. Make the minimum coherent change and keep runtime/capture/evidence boundaries explicit.
-4. Run compile/tests and the relevant specialized regression tests before promotion.
-5. For release-bound changes, rely on the existing main pipeline: CI → real AVD acceptance → Windows standalone/GUI/installer smoke → clean-Windows provisioning → Publish Release.
-6. For evidence/network changes, verify with a real Research ZIP when owner evidence is available.
-7. After verified durable findings, persist semantic changes to the authoritative `context` branch and reseal manager state.
+1. Reinstate from `context` and reconcile live `main`, latest release and CI.
+2. Work on a dedicated feature branch from current product authority.
+3. Make the minimum coherent change with explicit evidence boundaries.
+4. Run unit/compile plus relevant AVD/desktop verification.
+5. For release-bound work, use the existing commit-triggered main pipeline.
+6. Persist verified durable findings and reseal manager state.
 
-## Product roadmap from v0.18.0
+## Completed roadmap stages
 
-### Stage A — Raw / Packet Inspector — COMPLETE
+### Stage A — Raw / Packet Inspector — COMPLETE (v0.18.0)
+Concrete PCAP packet inspection with reproducible raw offsets and bounded hex preview.
 
-Released as v0.18.0. Unified Evidence Explorer can resolve a normalized flow to concrete packet records in the original PCAP with reproducible packet index/byte-offset locators and bounded raw preview. Real-AVD release acceptance verifies packet count and locator integrity against a generated Research ZIP.
+### Stage B — Android sidecar foundation — COMPLETE (v0.19.0)
+Temporary project-owned app_process agent, exact handshake, long-lived transport and deterministic cleanup.
 
-### Stage B — Android sidecar foundation — ACTIVE
+### Stage C — continuous screen evidence — COMPLETE AS EXPERIMENTAL (v0.20.0)
+Parallel MediaCodec/device-PTS screen evidence with explicit A/B report. Canonical screenrecord is not yet replaced.
 
-Introduce a project-owned, version-pinned temporary Android-side `app_process` agent as an experimental infrastructure component.
+### Stage D — interaction completeness — COMPLETE (v0.21.0)
+Two-pointer gestures over existing gRPC input plus display-geometry generation safety and semantic interaction evidence.
 
-Required design:
-- no installed Android APK/service and no persistent guest modification;
-- host deploys a versioned jar/dex payload to a private path under `/data/local/tmp`;
-- execute as Android shell via `app_process`;
-- exact client/agent protocol/version handshake before use;
-- one long-lived local transport instead of repeated short-lived `adb shell` commands for sidecar functions;
-- prefer host-listen + `adb reverse` so host readiness precedes guest connection and polling races are avoided;
-- bounded startup timeout, explicit failure reason and deterministic teardown/removal;
-- sidecar diagnostics are observable but do not weaken existing research completeness semantics until a specific collector adopts it;
-- no display/input responsibility: Emulator gRPC/MMAP remains authoritative.
+## Stage E — deeper evidence intelligence — ACTIVE
 
-Initial Stage B completion should prove lifecycle/handshake/transport on real AVD before any collector is migrated onto it.
+### v0.22 target — Packet ↔ Action temporal evidence
 
-### Stage C — continuous screen evidence
+Extend Packet Inspector using only evidence already present in the Research ZIP:
+- read canonical `research-timeline.json` action windows;
+- for each inspected packet, identify action windows that contain the packet target timestamp and that reference the selected flow;
+- label relation strictly as `temporal-only` with `causal_claim=false`;
+- expose action IDs/labels in packet search/table/details;
+- add direct Packet → Timeline navigation;
+- preserve raw PCAP authority and create no new raw artifact;
+- add regression tests and real-AVD acceptance for correlation invariants.
 
-Build an experimental continuous screen evidence collector on the verified sidecar foundation using Android Surface/MediaCodec concepts and device-generated presentation timestamps. Keep the accepted chunked `screenrecord` collector as the baseline during A/B verification. Promotion requires real Research ZIP evidence showing no coverage regression, stable timing/provenance and cleaner session continuity.
+Later Stage E work may deepen protocol/session drill-down and screen/network cross-links only where clock-domain provenance is sufficient.
 
-Audio capture is excluded.
+## Explicit exclusions
 
-### Stage D — interaction completeness
-
-Extend the existing gRPC input path with multi-touch gestures and explicit gesture evidence. Add a display-geometry generation invariant so stale input created for an old rotation/geometry is rejected rather than remapped heuristically.
-
-Later keyboard/clipboard improvements may be added as opt-in UX features; automatic host clipboard synchronization must not be enabled by default.
-
-Virtual Display is excluded.
-
-### Stage E — deeper evidence intelligence
-
-After continuous media evidence is stable, extend analyzers only where raw evidence can support stronger conclusions: richer packet/session drill-down, protocol metadata and cross-links among Timeline, process/socket evidence, screen timing and network evidence. Preserve explicit confidence/provenance and avoid causal overclaim.
-
-## Context maintenance plan
-
-- Keep `main` discovery-only for Context Capsule bootstrap outside product release changes.
-- Persist manager identity, BDI state, memory and current working views only on `context`.
-- Never let a temporary feature branch become manager-state authority.
-- Keep secrets, transient runtime state and hidden reasoning out of the capsule.
+- Audio Evidence: out of scope.
+- Virtual Display: out of scope.
+- scrcpy-style encoded video must not replace gRPC/MMAP live display.

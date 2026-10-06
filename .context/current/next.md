@@ -1,10 +1,11 @@
 # Next Actions
 
-1. Treat v0.18.0 Raw / Packet Inspector as the verified product baseline.
-2. Keep Audio Evidence and Virtual Display out of scope unless the owner explicitly reopens them.
-3. Start Stage B from current `main`: create a dedicated sidecar feature branch and introduce the minimum project-owned Android `app_process` agent plus host lifecycle/transport abstraction.
-4. Implement exact client/agent protocol-version handshake, host-listen + `adb reverse` connection establishment, bounded timeout/error reporting and deterministic guest/host cleanup.
-5. Add unit/protocol tests first, then a dedicated real-AVD acceptance proving start → handshake → request/response → stop/cleanup without changing display/input or the v0.10.5 launch sequence.
-6. Do not migrate screen recording onto the sidecar during Stage B. Continuous screen evidence is Stage C and begins only after the sidecar foundation itself is verified.
-7. Keep owner-side v0.18.0 Research ZIP validation available in parallel; it is not a blocker for Stage B.
-8. Persist any verified Stage B architecture finding and reseal manager state before moving to Stage C.
+1. Branch v0.22 work from current `main` v0.21.0 baseline.
+2. Extend Packet Inspector to load action correlation windows from `02_normalized/research-timeline.json`.
+3. For packets belonging to the selected flow, attach only those actions whose existing temporal window contains the packet timestamp and whose existing network correlation references that flow.
+4. Preserve explicit `temporal-only` and `causal_claim=false`; do not manufacture causality or rewrite Timeline evidence.
+5. Add packet-table Action column, searchable action IDs/labels, detailed window provenance and Packet → Timeline navigation.
+6. Add unit regression tests for boundaries, multiple actions and no-match behavior.
+7. Strengthen real-AVD acceptance so any matched packet/action relation is validated against the archived Timeline window and flow IDs.
+8. Run CI + AVD + Windows desktop gates, then release through the normal main pipeline if all checks pass.
+9. Keep experimental continuous-screen collector non-canonical pending separate owner-side A/B promotion evidence.

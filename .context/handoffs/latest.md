@@ -1,19 +1,22 @@
 # Latest Handoff
 
-Generation: 3
+Generation: 4
 Date: 2026-10-06
 
-The persistent Project Manager `apk-research-project-manager` is active.
+Persistent manager: `apk-research-project-manager`.
 
-Authority split:
+Authority:
 - manager state: `context`;
-- product baseline: `main`;
-- discovery: `main`.
+- product: `main`.
 
-Current verified product baseline is apk-research v0.18.0 at `4d9f3097406502ec397416ea3e7ce07264e74814`. Main pipeline #120 completed SUCCESS and GitHub Release v0.18.0 was published. Installer `apk-research-setup_v0.18.0.exe` SHA-256 is `dcae7555a407ba840577e22e4447d20e4afc44804582e8ab8954d40406d9f2a9`.
+Verified product baseline is apk-research v0.21.0 at `250c507ca3302558ba11d5df57d3129a38ad6fbe`. Main pipeline #124 completed SUCCESS and GitHub Release v0.21.0 is published. Installer SHA-256: `2d655d007b67f5d1c6f866505b9865d300caa6f951e5c90f53af83d7c862d648`.
 
-Stage A is complete: Raw / Packet Inspector resolves normalized flows to concrete records in the original PCAP and passed real-AVD Research ZIP acceptance plus Windows packaged GUI/install smoke.
+Roadmap stages A-D are implemented:
+- v0.18 Raw / Packet Inspector;
+- v0.19 Android sidecar foundation;
+- v0.20 experimental Continuous Screen Evidence;
+- v0.21 Interaction Completeness.
 
-Stage B is now the active roadmap item: a project-owned temporary Android `app_process` sidecar foundation with exact version handshake, long-lived transport, host-listen + adb reverse startup and deterministic cleanup. It must not replace the established gRPC/MMAP display/input path.
+Stage E is active. Immediate v0.22 work is Packet ↔ Action temporal evidence: annotate inspected packets using existing archived Timeline action windows and selected-flow references, keep `causal_claim=false`, and add direct Packet → Timeline navigation.
 
-Audio Evidence and Virtual Display remain explicitly excluded.
+Audio Evidence and Virtual Display remain excluded. Canonical screenrecord remains authoritative pending explicit promotion decision for the experimental continuous-screen collector.

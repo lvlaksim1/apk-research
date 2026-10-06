@@ -1,21 +1,19 @@
 # Manager intentions and commitments
 
-## Active — Stage B Android sidecar foundation
+## Active — Stage E deeper evidence intelligence
 
 Status: active.
 
-Continue from the verified v0.18.0 baseline and implement a project-owned temporary Android-side `app_process` sidecar foundation. It must use explicit client/agent version compatibility, a long-lived local transport, deterministic lifecycle/cleanup and a startup design that avoids polling races where practical.
-
-The sidecar is infrastructure for future evidence collection. It must not replace or become a fallback for the proven hidden Emulator → gRPC/MMAP → AndroidView display/input path.
+Continue from the verified v0.21.0 baseline by strengthening cross-links among existing raw and derived evidence without changing capture/runtime semantics. The immediate v0.22 target is packet-level temporal correlation back to Research Timeline actions: each inspected packet may identify the action correlation window that contains its target timestamp, explicitly preserving `temporal-only` / `causal_claim=false`, with direct Packet → Timeline navigation.
 
 ## Active — continuity and evidence-preserving development
 
 Status: active.
 
-Maintain project continuity across runtimes, reconcile durable context with live repository/CI/release evidence before consequential changes, and preserve the established RAW-first evidence and v0.10.5 runtime/clean-launch invariants.
+Reconcile live `main`, releases and CI before consequential changes; preserve the validated runtime/evidence invariants and persist durable findings to `context`.
 
-## Proposed — owner-side v0.18.0 real-world validation
+## Proposed — owner-side real-world A/B screen validation
 
-Status: proposed, not blocking.
+Status: proposed, non-blocking.
 
-If the owner supplies a real v0.18.0 Research ZIP or reports GUI behavior, validate Packet Inspector, Evidence Explorer and the unchanged forensic chain against that owner-side evidence. The successful release-gate real AVD evidence is sufficient to continue Stage B without waiting for this.
+If the owner supplies a real Research ZIP produced by v0.20+ or later, compare experimental continuous-screen evidence against canonical screenrecord before any promotion decision. Do not auto-promote based only on CI/AVD.
