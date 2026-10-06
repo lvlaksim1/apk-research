@@ -1,40 +1,34 @@
-# apk-research v0.20.0
+# apk-research v0.21.0
 
-v0.20.0 adds **Continuous Screen Evidence** as an experimental A/B capture path on top of the v0.19 Android Sidecar Foundation.
+v0.21.0 adds **Interaction Completeness** without changing the established Emulator display/runtime architecture.
 
 ## Added
 
-- sidecar protocol v2 / agent 0.2.0;
-- a dedicated binary media socket isolated from the sidecar control channel;
-- host-listen-first `adb reverse` setup for the media channel;
-- Android Surface/MediaCodec H.264 screen capture from display 0;
-- exact MediaCodec packet payload preservation;
-- device-generated packet PTS, codec-config/key-frame/EOS flags and raw byte offsets;
-- `01_raw/screen/continuous-screen.h264`;
-- `02_normalized/continuous-screen-packets.jsonl`;
-- `02_normalized/continuous-screen.json`;
-- `02_normalized/screen-ab-comparison.json`;
-- real-AVD acceptance for packet/byte accounting, monotonic media PTS, codec config, terminal EOS and sidecar cleanup.
+- two-pointer Emulator gRPC input through the existing persistent `streamInputEvent`;
+- Ctrl+drag symmetric pinch/rotate gesture;
+- Shift+drag vertical tilt gesture;
+- Ctrl+Shift+drag horizontal tilt gesture;
+- one semantic `multi_touch` Timeline action per completed gesture;
+- explicit pointer count, gesture mode, start/end points, duration and display-geometry generation in user-action evidence;
+- display geometry generations derived from framebuffer size, input size and rotation;
+- stale-geometry gesture cancellation instead of remapping old pointer motion onto a new display geometry;
+- real-AVD gRPC acceptance that sends a two-pointer TouchEvent.
 
 ## Evidence boundary
 
-Android `screenrecord` remains the canonical required screen collector. The sidecar collector is experimental and non-required, so a sidecar-specific failure does not degrade otherwise valid canonical evidence.
+Multi-touch records what apk-research injected. It does not claim that the target application consumed or causally reacted to the gesture. Existing Action ↔ Flow relationships remain `temporal-only` with `causal_claim=false`.
 
-The A/B report explicitly records `promotion_decision=not-automatic`. A future promotion requires real owner-side Research ZIP evidence; v0.20 does not infer equivalence from CI alone.
-
-MediaCodec PTS remain in the device media-presentation clock domain. They are preserved exactly and are not mislabeled as UTC.
+A gesture interrupted by a display geometry change is recorded explicitly as incomplete rather than silently translated to new coordinates.
 
 ## Unchanged
 
 - hidden Emulator → gRPC/MMAP → AndroidView live display;
-- persistent Emulator gRPC input;
 - v0.10.5 startup/clean-launch sequencing;
-- canonical Android screenrecord evidence;
-- raw PCAP and package/socket attribution semantics;
-- Action ↔ Flow `temporal-only` / `causal_claim=false` semantics.
-
-Audio Evidence and the user-facing Virtual Display research mode remain out of scope.
+- Android sidecar and continuous-screen A/B collector;
+- canonical screenrecord evidence;
+- raw PCAP and package/socket attribution;
+- Audio Evidence and Virtual Display remain out of scope.
 
 ## Validation
 
-Stable publication requires normal CI, real AVD Research ZIP acceptance including the continuous-screen gate, Windows standalone/GUI/installer smoke, clean-Windows provisioning and checksum verification.
+Release validation includes unit coverage for multi-pointer wire encoding, display-generation tracking, synthetic second-pointer geometry and semantic action recording, plus real-AVD transmission of a two-pointer gRPC TouchEvent.
