@@ -333,8 +333,8 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(android_title)
         toolbar.addStretch(1)
         self.android_hint = QLabel(
-            "Мышь = touch • колесо = swipe • "
-            "клавиатура = ввод"
+            "Мышь = touch • Ctrl+drag = pinch/rotate • "
+            "Shift+drag = tilt • колесо = swipe"
         )
         self.android_hint.setStyleSheet(
             "color: #7b838c;"
@@ -605,14 +605,8 @@ class MainWindow(QMainWindow):
         self.android_view.swipeRequested.connect(
             c.swipe
         )
-        self.android_view.touchDownRequested.connect(
-            c.touch_down
-        )
-        self.android_view.touchMoveRequested.connect(
-            c.touch_move
-        )
-        self.android_view.touchUpRequested.connect(
-            c.touch_up
+        self.android_view.touchStateRequested.connect(
+            c.touch_state
         )
         self.android_view.keyRequested.connect(
             c.keyevent
@@ -876,7 +870,8 @@ class MainWindow(QMainWindow):
                 suffix += f" • GPU {gpu_mode}"
             self.android_hint.setText(
                 "Embedded gRPC/MMAP • мышь = touch • "
-                "колесо = swipe • клавиатура = ввод"
+                "Ctrl+drag = pinch/rotate • "
+                "Shift+drag = tilt • колесо = swipe"
             )
             self.status_android.setText(
                 "● Android готов" + suffix
