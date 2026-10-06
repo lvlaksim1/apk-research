@@ -265,3 +265,131 @@ def test_clean_restart_holds_operator_preview_only() -> None:
     )
     controller.close()
 
+
+
+def test_multi_touch_is_recorded_as_one_semantic_action(
+    monkeypatch,
+) -> None:
+    controller = DesktopController()
+    recorded: list[dict] = []
+    queued: list[tuple] = []
+
+    class Recorder:
+        def record_user_action(
+            self,
+            action: str,
+            **kwargs,
+        ) -> bool:
+            recorded.append(
+                {
+                    "action": action,
+                    **kwargs,
+                }
+            )
+            return True
+
+    controller.orchestrator = Recorder()
+    monkeypatch.setattr(
+        controller,
+        "_queue_input",
+        lambda *args: queued.append(args),
+    )
+    timestamps = iter(
+        [
+            "2026-10-06T01:00:00.000000Z",
+            "2026-10-06T01:00:00.250000Z",
+        ]
+    )
+    monkeypatch.setattr(
+        controller,
+        "_host_utc_now",
+        lambda: next(timestamps),
+    )
+
+    controller.touch_state(
+        "down",
+        "pinch_rotate",
+        ((100, 200), (900, 1600)),
+        7,
+    )
+    controller.touch_state(
+        "up",
+        "pinch_rotate",
+        ((150, 250), (850, 1550)),
+        7,
+    )
+
+    assert queued[0][0] == "touch_points"
+    assert queued[0][1][0] == (0, 100, 200, 1)
+    assert queued[0][1][1] == (1, 900, 1600, 1)
+    assert queued[1][1][0][-1] == 0
+    assert queued[1][1][1][-1] == 0
+
+    assert len(recorded) == 1
+    assert recorded[0]["action"] == "multi_touch"
+    details = recorded[0]["details"]
+    assert details["mode"] == "pinch_rotate"
+    assert details["pointer_count"] == 2
+    assert details["geometry_generation"] == 7
+    assert details["completed"] is True
+    controller.close()
+
+
+def test_geometry_change_cancellation_is_explicit_action(
+    monkeypatch,
+) -> None:
+    controller = DesktopController()
+    recorded: list[dict] = []
+
+    class Recorder:
+        def record_user_action(
+            self,
+            action: str,
+            **kwargs,
+        ) -> bool:
+            recorded.append(
+                {
+                    "action": action,
+                    **kwargs,
+                }
+            )
+            return True
+
+    controller.orchestrator = Recorder()
+    monkeypatch.setattr(
+        controller,
+        "_queue_input",
+        lambda *args: None,
+    )
+    timestamps = iter(
+        [
+            "2026-10-06T01:00:00.000000Z",
+            "2026-10-06T01:00:00.100000Z",
+        ]
+    )
+    monkeypatch.setattr(
+        controller,
+        "_host_utc_now",
+        lambda: next(timestamps),
+    )
+
+    controller.touch_state(
+        "down",
+        "single",
+        ((100, 200),),
+        3,
+    )
+    controller.touch_state(
+        "cancel",
+        "single",
+        ((100, 200),),
+        3,
+    )
+
+    assert recorded[0]["action"] == "gesture_cancelled"
+    assert (
+        recorded[0]["details"]["cancel_reason"]
+        == "display_geometry_changed"
+    )
+    assert recorded[0]["details"]["completed"] is False
+    controller.close()
