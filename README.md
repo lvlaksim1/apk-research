@@ -1,5 +1,15 @@
 # apk-research
 
+## v0.23.0 — Transport Session Evidence
+
+v0.23.0 deepens Raw / Packet Inspector with **transport-session evidence derived directly from TCP headers already present in the authoritative PCAP**.
+
+For every selected TCP flow, Packet Inspector now exposes per-packet sequence and acknowledgment numbers, TCP flags, header length, receive window and TCP payload length. It also builds a conservative session summary for an observed three-way handshake and FIN/RST termination.
+
+The summary is deliberately capture-bounded: a handshake is reported complete only when SYN → SYN/ACK → ACK are actually present in the selected flow, and missing lifecycle packets are labeled `partial-or-not-observed-in-capture` or `not-observed-in-capture`. Absence from the capture is never promoted into evidence that an event did not occur.
+
+This is presentation-only analysis. Raw `01_raw/network/traffic.pcap` remains authoritative. Packet ↔ Action remains `temporal-only` with `causal_claim=false`. The hidden Emulator → gRPC/MMAP → AndroidView runtime, v0.10.5 startup/clean-launch sequencing, sidecar and collectors are unchanged. Audio Evidence and Virtual Display remain out of scope.
+
 ## v0.22.0 — Packet ↔ Action Evidence
 
 v0.22.0 deepens the Raw / Packet Inspector by resolving concrete PCAP packets back to the **existing exported Research Timeline action windows**.

@@ -1,5 +1,41 @@
 # Refactoring and Architecture Log
 
+## v0.23.0 — Transport Session Evidence
+
+### Scope
+
+Stage E continues with transport-layer interpretation over the concrete packets already exposed by Raw / Packet Inspector. Capture, normalized flow identity, attribution and Android runtime behavior are unchanged.
+
+### TCP evidence model
+
+For each packet in a selected TCP flow, Packet Inspector derives only fields directly present in the TCP header:
+- sequence number;
+- acknowledgment number;
+- flags;
+- header length;
+- receive window;
+- TCP payload length.
+
+The flow-level transport summary detects an observed three-way handshake only when SYN → SYN/ACK → ACK are all present in capture order. FIN and RST are reported only when their packets are present.
+
+### Capture-bounded semantics
+
+Missing lifecycle packets are represented as `partial-or-not-observed-in-capture` or `not-observed-in-capture`. apk-research does not infer that an unseen handshake or termination did not occur.
+
+No TCP application stream reconstruction is introduced. Encrypted payload remains encrypted, and no missing packet is synthesized.
+
+### GUI integration
+
+Packet details/search expose transport fields and the selected flow summary presents observed handshake/termination state plus the packet IDs supporting those observations.
+
+### Acceptance boundary
+
+Unit tests cover TCP header parsing, complete and partial handshakes, FIN/RST and non-TCP applicability. Real AVD acceptance validates the same semantics against the generated Research ZIP.
+
+### Compatibility boundary
+
+Raw PCAP remains authoritative. Packet ↔ Action remains `temporal-only` with `causal_claim=false`. No Research ZIP schema, collector, hidden Emulator → gRPC/MMAP runtime, v0.10.5 startup sequencing, sidecar responsibility or canonical screenrecord behavior changes. Audio Evidence and Virtual Display remain excluded.
+
 ## v0.22.0 — Packet ↔ Action Evidence
 
 ### Scope

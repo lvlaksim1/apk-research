@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.23.0] - 2026-10-06
+
+### Transport Session Evidence
+
+- Extends Raw / Packet Inspector with TCP sequence/acknowledgment numbers, flags, header length, receive window and payload length derived from packet headers.
+- Adds a capture-bounded TCP session summary for the selected normalized flow.
+- Reports a complete three-way handshake only when SYN → SYN/ACK → ACK are all observed in the selected PCAP flow.
+- Reports FIN/RST termination evidence when present and uses explicit `not-observed-in-capture` semantics when lifecycle packets are absent.
+- Adds transport evidence to Packet Inspector details and free-text search.
+- Adds regression coverage for TCP header parsing and session-state interpretation.
+- Extends real-AVD acceptance to validate transport evidence on a generated Research ZIP.
+- Keeps raw PCAP authoritative and does not infer missing packets, reassemble TCP application data or upgrade Packet ↔ Action beyond `temporal-only` / `causal_claim=false`.
+- Leaves gRPC/MMAP runtime, v0.10.5 launch sequencing, sidecar, collectors, canonical screenrecord, Audio Evidence scope and Virtual Display scope unchanged.
+
 ## [0.22.0] - 2026-10-06
 
 ### Packet ↔ Action Evidence

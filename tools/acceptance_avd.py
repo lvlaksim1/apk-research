@@ -396,6 +396,104 @@ def main() -> int:
                             "Packet/action relation claims causality"
                         )
 
+        tcp_flow = next(
+            (
+                flow
+                for flow in flow_records
+                if str(flow.get("protocol") or "").lower() == "tcp"
+            ),
+            None,
+        )
+        tcp_session_status = "no-tcp-flow-observed"
+        if tcp_flow is not None:
+            tcp_report = inspect_archive_flow(
+                Path(result.archive),
+                tcp_flow,
+            )
+            transport_session = tcp_report.get("transport_session")
+            if (
+                not isinstance(transport_session, dict)
+                or transport_session.get("applicable") is not True
+                or transport_session.get("protocol") != "tcp"
+            ):
+                raise RuntimeError(
+                    "Packet Inspector TCP session summary is missing"
+                )
+            tcp_packets = [
+                packet
+                for packet in tcp_report.get("packets") or []
+                if isinstance(packet, dict)
+            ]
+            if not tcp_packets:
+                raise RuntimeError(
+                    "Packet Inspector TCP session has no packets"
+                )
+            valid_headers = [
+                packet
+                for packet in tcp_packets
+                if packet.get("tcp_header_valid") is True
+            ]
+            if not valid_headers:
+                raise RuntimeError(
+                    "Packet Inspector did not expose any valid TCP header"
+                )
+            for packet in valid_headers:
+                if not isinstance(packet.get("tcp_flags"), list):
+                    raise RuntimeError(
+                        "Packet Inspector TCP flags are not structured"
+                    )
+                if packet.get("tcp_sequence") is None:
+                    raise RuntimeError(
+                        "Packet Inspector TCP sequence is missing"
+                    )
+                if packet.get("tcp_acknowledgment") is None:
+                    raise RuntimeError(
+                        "Packet Inspector TCP acknowledgment is missing"
+                    )
+                header_length = int(
+                    packet.get("tcp_header_length") or 0
+                )
+                if header_length < 20:
+                    raise RuntimeError(
+                        "Packet Inspector TCP header length is invalid"
+                    )
+                if int(packet.get("tcp_payload_length") or 0) < 0:
+                    raise RuntimeError(
+                        "Packet Inspector TCP payload length is invalid"
+                    )
+
+            handshake_status = str(
+                transport_session.get("handshake_status") or ""
+            )
+            if handshake_status not in {
+                "complete-three-way-observed",
+                "partial-or-not-observed-in-capture",
+            }:
+                raise RuntimeError(
+                    "Packet Inspector emitted unsupported handshake status"
+                )
+            termination_status = str(
+                transport_session.get("termination_status") or ""
+            )
+            if termination_status not in {
+                "reset-observed",
+                "fin-observed",
+                "not-observed-in-capture",
+            }:
+                raise RuntimeError(
+                    "Packet Inspector emitted unsupported termination status"
+                )
+            absence_semantics = str(
+                transport_session.get("absence_semantics") or ""
+            )
+            if "does not prove" not in absence_semantics:
+                raise RuntimeError(
+                    "Packet Inspector lost capture-absence semantics"
+                )
+            tcp_session_status = (
+                handshake_status + "/" + termination_status
+            )
+
         first_packet = inspected_packets[0]
         if int(first_packet.get("pcap_record_offset") or -1) < 24:
             raise RuntimeError(
@@ -421,6 +519,7 @@ def main() -> int:
             ),
             "correlation_type": packet_report.get("correlation_type"),
             "causal_claim": packet_report.get("causal_claim"),
+            "tcp_session_status": tcp_session_status,
         }, ensure_ascii=False))
 
         with zipfile.ZipFile(result.archive) as archive:

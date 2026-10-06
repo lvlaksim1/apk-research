@@ -140,7 +140,9 @@ class PacketInspectorMainWindow(UnifiedEvidenceMainWindow):
 
         note = QLabel(
             "Packet Inspector читает существующий traffic.pcap напрямую из Research ZIP. "
-            "Он не создаёт новую forensic-истину и не трактует зашифрованные байты как plaintext."
+            "Он не создаёт новую forensic-истину и не трактует зашифрованные байты как plaintext. "
+            "Transport-session статус описывает только наблюдённые TCP flags: отсутствие события "
+            "в capture не доказывает, что его не было."
         )
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -339,6 +341,16 @@ class PacketInspectorMainWindow(UnifiedEvidenceMainWindow):
                 self.packet_table.setItem(row, column, item)
 
         self.packet_table.resizeColumnsToContents()
+        session = report.get("transport_session")
+        session_text = ""
+        if (
+            isinstance(session, dict)
+            and session.get("applicable") is True
+        ):
+            session_text = (
+                f" • handshake {session.get('handshake_status') or '—'}"
+                f" • termination {session.get('termination_status') or '—'}"
+            )
         self.packet_summary.setText(
             f"{report.get('flow_id') or '—'}"
             f" • {str(report.get('protocol') or '').upper() or '—'}"
@@ -349,6 +361,7 @@ class PacketInspectorMainWindow(UnifiedEvidenceMainWindow):
             f" • CRC32 {report.get('artifact_crc32') or '—'}"
             f" • action windows {int(report.get('timeline_action_window_count') or 0)}"
             f" • matched packets {int(report.get('packet_action_match_count') or 0)}"
+            f"{session_text}"
         )
         self.tabs.setCurrentIndex(self.packet_tab_index)
         self._apply_packet_filter()

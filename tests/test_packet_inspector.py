@@ -11,6 +11,7 @@ from apk_research.desktop.packet_inspector import (
     inspect_pcap_flow,
     packet_action_label,
     packet_search_text,
+    packet_transport_label,
 )
 
 
@@ -45,6 +46,66 @@ def _ipv4_udp(
         + b"\x08\x00"
     )
     return ethernet + ip + udp
+
+
+def _ipv4_tcp(
+    src: bytes,
+    dst: bytes,
+    src_port: int,
+    dst_port: int,
+    *,
+    sequence: int,
+    acknowledgment: int,
+    flags: int,
+    payload: bytes = b"",
+) -> bytes:
+    tcp = struct.pack(
+        "!HHIIBBHHH",
+        src_port,
+        dst_port,
+        sequence,
+        acknowledgment,
+        0x50,
+        flags,
+        64240,
+        0,
+        0,
+    ) + payload
+    total_length = 20 + len(tcp)
+    ip = (
+        bytes([0x45, 0])
+        + struct.pack("!H", total_length)
+        + b"\x00\x00\x00\x00"
+        + bytes([64, 6])
+        + b"\x00\x00"
+        + src
+        + dst
+    )
+    ethernet = (
+        b"\x00\x11\x22\x33\x44\x55"
+        + b"\x66\x77\x88\x99\xaa\xbb"
+        + b"\x08\x00"
+    )
+    return ethernet + ip + tcp
+
+
+def _tcp_flow() -> dict:
+    return {
+        "flow_id": "flow-tcp-000001",
+        "protocol": "tcp",
+        "endpoint_a": {
+            "ip": "10.0.2.15",
+            "port": 40000,
+        },
+        "endpoint_b": {
+            "ip": "93.184.216.34",
+            "port": 443,
+        },
+        "local_ip": "10.0.2.15",
+        "local_port": 40000,
+        "remote_ip": "93.184.216.34",
+        "remote_port": 443,
+    }
 
 
 def _dns_query(name: str) -> bytes:
@@ -281,3 +342,128 @@ def test_packet_action_correlation_requires_same_flow_reference() -> None:
     assert correlated["timeline_action_window_count"] == 0
     assert correlated["packet_action_match_count"] == 0
     assert correlated["packets"][0]["temporal_action_ids"] == []
+
+
+
+def test_tcp_transport_metadata_and_three_way_handshake_evidence() -> None:
+    local = b"\x0a\x00\x02\x0f"
+    remote = b"\x5d\xb8\xd8\x22"
+    frames = [
+        _ipv4_tcp(
+            local,
+            remote,
+            40000,
+            443,
+            sequence=100,
+            acknowledgment=0,
+            flags=0x02,
+        ),
+        _ipv4_tcp(
+            remote,
+            local,
+            443,
+            40000,
+            sequence=900,
+            acknowledgment=101,
+            flags=0x12,
+        ),
+        _ipv4_tcp(
+            local,
+            remote,
+            40000,
+            443,
+            sequence=101,
+            acknowledgment=901,
+            flags=0x10,
+        ),
+        _ipv4_tcp(
+            local,
+            remote,
+            40000,
+            443,
+            sequence=101,
+            acknowledgment=901,
+            flags=0x18,
+            payload=b"hello",
+        ),
+        _ipv4_tcp(
+            remote,
+            local,
+            443,
+            40000,
+            sequence=901,
+            acknowledgment=106,
+            flags=0x11,
+        ),
+    ]
+
+    report = inspect_pcap_flow(
+        io.BytesIO(_pcap(*frames)),
+        _tcp_flow(),
+    )
+
+    assert report["selected_packet_count"] == 5
+    first, second, third, fourth, fifth = report["packets"]
+
+    assert first["direction"] == "outbound"
+    assert first["tcp_flags"] == ["SYN"]
+    assert first["tcp_sequence"] == 100
+    assert first["tcp_acknowledgment"] == 0
+    assert first["tcp_header_length"] == 20
+    assert first["tcp_payload_length"] == 0
+
+    assert second["direction"] == "inbound"
+    assert second["tcp_flags"] == ["ACK", "SYN"]
+    assert third["tcp_flags"] == ["ACK"]
+    assert fourth["tcp_flags"] == ["ACK", "PSH"]
+    assert fourth["tcp_payload_length"] == 5
+    assert fifth["tcp_flags"] == ["ACK", "FIN"]
+
+    session = report["transport_session"]
+    assert session["applicable"] is True
+    assert session["handshake_observed"] is True
+    assert session["handshake_status"] == "complete-three-way-observed"
+    assert session["handshake_packet_ids"] == [
+        first["packet_id"],
+        second["packet_id"],
+        third["packet_id"],
+    ]
+    assert session["termination_status"] == "fin-observed"
+    assert session["termination_packet_ids"] == [
+        fifth["packet_id"]
+    ]
+
+    assert packet_transport_label(first) == "TCP:SYN"
+    assert "syn" in packet_search_text(first)
+    details = format_packet_details(fourth)
+    assert "TCP flags: ACK, PSH" in details
+    assert "Sequence / ACK: 101 / 901" in details
+
+
+def test_tcp_session_absence_is_not_interpreted_as_non_occurrence() -> None:
+    frame = _ipv4_tcp(
+        b"\x0a\x00\x02\x0f",
+        b"\x5d\xb8\xd8\x22",
+        40000,
+        443,
+        sequence=500,
+        acknowledgment=700,
+        flags=0x10,
+        payload=b"midstream",
+    )
+    report = inspect_pcap_flow(
+        io.BytesIO(_pcap(frame)),
+        _tcp_flow(),
+    )
+
+    session = report["transport_session"]
+    assert session["handshake_observed"] is False
+    assert (
+        session["handshake_status"]
+        == "partial-or-not-observed-in-capture"
+    )
+    assert (
+        session["termination_status"]
+        == "not-observed-in-capture"
+    )
+    assert "does not prove" in session["absence_semantics"]
