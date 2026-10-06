@@ -8,11 +8,14 @@ import java.io.OutputStreamWriter;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
 
 public final class Agent {
-    public static final int PROTOCOL_VERSION = 1;
-    public static final String AGENT_VERSION = "0.1.0";
+    public static final int PROTOCOL_VERSION = 2;
+    public static final String AGENT_VERSION = "0.2.0";
     private static final int CONNECT_TIMEOUT_MS = 5000;
+    private static final int SCREEN_START_TIMEOUT_MS = 8000;
+    private static final int SCREEN_STOP_TIMEOUT_MS = 8000;
     private static final int MAX_LINE_LENGTH = 4096;
 
     private Agent() {
@@ -36,20 +39,29 @@ public final class Agent {
         if (args.length != 2 || !"--port".equals(args[0])) {
             throw new IllegalArgumentException("usage: --port <1..65535>");
         }
-        int port;
+        return parseInt(args[1], 1, 65535, "invalid port");
+    }
+
+    private static int parseInt(
+            String value,
+            int minimum,
+            int maximum,
+            String message) {
+        int parsed;
         try {
-            port = Integer.parseInt(args[1]);
+            parsed = Integer.parseInt(value);
         } catch (NumberFormatException exc) {
-            throw new IllegalArgumentException("invalid port");
+            throw new IllegalArgumentException(message);
         }
-        if (port < 1 || port > 65535) {
-            throw new IllegalArgumentException("invalid port");
+        if (parsed < minimum || parsed > maximum) {
+            throw new IllegalArgumentException(message);
         }
-        return port;
+        return parsed;
     }
 
     private static void run(int port) throws IOException {
         Socket socket = new Socket();
+        ScreenStreamer screen = null;
         try {
             socket.connect(
                     new InetSocketAddress("127.0.0.1", port),
@@ -93,9 +105,11 @@ public final class Agent {
             while (true) {
                 String line = readBoundedLine(reader);
                 if (line == null) {
+                    stopScreenQuietly(screen);
                     return;
                 }
                 if ("STOP".equals(line)) {
+                    stopScreenQuietly(screen);
                     writeLine(writer, "BYE");
                     return;
                 }
@@ -105,16 +119,131 @@ public final class Agent {
                         writeLine(writer, "ERROR invalid-token");
                         continue;
                     }
-                    long uptimeMillis = System.nanoTime() / 1_000_000L;
+                    long uptimeMillis = android.os.SystemClock.uptimeMillis();
                     writeLine(
                             writer,
                             "PONG " + token + " " + uptimeMillis);
                     continue;
                 }
+                if (line.startsWith("SCREEN_START ")) {
+                    if (screen != null && !screen.isDone()) {
+                        writeLine(writer, "ERROR screen-already-running");
+                        continue;
+                    }
+                    String[] parts = line.split(" ");
+                    if (parts.length != 5) {
+                        writeLine(writer, "ERROR invalid-screen-start");
+                        continue;
+                    }
+                    try {
+                        int mediaPort = parseInt(
+                                parts[1], 1, 65535, "invalid media port");
+                        int width = parseInt(
+                                parts[2], 64, 4096, "invalid screen width");
+                        int height = parseInt(
+                                parts[3], 64, 4096, "invalid screen height");
+                        int bitRate = parseInt(
+                                parts[4], 100000, 50000000, "invalid bit rate");
+
+                        ScreenStreamer candidate = new ScreenStreamer(
+                                mediaPort,
+                                width,
+                                height,
+                                bitRate);
+                        candidate.start();
+                        if (!candidate.awaitStarted(
+                                SCREEN_START_TIMEOUT_MS,
+                                TimeUnit.MILLISECONDS)) {
+                            candidate.requestStop();
+                            candidate.awaitDone(
+                                    SCREEN_STOP_TIMEOUT_MS,
+                                    TimeUnit.MILLISECONDS);
+                            writeLine(writer, "ERROR screen-start-timeout");
+                            continue;
+                        }
+                        String error = candidate.getError();
+                        if (error != null) {
+                            candidate.requestStop();
+                            candidate.awaitDone(
+                                    SCREEN_STOP_TIMEOUT_MS,
+                                    TimeUnit.MILLISECONDS);
+                            writeLine(writer, "ERROR screen-start-failed");
+                            continue;
+                        }
+                        screen = candidate;
+                        writeLine(
+                                writer,
+                                "SCREEN_STARTED "
+                                        + width
+                                        + " "
+                                        + height
+                                        + " h264");
+                    } catch (IllegalArgumentException exc) {
+                        writeLine(writer, "ERROR invalid-screen-start");
+                    } catch (InterruptedException exc) {
+                        Thread.currentThread().interrupt();
+                        writeLine(writer, "ERROR screen-start-interrupted");
+                    }
+                    continue;
+                }
+                if ("SCREEN_STOP".equals(line)) {
+                    if (screen == null) {
+                        writeLine(writer, "ERROR screen-not-running");
+                        continue;
+                    }
+                    screen.requestStop();
+                    try {
+                        if (!screen.awaitDone(
+                                SCREEN_STOP_TIMEOUT_MS,
+                                TimeUnit.MILLISECONDS)) {
+                            writeLine(writer, "ERROR screen-stop-timeout");
+                            continue;
+                        }
+                    } catch (InterruptedException exc) {
+                        Thread.currentThread().interrupt();
+                        writeLine(writer, "ERROR screen-stop-interrupted");
+                        continue;
+                    }
+
+                    String error = screen.getError();
+                    if (error != null) {
+                        writeLine(writer, "ERROR screen-stream-failed");
+                        screen = null;
+                        continue;
+                    }
+
+                    writeLine(
+                            writer,
+                            "SCREEN_STOPPED "
+                                    + screen.getPacketCount()
+                                    + " "
+                                    + screen.getByteCount()
+                                    + " "
+                                    + screen.getFirstPtsUs()
+                                    + " "
+                                    + screen.getLastPtsUs());
+                    screen = null;
+                    continue;
+                }
                 writeLine(writer, "ERROR unknown-command");
             }
         } finally {
+            stopScreenQuietly(screen);
             socket.close();
+        }
+    }
+
+    private static void stopScreenQuietly(ScreenStreamer screen) {
+        if (screen == null) {
+            return;
+        }
+        screen.requestStop();
+        try {
+            screen.awaitDone(
+                    SCREEN_STOP_TIMEOUT_MS,
+                    TimeUnit.MILLISECONDS);
+        } catch (InterruptedException exc) {
+            Thread.currentThread().interrupt();
         }
     }
 

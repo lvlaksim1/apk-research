@@ -10,15 +10,10 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = (
+SOURCE_ROOT = (
     ROOT
     / "android_sidecar"
     / "src"
-    / "com"
-    / "lvlaksim1"
-    / "apkresearch"
-    / "sidecar"
-    / "Agent.java"
 )
 DEFAULT_OUTPUT = (
     ROOT
@@ -113,8 +108,15 @@ def _run_d8(d8: Path, arguments: list[str]) -> None:
 
 
 def build(output: Path) -> Path:
-    if not SOURCE.is_file():
-        raise RuntimeError(f"Sidecar source not found: {SOURCE}")
+    sources = sorted(
+        path
+        for path in SOURCE_ROOT.rglob("*.java")
+        if path.is_file()
+    )
+    if not sources:
+        raise RuntimeError(
+            f"Sidecar sources not found under: {SOURCE_ROOT}"
+        )
 
     javac = shutil.which("javac")
     if not javac:
@@ -141,9 +143,11 @@ def build(output: Path) -> Path:
                 "8",
                 "-target",
                 "8",
+                "-classpath",
+                str(android_jar),
                 "-d",
                 str(classes),
-                str(SOURCE),
+                *(str(path) for path in sources),
             ],
             check=True,
         )
