@@ -6,6 +6,11 @@ on:
   pull_request:
     paths:
       - "android_sidecar/**"
+      - "src/apk_research/desktop/android_runtime.py"
+      - "src/apk_research/desktop/android_view.py"
+      - "src/apk_research/desktop/controller.py"
+      - "src/apk_research/desktop/emulator_grpc.py"
+      - "src/apk_research/desktop/main_window.py"
       - "src/apk_research/desktop/sidecar.py"
       - "src/apk_research/collectors/continuous_screen.py"
       - "src/apk_research/orchestrator.py"
