@@ -754,6 +754,17 @@ class AndroidRuntime:
             y,
         )
 
+    def touch_points(
+        self,
+        points: Sequence[
+            tuple[int, int, int, int]
+        ],
+    ) -> None:
+        self._run_required_input(
+            "touch_points",
+            tuple(points),
+        )
+
     def tap(self, x: int, y: int) -> None:
         self._run_required_input(
             "tap",
