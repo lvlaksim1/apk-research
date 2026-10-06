@@ -1,5 +1,35 @@
 # Refactoring and Architecture Log
 
+## v0.21.0 — Interaction Completeness
+
+### Scope
+
+v0.21 completes the existing Emulator gRPC interaction layer without replacing its proven transport. The embedded Android view adds two-pointer gesture synthesis while preserving the hidden Emulator → gRPC/MMAP → AndroidView runtime and persistent `streamInputEvent`.
+
+### Gesture model
+
+- normal left drag remains a one-pointer touch/swipe;
+- Ctrl+drag injects a symmetric two-pointer pinch/rotate gesture;
+- Shift+drag injects vertical tilt;
+- Ctrl+Shift+drag injects horizontal tilt;
+- both active pointers are serialized in the same Emulator `TouchEvent` with stable identifiers.
+
+### Geometry invariant
+
+Each pointer gesture is bound to one display-geometry generation defined by framebuffer dimensions, Android input dimensions and rotation. If that geometry changes while the gesture is active, the old gesture is terminated at its last known points. Subsequent movement is not remapped onto the new geometry.
+
+### Evidence boundary
+
+A completed two-pointer interaction is recorded as one semantic `multi_touch` user action with mode, pointer count, start/end points, duration and geometry generation. Geometry-interrupted single-pointer input is recorded explicitly as `gesture_cancelled` with `cancel_reason=display_geometry_changed`.
+
+These records prove what apk-research injected, not that the target application consumed the gesture or caused later network/process activity. Action ↔ Flow remains `temporal-only` with `causal_claim=false`.
+
+### Acceptance boundary
+
+Real AVD acceptance transmits a two-pointer event through the same persistent Emulator gRPC stream. The AVD workflow path gate now explicitly includes desktop input/runtime files so future input changes cannot bypass this acceptance.
+
+No changes to v0.10.5 startup/clean-launch sequencing, Android sidecar responsibilities, continuous-screen A/B collection, raw PCAP semantics, Audio Evidence scope or Virtual Display scope.
+
 ## v0.20.0 — Continuous Screen Evidence
 
 ### Scope
@@ -212,7 +242,7 @@ Network inspection теперь одновременно читает `research-
 
 ## Текущее состояние
 
-**Этап:** v0.19.0 — Android Sidecar Foundation.
+**Этап:** v0.21.0 — Interaction Completeness.
 **Stable baseline:** Windows uses only hidden Emulator + top-down gRPC/MMAP display + persistent gRPC input. No alternate display/input fallback. Boot stall recovery: one `-wipe-data`; stale private-AVD cleanup remains recovery infrastructure.  
 **Core evidence baseline:** v0.1.0 Research Session Core.  
 **Реализовано:** GUI, self-contained Windows distribution, managed Android runtime/AVD, APK install, embedded Android view, Windows provisioning gate и desktop release gates.  
