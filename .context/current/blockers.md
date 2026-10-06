@@ -1,6 +1,6 @@
 # Current Blockers and Unknowns
 
-Last reconciled: 2026-10-06.
+Last reconciled: 2026-10-07.
 
 ## Product blockers
 

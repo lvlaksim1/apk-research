@@ -1,6 +1,6 @@
 # Current Project State
 
-Last reconciled: 2026-10-06.
+Last reconciled: 2026-10-07.
 
 ## Product
 
@@ -39,6 +39,6 @@ Hidden Emulator → gRPC/MMAP → AndroidView and v0.10.5 clean-launch sequencin
 
 ## Development status
 
-v0.23.1 is complete and published. No v0.24 implementation is active at this checkpoint.
+v0.23.1 is complete and published. No v0.24 implementation is active at this clean-chat checkpoint. Any stale corrective branch is historical only; new work must branch from current `main`.
 
 Audio Evidence and Virtual Display remain out of scope.
