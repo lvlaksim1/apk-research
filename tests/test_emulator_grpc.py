@@ -4,6 +4,7 @@ import pytest
 
 from apk_research.desktop.emulator_grpc import (
     FRAME_ROWS_TOP_DOWN,
+    DisplayGeometryTracker,
     EmulatorGrpcClient,
     EmulatorGrpcError,
     Image,
@@ -16,6 +17,7 @@ from apk_research.desktop.emulator_grpc import (
     TouchEvent,
     is_reverse_rotation,
     map_display_ratio_to_input,
+    secondary_touch_point,
 )
 
 
@@ -238,3 +240,86 @@ def test_input_fails_when_stream_input_event_is_unavailable(
         client.touch_down(10, 20)
 
     client.close()
+
+
+def test_multi_touch_state_uses_one_wire_event(
+    monkeypatch,
+) -> None:
+    client = EmulatorGrpcClient(8554)
+    queued = []
+    monkeypatch.setattr(
+        client,
+        "_queue_input_event",
+        lambda event: queued.append(event),
+    )
+
+    client.touch_points(
+        (
+            (0, 100, 200, 1),
+            (1, 900, 1600, 1),
+        )
+    )
+
+    touches = queued[0].touch_event.touches
+    assert [item.identifier for item in touches] == [0, 1]
+    assert [(item.x, item.y) for item in touches] == [
+        (100, 200),
+        (900, 1600),
+    ]
+    assert [item.pressure for item in touches] == [1, 1]
+    client.close()
+
+
+def test_display_geometry_generation_changes_only_on_geometry() -> None:
+    tracker = DisplayGeometryTracker()
+
+    generation, changed = tracker.update(
+        frame_width=405,
+        frame_height=720,
+        input_width=1080,
+        input_height=1920,
+        rotation=0,
+    )
+    assert (generation, changed) == (1, False)
+
+    generation, changed = tracker.update(
+        frame_width=405,
+        frame_height=720,
+        input_width=1080,
+        input_height=1920,
+        rotation=0,
+    )
+    assert (generation, changed) == (1, False)
+
+    generation, changed = tracker.update(
+        frame_width=720,
+        frame_height=405,
+        input_width=1920,
+        input_height=1080,
+        rotation=1,
+    )
+    assert (generation, changed) == (2, True)
+
+
+def test_secondary_touch_modes_are_geometry_bounded() -> None:
+    assert secondary_touch_point(
+        100,
+        200,
+        1000,
+        2000,
+        "pinch_rotate",
+    ) == (899, 1799)
+    assert secondary_touch_point(
+        100,
+        200,
+        1000,
+        2000,
+        "vertical_tilt",
+    ) == (899, 200)
+    assert secondary_touch_point(
+        100,
+        200,
+        1000,
+        2000,
+        "horizontal_tilt",
+    ) == (100, 1799)
