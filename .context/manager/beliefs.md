@@ -2,11 +2,11 @@
 
 ## Product baseline and latest release
 
-The product authority is `main`. The current verified product baseline and latest published release are `apk-research v0.22.0` at commit `d58265584223246974fb641f02e0dd3fb8d3f4f1`.
+The product authority is `main`. The current verified product baseline and latest published release are `apk-research v0.23.0` at commit `cde0b56b5332f0b601221c9157efbd90da18fc33`.
 
-Release asset `apk-research-setup_v0.22.0.exe` has SHA-256 `d6f7ae647d755455a374189a3731e15057fc74ec88c4b9a846143145ebb0ae8a`. Main pipeline #125 (`37406246024`) completed successfully for the exact release SHA, including CI, real AVD Research ZIP acceptance, Windows standalone/GUI/installer smoke, clean-Windows managed Android provisioning, checksum verification and GitHub Release publication.
+Release asset `apk-research-setup_v0.23.0.exe` has SHA-256 `c714270e3d3045d1166afa900d3a4916f7a33b11cf1d2922bb0d59c621bb34b4` and size 36,312,015 bytes. Main pipeline #126 (`37412349775`) completed SUCCESS for the exact release SHA, including CI, real AVD Research ZIP acceptance, Windows standalone/GUI/installer smoke, clean-Windows managed Android provisioning, checksum verification and GitHub Release publication.
 
-- source: GitHub repository main, pipeline #125 and GitHub Release v0.22.0, reconciled 2026-10-06
+- source: GitHub repository main, pipeline #126 and GitHub Release v0.23.0, reconciled 2026-10-06
 - authority: verified-repository + verified-ci
 
 ## Stage A-D baseline
@@ -19,15 +19,19 @@ Release asset `apk-research-setup_v0.22.0.exe` has SHA-256 `d6f7ae647d755455a374
 - source: verified repository/release lineage
 - authority: verified-repository + verified-ci
 
-## v0.22.0 Packet ↔ Action Evidence
+## Stage E evidence intelligence
 
-Packet Inspector now resolves concrete packets back to existing archived Research Timeline action windows. A relation is emitted only when the action already references the same canonical `flow_id` and the packet target timestamp lies inside that action's exported target-time window.
+### v0.22.0 Packet ↔ Action Evidence
 
-The relation reuses the archived window rather than recalculating or widening it. Every packet/action relation remains `temporal-only` and `causal_claim=false`. If the Timeline artifact is missing/invalid, raw packet inspection continues without guessed action links.
+Packet Inspector resolves concrete PCAP packets back to existing archived Research Timeline action windows only when the action already references the same canonical `flow_id` and the packet target timestamp lies inside that action's exported target-time window. Relations remain `temporal-only` and `causal_claim=false`.
 
-Real AVD release acceptance proved the correlation against a genuinely generated Research ZIP and validated that emitted action IDs exist in both the selected flow correlation and archived Timeline.
+### v0.23.0 Transport Session Evidence
 
-- source: release commit `d58265584223246974fb641f02e0dd3fb8d3f4f1` and pipeline #125
+Packet Inspector now derives per-packet TCP sequence/acknowledgment numbers, flags, header length, receive window and payload length directly from observed TCP headers. A flow-level transport summary reports a complete three-way handshake only when SYN → SYN/ACK → ACK are actually present in capture order, and reports FIN/RST termination only when observed.
+
+Missing lifecycle packets are represented as `partial-or-not-observed-in-capture` or `not-observed-in-capture`; absence from PCAP is not evidence that the event did not occur. No TCP application-stream reconstruction or plaintext inference was introduced.
+
+- source: release commit `cde0b56b5332f0b601221c9157efbd90da18fc33` and pipeline #126
 - authority: verified-repository + verified-ci
 
 ## Proven Android runtime baseline
@@ -39,7 +43,7 @@ The validated runtime remains hidden Android Emulator (`-qt-hide-window`) → Em
 
 ## Evidence semantics
 
-Raw PCAP remains the primary network source of truth. Package/socket ownership, normalized flows, Timeline correlation, QUIC/HTTP3 metadata, Evidence Explorer, Packet Inspector and packet/action links are derived/presentation evidence. Temporal adjacency must never be promoted to proven causality.
+Raw PCAP remains the primary network source of truth. Package/socket ownership, normalized flows, Timeline correlation, QUIC/HTTP3 metadata, Evidence Explorer, Packet Inspector, packet/action links and transport-session summaries are derived/presentation evidence. Temporal adjacency and unobserved packets must never be promoted into stronger claims.
 
 - source: verified repository implementation
 - authority: verified-repository
@@ -60,7 +64,7 @@ Audio Evidence and Virtual Display remain explicitly out of scope. scrcpy-style 
 
 ## WHPX
 
-WHPX acceptance remains advisory/non-publication-gating. v0.22 WHPX run #118 was queued at the time of the release checkpoint; this does not affect the verified v0.22 publication result.
+WHPX acceptance remains advisory/non-publication-gating. v0.23 WHPX run #119 was queued independently of the successful release pipeline; its queue/result does not affect the verified v0.23 publication state.
 
 - source: repository workflow and GitHub Actions
 - authority: verified-repository + verified-ci

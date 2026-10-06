@@ -4,11 +4,11 @@ Last reconciled: 2026-10-06.
 
 ## Product blockers
 
-No known product-code blocker is active. v0.22.0 is published and all publication gates passed.
+No known product-code blocker is active. v0.23.0 is published and all publication gates passed.
 
 ## Owner-side evidence
 
-No owner-provided real v0.22.0 Research ZIP acceptance is recorded yet. This is useful validation of the real GUI navigation path but does not block further development because exact-SHA real-AVD Research ZIP acceptance passed.
+No owner-provided real v0.23.0 Research ZIP acceptance is recorded yet. This is useful validation of the real GUI navigation and transport-session presentation path but does not block further development because exact-SHA real-AVD Research ZIP acceptance passed.
 
 ## Continuous screen promotion
 
@@ -16,4 +16,4 @@ The sidecar MediaCodec continuous-screen collector remains experimental. CI/AVD 
 
 ## WHPX
 
-v0.22 WHPX run #118 was queued at this checkpoint. WHPX is advisory/non-publication-gating; queue/cancellation behavior is infrastructure evidence, not a product defect.
+v0.23 WHPX run #119 is advisory/non-publication-gating. Queue/cancellation/failure there is infrastructure evidence unless a future claim explicitly depends on WHPX; it does not invalidate the successful v0.23 main pipeline.
