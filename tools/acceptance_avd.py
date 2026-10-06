@@ -137,7 +137,12 @@ def main() -> int:
             "keyevent",
             "3",
         )
-        time.sleep(1)
+        print(json.dumps({
+            "event": "continuous_screen_idle_probe",
+            "status": "started",
+            "idle_seconds": 10.0,
+        }, ensure_ascii=False))
+        time.sleep(10.0)
         client.launch_package(SERIAL, package_name)
         print(json.dumps({
             "event": "screen_activity_probe",
@@ -538,6 +543,58 @@ def main() -> int:
                 archive.read(
                     "02_normalized/screen-ab-comparison.json"
                 )
+            )
+
+        sidecar_ports: set[int] = set()
+        for section_name in ("sidecar_handshake", "stream"):
+            section = continuous_metadata.get(section_name)
+            if not isinstance(section, dict):
+                continue
+            for key in ("host_port", "device_port"):
+                try:
+                    port = int(section.get(key))
+                except (TypeError, ValueError):
+                    continue
+                if 1 <= port <= 65535:
+                    sidecar_ports.add(port)
+
+        leaked_sidecar_flows = []
+        for flow in flow_inventory.get("flows") or []:
+            if not isinstance(flow, dict):
+                continue
+            endpoints = (
+                flow.get("endpoint_a") or {},
+                flow.get("endpoint_b") or {},
+            )
+            endpoint_ips = {
+                str(endpoint.get("ip") or "")
+                for endpoint in endpoints
+                if isinstance(endpoint, dict)
+            }
+            endpoint_ports = {
+                int(endpoint.get("port"))
+                for endpoint in endpoints
+                if isinstance(endpoint, dict)
+                and str(endpoint.get("port") or "").isdigit()
+            }
+            if (
+                endpoint_ips
+                and endpoint_ips <= {"127.0.0.1", "::1"}
+                and endpoint_ports & sidecar_ports
+            ):
+                leaked_sidecar_flows.append(
+                    str(flow.get("flow_id") or "")
+                )
+        if leaked_sidecar_flows:
+            raise RuntimeError(
+                "Sidecar infrastructure leaked into normalized app flows: "
+                + ", ".join(leaked_sidecar_flows)
+            )
+        if int(
+            flow_summary.get("infrastructure_packet_count") or 0
+        ) <= 0:
+            raise RuntimeError(
+                "Real AVD did not classify captured sidecar infrastructure"
             )
 
         if continuous_metadata.get("canonical") is not False:

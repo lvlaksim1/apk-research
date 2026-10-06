@@ -776,6 +776,9 @@ def build_flow_inventory(
     non_tcp_udp_bytes = 0
     non_tcp_udp_protocol_counts: dict[str, int] = {}
     unresolved_transport_packet_count = 0
+    infrastructure_packet_count = 0
+    infrastructure_bytes = 0
+    infrastructure_kind_counts: dict[str, int] = {}
 
     for packet in packets:
         try:
@@ -789,6 +792,25 @@ def build_flow_inventory(
         length = int(
             packet.get("captured_length") or 0
         )
+        infrastructure = packet.get(
+            "infrastructure"
+        )
+        if isinstance(infrastructure, dict):
+            infrastructure_packet_count += 1
+            infrastructure_bytes += length
+            kind = str(
+                infrastructure.get("kind")
+                or "infrastructure"
+            )
+            infrastructure_kind_counts[kind] = (
+                infrastructure_kind_counts.get(
+                    kind,
+                    0,
+                )
+                + 1
+            )
+            continue
+
         if protocol not in {"tcp", "udp"}:
             non_tcp_udp_packet_count += 1
             non_tcp_udp_bytes += length
@@ -1104,6 +1126,17 @@ def build_flow_inventory(
                 total_inbound_bytes
             ),
             "source_packet_count": len(packets),
+            "infrastructure_packet_count": (
+                infrastructure_packet_count
+            ),
+            "infrastructure_bytes": (
+                infrastructure_bytes
+            ),
+            "infrastructure_kind_counts": dict(
+                sorted(
+                    infrastructure_kind_counts.items()
+                )
+            ),
             "quic_flow_count": quic_flow_count,
             "http3_flow_count": http3_flow_count,
             "quic_initial_decrypted_flow_count": (

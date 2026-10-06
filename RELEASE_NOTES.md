@@ -1,32 +1,28 @@
-# apk-research v0.23.0
+# apk-research v0.23.1
 
-v0.23.0 adds **Transport Session Evidence** to Raw / Packet Inspector without changing capture or runtime behavior.
+v0.23.1 corrects two defects proven by an owner-side real v0.23.0 Research ZIP.
 
-## Added
+## Fixed
 
-- per-packet TCP sequence and acknowledgment numbers;
-- decoded TCP flags, header length, receive window and TCP payload length;
-- a capture-bounded transport-session summary for selected TCP flows;
-- complete three-way-handshake evidence only when SYN → SYN/ACK → ACK are all present in the PCAP;
-- FIN/RST termination evidence with packet IDs;
-- explicit `partial-or-not-observed-in-capture` and `not-observed-in-capture` states instead of inferring missing lifecycle events;
-- transport-session summary/details/search in the Packets GUI;
-- regression tests for TCP header/session parsing;
-- real-AVD acceptance against a generated Research ZIP.
+- Sidecar `adb reverse` control/media loopback packets are classified from the exact dynamic ports stored in continuous-screen provenance.
+- Those researcher-induced packets remain untouched in raw `01_raw/network/traffic.pcap` but no longer become ordinary app flows, Timeline flow markers or Packet/Action correlations.
+- Network/Timeline summaries expose explicit infrastructure packet/byte accounting.
+- The long-lived Sidecar media socket no longer inherits the 8-second handshake/control read timeout after the binary stream is established.
+- A static Android screen can therefore remain silent for longer than eight seconds without being treated as a dead media stream.
+- Real-AVD acceptance now includes a 10-second idle-screen interval and rejects any Sidecar loopback flow that leaks into normalized app evidence.
+- Unit regressions cover exact dynamic-port classification, raw-vs-derived accounting and inherited media timeout removal.
 
 ## Evidence boundary
 
-Transport Session Evidence describes only TCP headers actually observed in the authoritative raw PCAP. A packet missing from the capture is not treated as proof that the corresponding network event did not occur.
+Raw PCAP remains authoritative and is never filtered or rewritten. Infrastructure classification affects only derived app-analysis views.
 
-No TCP stream reassembly, application plaintext inference or causal upgrade is introduced. Existing Packet ↔ Action links remain `temporal-only` with `causal_claim=false`.
+Continuous Screen remains experimental/non-canonical. Canonical Android `screenrecord` remains required and authoritative.
 
 ## Unchanged
 
-- raw `01_raw/network/traffic.pcap` remains authoritative;
-- no Research ZIP schema or collector change;
 - hidden Emulator → gRPC/MMAP → AndroidView live display;
 - persistent geometry-safe gRPC input;
 - v0.10.5 startup/clean-launch sequencing;
-- Android sidecar and experimental continuous-screen A/B collector;
-- canonical screenrecord evidence;
+- Packet ↔ Action remains `temporal-only` with `causal_claim=false`;
+- Transport Session Evidence remains capture-bounded;
 - Audio Evidence and Virtual Display remain out of scope.

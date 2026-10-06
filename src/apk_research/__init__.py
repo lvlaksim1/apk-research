@@ -1,6 +1,6 @@
 """apk-research core package."""
 
-__version__ = "0.23.0"
+__version__ = "0.23.1"
 
-# v0.23.0 release metadata is complete for transport-session evidence.
+# v0.23.1 corrects experimental sidecar evidence isolation and media idle handling.
 __all__ = ["__version__"]

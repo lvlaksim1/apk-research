@@ -1,5 +1,15 @@
 # apk-research
 
+## v0.23.1 — Sidecar Evidence Isolation & Idle Stability
+
+v0.23.1 is a corrective release based on the first owner-side real Research ZIP produced by v0.23.0.
+
+The experimental Android Sidecar control/media channels use `adb reverse` loopback TCP. Those researcher-induced packets remain preserved in the authoritative raw PCAP, but are now identified from the exact dynamic ports recorded in `continuous-screen.json` and excluded from normal app Network/Timeline/Packet correlations. Derived summaries report their packet/byte counts explicitly instead of presenting them as target-application traffic.
+
+The continuous-screen media connection also no longer inherits the short 8-second handshake/control socket timeout. Once the binary stream is established, media reception is long-lived and blocking; a legitimately static screen may remain silent until the control channel requests stop. This fixes the real v0.23 owner archive failure where a static interval longer than eight seconds ended the experimental stream.
+
+Canonical Android `screenrecord` remains authoritative and Continuous Screen remains experimental/non-canonical. Raw PCAP is never filtered or rewritten. Hidden Emulator → gRPC/MMAP → AndroidView and v0.10.5 startup sequencing are unchanged.
+
 ## v0.23.0 — Transport Session Evidence
 
 v0.23.0 deepens Raw / Packet Inspector with **transport-session evidence derived directly from TCP headers already present in the authoritative PCAP**.

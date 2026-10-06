@@ -168,6 +168,11 @@ class SidecarScreenStream:
         info: SidecarScreenInfo,
     ) -> None:
         self._connection = connection
+        # The accepted media socket initially inherits AndroidSidecar's
+        # bounded handshake timeout. Once the binary stream is established,
+        # silence is valid (for example a completely static screen), so media
+        # reception must be blocking and stopped through the control channel.
+        self._connection.settimeout(None)
         self.info = info
         self._sequence = 0
         self._closed = False

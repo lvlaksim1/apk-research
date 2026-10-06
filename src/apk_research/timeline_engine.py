@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import bisect
+import ipaddress
 import json
 import os
 from collections import Counter
@@ -24,6 +25,90 @@ MAX_FLOW_SAMPLE = 12
 MAX_LOG_SAMPLE = 12
 
 _LEGACY_BUILD = legacy.build_research_timeline
+
+_SIDECAR_METADATA_ARTIFACT = (
+    "02_normalized/continuous-screen.json"
+)
+
+
+def _sidecar_infrastructure_ports(root: Path) -> set[int]:
+    metadata = legacy._read_json(
+        root / _SIDECAR_METADATA_ARTIFACT
+    )
+    ports: set[int] = set()
+    for section_name in (
+        "sidecar_handshake",
+        "stream",
+    ):
+        section = metadata.get(section_name)
+        if not isinstance(section, dict):
+            continue
+        for key in ("host_port", "device_port"):
+            try:
+                port = int(section.get(key))
+            except (TypeError, ValueError):
+                continue
+            if 1 <= port <= 65535:
+                ports.add(port)
+    return ports
+
+
+def _loopback_ip(value: Any) -> bool:
+    try:
+        return ipaddress.ip_address(
+            str(value or "")
+        ).is_loopback
+    except ValueError:
+        return False
+
+
+def _mark_sidecar_infrastructure(
+    packets: list[dict[str, Any]],
+    ports: set[int],
+) -> dict[str, int]:
+    packet_count = 0
+    captured_bytes = 0
+    if not ports:
+        return {
+            "packet_count": 0,
+            "captured_bytes": 0,
+        }
+
+    for packet in packets:
+        if str(packet.get("protocol") or "").lower() != "tcp":
+            continue
+        if not (
+            _loopback_ip(packet.get("src"))
+            and _loopback_ip(packet.get("dst"))
+        ):
+            continue
+        try:
+            src_port = int(packet.get("src_port"))
+            dst_port = int(packet.get("dst_port"))
+        except (TypeError, ValueError):
+            continue
+        matched = sorted(
+            {src_port, dst_port} & ports
+        )
+        if not matched:
+            continue
+        packet["infrastructure"] = {
+            "kind": "apk-research-sidecar",
+            "evidence": (
+                "continuous-screen-metadata+"
+                "loopback-tcp-port"
+            ),
+            "matched_ports": matched,
+        }
+        packet_count += 1
+        captured_bytes += int(
+            packet.get("captured_length") or 0
+        )
+
+    return {
+        "packet_count": packet_count,
+        "captured_bytes": captured_bytes,
+    }
 
 
 def _alignment(root: Path, fallback: dict[str, Any]) -> dict[str, Any]:
@@ -158,6 +243,9 @@ def _flow_summary(
     package_dns_seen: set[str] = set()
     package_sni_seen: set[str] = set()
     total_bytes = 0
+    analysis_packet_count = 0
+    infrastructure_packet_count = 0
+    infrastructure_captured_bytes = 0
     attribution_counts = {
         "EXACT": 0,
         "HIGH": 0,
@@ -166,6 +254,17 @@ def _flow_summary(
     }
 
     for packet in packets:
+        if isinstance(
+            packet.get("infrastructure"),
+            dict,
+        ):
+            infrastructure_packet_count += 1
+            infrastructure_captured_bytes += int(
+                packet.get("captured_length") or 0
+            )
+            continue
+
+        analysis_packet_count += 1
         total_bytes += int(
             packet.get("captured_length") or 0
         )
@@ -275,8 +374,15 @@ def _flow_summary(
         + attribution_counts["MEDIUM"]
     )
     return {
-        "packet_count": len(packets),
+        "packet_count": analysis_packet_count,
+        "source_packet_count": len(packets),
         "captured_bytes": total_bytes,
+        "infrastructure_packet_count": (
+            infrastructure_packet_count
+        ),
+        "infrastructure_captured_bytes": (
+            infrastructure_captured_bytes
+        ),
         "flow_ids": flow_ids,
         "new_flow_ids": new_flow_ids,
         "flows": flows,
@@ -296,7 +402,7 @@ def _flow_summary(
             "attributed_packet_count": (
                 attributed_packets
             ),
-            "total_packet_count": len(packets),
+            "total_packet_count": analysis_packet_count,
         },
     }
 
@@ -480,6 +586,10 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
         root / "01_raw" / "network" / "traffic.pcap"
     )
     packets.sort(key=lambda item: float(item["epoch"]))
+    infrastructure = _mark_sidecar_infrastructure(
+        packets,
+        _sidecar_infrastructure_ports(root),
+    )
     packet_epochs = [float(item["epoch"]) for item in packets]
     attribution_summary, attribution_snapshots = (
         load_socket_attribution(root)
@@ -635,8 +745,33 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
 
     timeline["schema_version"] = "0.4"
     timeline["clock_alignment"] = alignment
+    analysis_packets = [
+        packet
+        for packet in packets
+        if not isinstance(
+            packet.get("infrastructure"),
+            dict,
+        )
+    ]
     timeline["network_attribution"] = (
-        attribution_index.summarize_packets(packets)
+        attribution_index.summarize_packets(
+            analysis_packets
+        )
+    )
+    timeline["network_attribution"][
+        "raw_packet_count"
+    ] = len(packets)
+    timeline["network_attribution"][
+        "infrastructure_packet_count"
+    ] = int(infrastructure["packet_count"])
+    timeline["network_attribution"][
+        "infrastructure_captured_bytes"
+    ] = int(infrastructure["captured_bytes"])
+    timeline["network_attribution"][
+        "infrastructure_policy"
+    ] = (
+        "apk-research sidecar loopback traffic is preserved "
+        "in raw PCAP but excluded from app analysis"
     )
     timeline["network_attribution"][
         "flow_inventory_artifact"
@@ -655,6 +790,12 @@ def build_research_timeline(session: SessionManager) -> dict[str, Any]:
     summary = timeline.setdefault("summary", {})
     summary["user_actions"] = len(actions)
     summary["network_packets"] = network_summary["packet_count"]
+    summary["network_analysis_packets"] = len(
+        analysis_packets
+    )
+    summary["network_infrastructure_packets"] = int(
+        infrastructure["packet_count"]
+    )
     summary["network_markers"] = len(
         network_markers
     )
