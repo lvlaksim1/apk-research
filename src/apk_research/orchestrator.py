@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 from apk_research.collectors import (
+    ContinuousScreenCollector,
     DeviceMetadataCollector,
     LogcatCollector,
     RawNetworkCollector,
@@ -223,6 +224,16 @@ def _screen_factory(
     )
 
 
+def _continuous_screen_factory(
+    adb: AdbClient,
+    session: SessionManager,
+) -> CollectorLike:
+    return ContinuousScreenCollector(
+        adb,
+        session,
+    )
+
+
 class ResearchOrchestrator:
     """Coordinates one v0.1 AVD-RESEARCH session end to end."""
 
@@ -232,6 +243,7 @@ class ResearchOrchestrator:
         "02_normalized/clock-calibration.json"
     )
     LAUNCH_ARTIFACT = "01_raw/device/package-launch.txt"
+    SCREEN_AB_ARTIFACT = "02_normalized/screen-ab-comparison.json"
 
     def __init__(
         self,
@@ -247,6 +259,9 @@ class ResearchOrchestrator:
         metadata_factory: MetadataFactory = _metadata_factory,
         logcat_factory: CollectorFactory = _logcat_factory,
         screen_factory: ScreenFactory = _screen_factory,
+        continuous_screen_factory: CollectorFactory = (
+            _continuous_screen_factory
+        ),
         network_factory: NetworkFactory = _network_factory,
         attribution_factory: AttributionFactory = _attribution_factory,
         exporter: Exporter = export_research_zip,
@@ -265,6 +280,9 @@ class ResearchOrchestrator:
         self.metadata_factory = metadata_factory
         self.logcat_factory = logcat_factory
         self.screen_factory = screen_factory
+        self.continuous_screen_factory = (
+            continuous_screen_factory
+        )
         self.network_factory = network_factory
         self.attribution_factory = attribution_factory
         self.exporter = exporter
@@ -282,6 +300,7 @@ class ResearchOrchestrator:
         self.metadata: MetadataCollectorLike | None = None
         self.logcat: CollectorLike | None = None
         self.screen: CollectorLike | None = None
+        self.continuous_screen: CollectorLike | None = None
         self.network: NetworkCollectorLike | None = None
         self.attribution: AttributionCollectorLike | None = None
         self._started_collectors: list[tuple[str, CollectorLike]] = []
@@ -292,6 +311,7 @@ class ResearchOrchestrator:
         self._user_action_sequence = 0
         self._user_actions_enabled = False
         self._clock_calibration_registered = False
+        self._screen_ab_registered = False
 
     def start(self) -> StartResult:
         if self.session is not None:
@@ -378,6 +398,12 @@ class ResearchOrchestrator:
                 self.session,
                 self.screen_chunk_seconds,
             )
+            self.continuous_screen = (
+                self.continuous_screen_factory(
+                    self.adb,
+                    self.session,
+                )
+            )
 
             self.session.mark_ready()
             self._event("preflight_completed")
@@ -389,6 +415,10 @@ class ResearchOrchestrator:
             self._start_collector(
                 "socket_attribution",
                 self.attribution,
+            )
+            self._start_collector(
+                "continuous_screen",
+                self.continuous_screen,
             )
 
             self.session.mark_active()
@@ -765,6 +795,7 @@ class ResearchOrchestrator:
             )
 
         self._stop_started_collectors()
+        self._write_screen_ab_comparison()
 
         if (
             session.status == SessionStatus.STOPPING
@@ -887,6 +918,7 @@ class ResearchOrchestrator:
 
         try:
             self._stop_started_collectors()
+            self._write_screen_ab_comparison()
         except Exception:
             pass
 
@@ -903,6 +935,161 @@ class ResearchOrchestrator:
             return result.archive
         except Exception:
             return None
+
+    def _write_screen_ab_comparison(self) -> None:
+        session = self._require_session()
+        baseline_path = (
+            session.paths.root
+            / ScreenRecordingCollector.METADATA_ARTIFACT
+        )
+        experimental_path = (
+            session.paths.root
+            / ContinuousScreenCollector.METADATA_ARTIFACT
+        )
+        if (
+            not baseline_path.is_file()
+            or not experimental_path.is_file()
+        ):
+            return
+
+        try:
+            baseline = json.loads(
+                baseline_path.read_text(
+                    encoding="utf-8"
+                )
+            )
+            experimental = json.loads(
+                experimental_path.read_text(
+                    encoding="utf-8"
+                )
+            )
+        except (
+            OSError,
+            json.JSONDecodeError,
+        ):
+            return
+
+        chunks = [
+            item
+            for item in (
+                baseline.get("completed_chunks")
+                if isinstance(baseline, dict)
+                else []
+            )
+            or []
+            if isinstance(item, dict)
+            and item.get("status") == "completed"
+        ]
+        baseline_capture_span = sum(
+            float(item.get("capture_span_seconds") or 0.0)
+            for item in chunks
+        )
+        baseline_frame_count = 0
+        baseline_presentation_span = 0.0
+        for item in chunks:
+            timing = item.get("frame_timing")
+            if not isinstance(timing, dict):
+                continue
+            baseline_frame_count += int(
+                timing.get("frame_count") or 0
+            )
+            baseline_presentation_span += float(
+                timing.get(
+                    "presentation_span_seconds"
+                )
+                or 0.0
+            )
+
+        experimental_span = float(
+            experimental.get(
+                "presentation_span_seconds"
+            )
+            or 0.0
+        )
+        value = {
+            "schema_version": "0.1",
+            "canonical_backend": "adb-screenrecord",
+            "experimental_backend": (
+                ContinuousScreenCollector.BACKEND
+            ),
+            "canonical_status": baseline.get(
+                "status"
+            ),
+            "experimental_status": experimental.get(
+                "status"
+            ),
+            "canonical_chunk_count": len(chunks),
+            "canonical_capture_span_seconds": (
+                baseline_capture_span
+            ),
+            "canonical_frame_count": baseline_frame_count,
+            "canonical_presentation_span_seconds": (
+                baseline_presentation_span
+            ),
+            "experimental_packet_count": int(
+                experimental.get("packet_count")
+                or 0
+            ),
+            "experimental_media_frame_count": int(
+                experimental.get(
+                    "media_frame_count"
+                )
+                or 0
+            ),
+            "experimental_bytes_captured": int(
+                experimental.get(
+                    "bytes_captured"
+                )
+                or 0
+            ),
+            "experimental_presentation_span_seconds": (
+                experimental_span
+            ),
+            "presentation_span_delta_seconds": (
+                experimental_span
+                - baseline_presentation_span
+            ),
+            "promotion_decision": "not-automatic",
+            "interpretation": (
+                "Durations are diagnostic A/B evidence only. "
+                "The canonical screen source remains Android screenrecord "
+                "until real-world validation proves the sidecar collector "
+                "has no coverage/timing regression."
+            ),
+        }
+
+        path = (
+            session.paths.root
+            / self.SCREEN_AB_ARTIFACT
+        )
+        temporary = path.with_suffix(
+            path.suffix + ".tmp"
+        )
+        with temporary.open(
+            "w",
+            encoding="utf-8",
+            newline="\n",
+        ) as handle:
+            json.dump(
+                value,
+                handle,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+
+        if not self._screen_ab_registered:
+            session.register_artifact(
+                kind="screen_ab_comparison",
+                relative_path=self.SCREEN_AB_ARTIFACT,
+                source="orchestrator",
+                raw=False,
+            )
+            self._screen_ab_registered = True
 
     def _ensure_event_log(self) -> None:
         session = self._require_session()
