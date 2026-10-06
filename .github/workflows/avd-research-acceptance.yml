@@ -3,6 +3,14 @@ run-name: "AVD Acceptance • ${{ github.event.head_commit.message || github.ref
 
 on:
   workflow_call:
+  pull_request:
+    paths:
+      - "android_sidecar/**"
+      - "src/apk_research/desktop/sidecar.py"
+      - "src/apk_research/targets/adb.py"
+      - "tools/build_android_sidecar.py"
+      - "tools/acceptance_sidecar.py"
+      - ".github/workflows/avd-research-acceptance.yml"
 
 permissions:
   contents: read
