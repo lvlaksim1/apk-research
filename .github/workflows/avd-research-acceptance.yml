@@ -7,7 +7,10 @@ on:
     paths:
       - "android_sidecar/**"
       - "src/apk_research/desktop/sidecar.py"
+      - "src/apk_research/collectors/continuous_screen.py"
+      - "src/apk_research/orchestrator.py"
       - "src/apk_research/targets/adb.py"
+      - "tools/acceptance_avd.py"
       - "tools/build_android_sidecar.py"
       - "tools/acceptance_sidecar.py"
       - ".github/workflows/avd-research-acceptance.yml"

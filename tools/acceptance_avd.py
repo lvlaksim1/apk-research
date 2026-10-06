@@ -353,6 +353,211 @@ def main() -> int:
             "pcap_crc32": packet_report.get("artifact_crc32"),
         }, ensure_ascii=False))
 
+        with zipfile.ZipFile(result.archive) as archive:
+            continuous_metadata = json.loads(
+                archive.read(
+                    "02_normalized/continuous-screen.json"
+                )
+            )
+            continuous_index_text = archive.read(
+                "02_normalized/continuous-screen-packets.jsonl"
+            ).decode("utf-8")
+            continuous_h264 = archive.read(
+                "01_raw/screen/continuous-screen.h264"
+            )
+            screen_ab = json.loads(
+                archive.read(
+                    "02_normalized/screen-ab-comparison.json"
+                )
+            )
+
+        if continuous_metadata.get("canonical") is not False:
+            raise RuntimeError(
+                "Continuous screen evidence must remain non-canonical"
+            )
+        if continuous_metadata.get("experimental") is not True:
+            raise RuntimeError(
+                "Continuous screen evidence is not marked experimental"
+            )
+        if continuous_metadata.get("status") != "completed":
+            raise RuntimeError(
+                "Continuous screen collector did not complete: "
+                + str(continuous_metadata.get("status"))
+            )
+
+        continuous_packet_count = int(
+            continuous_metadata.get("packet_count") or 0
+        )
+        continuous_frame_count = int(
+            continuous_metadata.get("media_frame_count") or 0
+        )
+        continuous_bytes = int(
+            continuous_metadata.get("bytes_captured") or 0
+        )
+        continuous_span = float(
+            continuous_metadata.get(
+                "presentation_span_seconds"
+            )
+            or 0.0
+        )
+        if continuous_packet_count <= 0:
+            raise RuntimeError(
+                "Continuous screen collector produced no packets"
+            )
+        if continuous_frame_count <= 0:
+            raise RuntimeError(
+                "Continuous screen collector produced no media frames"
+            )
+        if continuous_bytes <= 0 or not continuous_h264:
+            raise RuntimeError(
+                "Continuous screen collector produced no H.264 bytes"
+            )
+        if continuous_span <= 0:
+            raise RuntimeError(
+                "Continuous screen device PTS span is empty"
+            )
+
+        continuous_records = []
+        for raw_line in continuous_index_text.splitlines():
+            if not raw_line.strip():
+                continue
+            continuous_records.append(
+                json.loads(raw_line)
+            )
+        if len(continuous_records) != continuous_packet_count:
+            raise RuntimeError(
+                "Continuous screen packet index count mismatch"
+            )
+
+        expected_offset = 0
+        indexed_bytes = 0
+        config_packets = 0
+        media_packets = 0
+        eos_packets = 0
+        previous_pts = None
+        for record in continuous_records:
+            size = int(record.get("size") or 0)
+            offset = int(record.get("raw_offset") or 0)
+            if offset != expected_offset:
+                raise RuntimeError(
+                    "Continuous screen raw offsets are not contiguous"
+                )
+            if size < 0:
+                raise RuntimeError(
+                    "Continuous screen packet has negative size"
+                )
+            expected_offset += size
+            indexed_bytes += size
+
+            if record.get("end_of_stream") is True:
+                eos_packets += 1
+            if record.get("codec_config") is True:
+                config_packets += 1
+            elif size > 0:
+                media_packets += 1
+                pts = int(record.get("pts_us") or 0)
+                if previous_pts is not None and pts < previous_pts:
+                    raise RuntimeError(
+                        "Continuous screen MediaCodec PTS regressed"
+                    )
+                previous_pts = pts
+
+        if config_packets <= 0:
+            raise RuntimeError(
+                "Continuous screen stream contains no codec config"
+            )
+        if media_packets != continuous_frame_count:
+            raise RuntimeError(
+                "Continuous screen media frame count mismatch"
+            )
+        if (
+            eos_packets != 1
+            or continuous_records[-1].get("end_of_stream") is not True
+        ):
+            raise RuntimeError(
+                "Continuous screen stream has no unique terminal EOS record"
+            )
+        if (
+            indexed_bytes != continuous_bytes
+            or indexed_bytes != len(continuous_h264)
+        ):
+            raise RuntimeError(
+                "Continuous screen byte accounting mismatch"
+            )
+
+        stop_info = continuous_metadata.get("stop")
+        if not isinstance(stop_info, dict):
+            raise RuntimeError(
+                "Continuous screen stop statistics are missing"
+            )
+        if int(stop_info.get("packet_count") or 0) != continuous_packet_count:
+            raise RuntimeError(
+                "Agent and host continuous-screen packet counts differ"
+            )
+        if int(stop_info.get("byte_count") or 0) != continuous_bytes:
+            raise RuntimeError(
+                "Agent and host continuous-screen byte counts differ"
+            )
+
+        cleanup = continuous_metadata.get("cleanup")
+        if (
+            not isinstance(cleanup, dict)
+            or cleanup.get("complete") is not True
+        ):
+            raise RuntimeError(
+                "Continuous screen sidecar cleanup is incomplete"
+            )
+
+        if screen_ab.get("canonical_backend") != "adb-screenrecord":
+            raise RuntimeError(
+                "Screen A/B report lost canonical screenrecord backend"
+            )
+        if (
+            screen_ab.get("experimental_backend")
+            != "android-sidecar-mediacodec-h264"
+        ):
+            raise RuntimeError(
+                "Screen A/B report has unexpected experimental backend"
+            )
+        if screen_ab.get("canonical_status") != "completed":
+            raise RuntimeError(
+                "Screen A/B canonical backend did not complete"
+            )
+        if screen_ab.get("experimental_status") != "completed":
+            raise RuntimeError(
+                "Screen A/B experimental backend did not complete"
+            )
+        if screen_ab.get("promotion_decision") != "not-automatic":
+            raise RuntimeError(
+                "Screen A/B report must not auto-promote experimental capture"
+            )
+        if int(
+            screen_ab.get("experimental_packet_count") or 0
+        ) != continuous_packet_count:
+            raise RuntimeError(
+                "Screen A/B report packet count mismatch"
+            )
+
+        print(json.dumps({
+            "event": "continuous_screen_acceptance",
+            "packet_count": continuous_packet_count,
+            "media_frame_count": continuous_frame_count,
+            "bytes_captured": continuous_bytes,
+            "presentation_span_seconds": continuous_span,
+            "config_packets": config_packets,
+            "eos_packets": eos_packets,
+            "canonical_capture_span_seconds": (
+                screen_ab.get("canonical_capture_span_seconds")
+            ),
+            "canonical_presentation_span_seconds": (
+                screen_ab.get("canonical_presentation_span_seconds")
+            ),
+            "experimental_presentation_span_seconds": (
+                screen_ab.get("experimental_presentation_span_seconds")
+            ),
+            "promotion_decision": screen_ab.get("promotion_decision"),
+        }, ensure_ascii=False))
+
         if "non_tcp_udp_packet_count" not in flow_summary:
             raise RuntimeError(
                 "Network flow inventory does not report non-TCP/UDP packets"

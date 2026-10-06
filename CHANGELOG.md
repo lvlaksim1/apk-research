@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.20.0] - 2026-10-06
+
+### Continuous Screen Evidence
+
+- Upgrades the temporary Android sidecar to protocol v2 / agent 0.2.0.
+- Adds a separate binary host-listen-first `adb reverse` media socket; control and media traffic remain isolated.
+- Captures display-0 screen evidence through Android Surface/MediaCodec as exact H.264 encoder packets.
+- Preserves MediaCodec packet flags and device-generated presentation timestamps in a packet-level JSONL index.
+- Stores the concatenated exact encoder payload bytes as `01_raw/screen/continuous-screen.h264`.
+- Records sidecar transport, agent monotonic start clock, host/target boundary samples, packet/byte accounting and cleanup provenance.
+- Adds `screen-ab-comparison.json` comparing the experimental stream with the existing canonical Android screenrecord collector.
+- Keeps the experimental collector non-required: its failure cannot silently invalidate otherwise complete canonical evidence.
+- Adds real-AVD acceptance for MediaCodec capture, PTS progression, codec config/EOS framing, exact byte accounting and deterministic cleanup.
+- Keeps Android screenrecord canonical and explicitly forbids automatic promotion based only on one A/B run.
+- Does not change hidden Emulator → gRPC/MMAP → AndroidView, persistent gRPC input, raw PCAP semantics or v0.10.5 launch sequencing.
+- Audio Evidence and the user-facing Virtual Display research mode remain excluded.
+
 ## [0.19.0] - 2026-10-06
 
 ### Android Sidecar Foundation

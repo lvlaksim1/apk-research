@@ -1,5 +1,10 @@
 """Raw evidence collectors."""
 
+from .continuous_screen import (
+    ContinuousScreenCollector,
+    ContinuousScreenCollectorError,
+    ContinuousScreenResult,
+)
 from .device_metadata import (
     DeviceMetadataCollector,
     DeviceMetadataResult,
@@ -31,6 +36,9 @@ from .socket_attribution import (
 )
 
 __all__ = [
+    "ContinuousScreenCollector",
+    "ContinuousScreenCollectorError",
+    "ContinuousScreenResult",
     "DeviceMetadataCollector",
     "DeviceMetadataResult",
     "MetadataCollectorError",

@@ -1,5 +1,35 @@
 # Refactoring and Architecture Log
 
+## v0.20.0 — Continuous Screen Evidence
+
+### Scope
+
+v0.20 introduces the first collector backed by the project-owned Android sidecar, but only as a parallel experimental evidence path. Existing Android `screenrecord` remains the canonical required screen source until real owner-side archives prove that the new path has no coverage or timing regression.
+
+### Media transport
+
+Sidecar protocol v2 keeps the bounded text control channel and adds a separate binary media connection. The host opens a second localhost listener and installs `adb reverse` before requesting `SCREEN_START`. The agent connects back, emits a versioned stream header, then serializes every MediaCodec output record as flags + device PTS + payload length + exact payload bytes. A zero-sized terminal EOS record is part of the stream protocol and packet accounting.
+
+### Capture provenance
+
+The experimental collector writes:
+- `01_raw/screen/continuous-screen.h264` — exact concatenation of MediaCodec payload bytes;
+- `02_normalized/continuous-screen-packets.jsonl` — sequence, flags, PTS, size and raw byte offset per protocol record;
+- `02_normalized/continuous-screen.json` — transport, timing model, statistics and cleanup provenance;
+- `02_normalized/screen-ab-comparison.json` — diagnostic comparison against canonical screenrecord.
+
+MediaCodec PTS are preserved in their device media clock domain; v0.20 does not pretend they are UTC. Host/target UTC boundary samples are recorded separately.
+
+### Promotion boundary
+
+The sidecar collector is registered `required=false`. A collector-specific failure is recorded as experimental evidence and cannot weaken a valid canonical Research Session. Release acceptance nevertheless requires the managed API 35 AVD to produce a clean experimental stream with exact host/agent accounting, nonzero presentation span, codec configuration, one terminal EOS record and complete cleanup.
+
+`screen-ab-comparison.json` always records `promotion_decision=not-automatic`. Promotion to canonical screen evidence requires later owner-side A/B evidence.
+
+### Runtime boundary
+
+No change to hidden Emulator → gRPC/MMAP → AndroidView, persistent gRPC input, v0.10.5 clean-launch sequencing, PCAP capture or network evidence semantics. Audio Evidence and the user-facing Virtual Display research mode remain outside scope.
+
 ## v0.19.0 — Android Sidecar Foundation
 
 ### Scope
