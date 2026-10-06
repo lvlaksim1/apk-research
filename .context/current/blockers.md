@@ -2,27 +2,17 @@
 
 Last reconciled: 2026-10-06.
 
-## Verified owner-side defects
+## Product blockers
 
-### Experimental continuous screen
+No known release-blocking product defect is active. v0.23.1 is published and all publication gates passed.
 
-A real v0.23 owner archive shows `failed-experimental`. It captured only about 10.04 s of media PTS while canonical screenrecord captured about 66.10 s. The host reports `Unable to read Android sidecar media stream`, stop statistics are absent and sidecar cleanup is incomplete.
+## Owner-side revalidation
 
-Code/evidence correlation identifies the immediate failure mechanism: the binary media socket retains the generic 8 s timeout, while the Android C2 encoder explicitly reports that `repeat-previous-frame-after` is unsupported. A static display can therefore legitimately produce no packets for more than 8 s, causing the host receiver to time out.
-
-### Sidecar network self-contamination
-
-The same archive proves that adb-reverse sidecar traffic is included as ordinary 127.0.0.1 TCP flows in `network-flows.json` and Timeline. Sidecar control+media account for 96.57% of TCP/UDP flow packets and 97.46% of TCP/UDP captured bytes, and the media flow is correlated with 15/16 user actions.
-
-Raw PCAP remains correct. The defect is in infrastructure-flow classification/presentation/correlation.
-
-## Canonical evidence health
-
-The required collectors are healthy: session complete, degraded=false, checksums valid, COLD launch, canonical screenrecord complete, tcpdump 0 kernel drops, socket attribution functioning, and no target-app crash/ANR found.
+A new owner-provided v0.23.1 Research ZIP has not yet been inspected. CI/real-AVD proves the exact regression cases, but a real owner session is still valuable to confirm the previous 66-second pattern no longer reproduces and that Sidecar infrastructure is absent from ordinary app correlations.
 
 ## Continuous screen promotion
 
-Promotion is blocked. The collector must remain experimental/non-canonical until owner-side A/B evidence passes after correction.
+Continuous Screen remains experimental/non-canonical. v0.23.1 fixes the observed idle timeout and evidence contamination, but promotion to canonical still requires separate owner-side A/B evidence and an explicit decision.
 
 ## WHPX
 

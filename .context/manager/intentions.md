@@ -1,24 +1,29 @@
 # Manager intentions and commitments
 
-## Active — v0.23 real-archive defect correction
+## Completed — v0.23 owner-archive defect correction
 
-Status: active pending owner execution directive.
+Status: completed in v0.23.1.
 
-The owner-side v0.23 archive proves that the experimental continuous-screen path is not ready for canonical use and currently contaminates normalized network analysis with apk-research sidecar traffic. The next corrective release should preserve the healthy canonical research chain while removing these effects.
+The two owner-proven v0.23.0 Sidecar defects were corrected without changing RAW authority or the proven Android runtime:
+- Sidecar loopback traffic remains in raw PCAP but is excluded from ordinary app derived evidence using exact archived dynamic ports;
+- long-lived media reception no longer inherits the short handshake timeout.
 
-Preferred minimal correction:
-- keep raw PCAP untouched;
-- classify exact dynamically allocated sidecar control/media loopback flows as apk-research infrastructure and exclude them from normal app Timeline/Network/Packet correlations by default;
-- prevent legitimate idle periods from killing continuous media reception (the steady-state media socket must not inherit the short handshake timeout);
-- strengthen real-AVD tests with an idle interval longer than the media timeout and assertions that sidecar infrastructure flows do not enter ordinary app correlation.
+PR #14 and main pipeline #127 both passed real-AVD idle/infrastructure regressions.
 
-If strict forensic isolation is preferred, temporarily disabling the experimental continuous-screen collector in normal research sessions is lower risk than leaving the current behavior active.
+## Proposed — owner-side v0.23.1 revalidation
+
+Status: proposed, non-blocking.
+
+When the owner supplies a new v0.23.1 Research ZIP, verify that:
+- Continuous Screen survives idle periods and completes cleanly;
+- Sidecar control/media packets are counted as infrastructure but absent from ordinary app flows and action correlations;
+- canonical screenrecord remains complete.
 
 ## Active — evidence-preserving Stage E continuation
 
-Status: active after correction.
+Status: active after owner-side revalidation or in parallel for low-risk presentation work.
 
-Continue deeper evidence intelligence from the verified v0.23.0 baseline only after the owner-side defects are corrected, preserving RAW-first provenance, capture-bounded semantics and explicit confidence boundaries.
+Continue deeper evidence intelligence from the verified v0.23.1 baseline, preserving RAW-first provenance, capture-bounded semantics and explicit confidence boundaries.
 
 ## Active — continuity and release integrity
 

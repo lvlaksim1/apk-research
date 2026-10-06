@@ -1,6 +1,6 @@
 # Latest Handoff
 
-Generation: 8
+Generation: 9
 Date: 2026-10-06
 
 Persistent manager: `apk-research-project-manager`.
@@ -9,14 +9,18 @@ Authority:
 - manager state: `context`;
 - product: `main`.
 
-Release baseline remains **apk-research v0.23.0** at `cde0b56b5332f0b601221c9157efbd90da18fc33`.
+Verified product baseline is **apk-research v0.23.1** at `39e483ee03d5337e4e928b4b85cce85c40f4fe35`.
 
-The owner supplied real archive `20261006T105244.785342Z-3076e6ba.research.zip`. Canonical research evidence is healthy: all checksums verify, session complete/degraded=false, COLD launch, canonical screenrecord complete, tcpdump 0 kernel drops, socket attribution works, and no com.evrasia crash/ANR is present.
+Installer: `apk-research-setup_v0.23.1.exe`.
+SHA-256: `b5bf2d31da1c47ef59d351988a09f5c0dad72a8117aab0c4849ae30bb54eb540`.
+Size: 36,323,501 bytes.
 
-However two real defects are now proven in the experimental continuous-screen path:
+Main pipeline #127 (`37460233667`) completed SUCCESS and GitHub Release v0.23.1 was published.
 
-1. Sidecar adb-reverse control/media traffic appears as ordinary loopback flows. Those two flows account for 11,993/12,419 TCP/UDP flow packets and 7,208,463/7,396,346 flow bytes; the media flow is correlated with 15/16 user actions.
+v0.23.1 corrects both defects proven by the owner's v0.23.0 archive:
+1. exact archived Sidecar loopback control/media traffic remains in RAW PCAP but is excluded from normal app flow/Timeline/action analysis and counted explicitly as infrastructure;
+2. the established Sidecar media stream no longer inherits the short 8 s socket timeout.
 
-2. Continuous screen records only about 10.04 s and ends `failed-experimental`. The sidecar C2 encoder reports repeat-previous-frame unsupported, while the host media socket has an 8 s timeout. The archive contains an 8.624 s target-time idle gap between the last media PTS and the next user action, explaining the host read timeout.
+Real-AVD release acceptance includes a 10 s idle-screen regression and Sidecar flow leakage assertion; both passed. Canonical screenrecord remains authoritative and Continuous Screen remains experimental/non-canonical.
 
-Canonical screenrecord remains authoritative and healthy. Continuous-screen promotion is blocked. Preferred next work is a focused corrective release before further feature development.
+Next valuable input is an owner-side v0.23.1 Research ZIP revalidation.

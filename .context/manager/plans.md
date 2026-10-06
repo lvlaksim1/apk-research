@@ -17,6 +17,7 @@
 - Stage D / v0.21 — interaction completeness — COMPLETE.
 - Stage E increment 1 / v0.22 — Packet ↔ Action temporal evidence — COMPLETE.
 - Stage E increment 2 / v0.23 — Transport Session Evidence — COMPLETE.
+- v0.23.1 corrective release — Sidecar evidence isolation + idle media stability — COMPLETE.
 
 ## Stage E continuation
 
