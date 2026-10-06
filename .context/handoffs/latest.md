@@ -1,6 +1,6 @@
 # Latest Handoff
 
-Generation: 10
+Generation: 11
 Date: 2026-10-07
 
 Persistent manager: `apk-research-project-manager`.
@@ -8,8 +8,6 @@ Persistent manager: `apk-research-project-manager`.
 Authority:
 - manager state: `context`;
 - product: `main`.
-
-This handoff is the clean-chat checkpoint.
 
 Verified product baseline is **apk-research v0.23.1** at `39e483ee03d5337e4e928b4b85cce85c40f4fe35`.
 
@@ -19,21 +17,22 @@ Size: 36,323,501 bytes.
 
 Main pipeline #127 (`37460233667`) completed SUCCESS and GitHub Release v0.23.1 was published.
 
-v0.23.1 corrects the two defects proven by the owner's real v0.23.0 Research ZIP:
-1. exact Sidecar control/media loopback traffic remains preserved in RAW PCAP but is excluded from ordinary app flow inventory, Timeline markers and Action/Packet correlations, with explicit infrastructure accounting;
-2. the established Sidecar media stream no longer inherits the short 8 s socket timeout.
+Owner-side archive `20261006T230500.602195Z-1206ec46.research.zip` revalidates both v0.23.0 corrective targets:
+1. Continuous Screen survives a 59.005490 s interval with no emitted media frame and resumes normally, proving the old inherited 8 s media timeout is gone.
+2. RAW PCAP preserves 21,787 exact Sidecar loopback packets on archived ports 53659/53669, while normalized app evidence contains zero Sidecar-port flows and no infrastructure action correlations.
 
-Real-AVD release acceptance includes a 10 s idle-screen regression and Sidecar-flow leakage assertion; both passed.
+The archive is sound: 31/31 checksums, complete/non-degraded session. Continuous H.264 decodes cleanly with 1,613 frames / 131.195188 s; canonical screenrecord completed with 925 frames / 132.671076 s. The same long static interval is visible in canonical frame timing and post-idle frames align visually.
+
+Therefore the v0.23.0 Sidecar defects are closed.
+
+Continuous Screen remains experimental only until one final owner-side session crosses the canonical `screenrecord` 170 s chunk boundary. That run validates the main architectural benefit—continuity through chunk rotation—before an explicit owner promotion decision.
 
 Protected baselines:
 - raw PCAP is authoritative;
 - Packet ↔ Action remains `temporal-only`, `causal_claim=false`;
 - hidden Emulator → gRPC/MMAP → AndroidView remains the live display path;
 - v0.10.5 clean-launch/startup sequencing remains the proven runtime baseline;
-- canonical Android screenrecord remains authoritative;
-- Continuous Screen remains experimental/non-canonical;
+- canonical Android screenrecord remains authoritative until promotion;
 - Audio Evidence and user-facing Virtual Display remain out of scope.
 
-No v0.24 implementation is active. Historical corrective branches must not be treated as active product authority; start any new development from current `main`.
-
-Best next input is an owner-side v0.23.1 Research ZIP. If supplied, verify Continuous Screen completion, Sidecar infrastructure isolation/accounting, canonical screenrecord coverage, packet/action navigation and v0.23 transport-session evidence before selecting the next Stage E increment.
+No v0.24 implementation is active. Start new product work from current `main`.

@@ -19,6 +19,14 @@
 - Stage E increment 2 / v0.23 — Transport Session Evidence — COMPLETE.
 - v0.23.1 corrective release — Sidecar evidence isolation + idle media stability — COMPLETE.
 
+## Immediate Continuous Screen closure plan
+
+1. Run one owner-side session longer than the canonical `screenrecord` 170 s chunk duration, preferably about four minutes.
+2. Keep ordinary interaction active around the 170 s rollover so a possible gap cannot hide behind a static display.
+3. Verify that Continuous Screen remains one uninterrupted collector through the rollover while canonical screenrecord rotates chunks as designed.
+4. Compare pre-rollover/post-rollover visual content and timing, clean completion and RAW/derived Sidecar traffic isolation.
+5. If no material regression is found, present an explicit promotion recommendation to the owner. Do not promote automatically.
+
 ## Stage E continuation
 
 Choose the next increment by the remaining investigative gap, not by feature novelty. Strong candidates are:

@@ -42,6 +42,24 @@ Real-AVD acceptance now includes a 10 s static-screen idle interval, longer than
 - source: owner-provided v0.23.0 archive, release commit `39e483ee03d5337e4e928b4b85cce85c40f4fe35`, PR #14 gates and main pipeline #127
 - authority: owner-evidence + verified-repository + verified-ci
 
+### Owner-side v0.23.1 revalidation
+
+Owner-provided archive `20261006T230500.602195Z-1206ec46.research.zip` verifies both v0.23.1 Sidecar corrections in a real session.
+
+- Product version 0.23.1; 31/31 archive checksums valid; session `complete`, `degraded=false`.
+- Continuous Screen completed cleanly with 1,613 decoded H.264 frames and 131.195188 s presentation span.
+- A real static-screen interval produced a 59.005490 s gap between consecutive Sidecar media frames. Canonical screenrecord shows the same static period as a 60.001711 s frame gap. Both resume at approximately 23:07:00Z. The media connection therefore survived far beyond the former 8 s timeout and resumed normally.
+- The action log contains an 83.418846 s no-action interval across the idle period; later interaction is captured normally.
+- RAW PCAP contains 22,520 packets, including 21,787 exact Sidecar loopback TCP packets on archived dynamic ports 53659/53669. All remain preserved in RAW evidence; zero Sidecar-port flows appear in the 32 normalized app flows and zero infrastructure events appear in action correlations.
+- Canonical screenrecord completed with 925 frames and 132.671076 s presentation span.
+- Continuous H.264 decodes cleanly end-to-end. Time-aligned visual samples, including the first frame after the long idle interval, match canonical screenrecord.
+- Continuous presentation span is 1.475888 s shorter than canonical, but the first continuous frame still precedes target package launch and the last extends beyond the owner stop request; no target-interaction loss is observed in this session.
+
+Conclusion: the two owner-proven v0.23.0 Sidecar defects are closed in v0.23.1. Continuous Screen remains experimental only because its main architectural benefit—continuity across canonical screenrecord chunk rotation—has not yet been owner-validated beyond the configured 170 s chunk boundary, and promotion still requires an explicit owner decision.
+
+- source: owner-provided v0.23.1 Research ZIP `20261006T230500.602195Z-1206ec46.research.zip`, inspected 2026-10-07
+- authority: owner-evidence + verified-archive-analysis
+
 ## Proven Android runtime baseline
 
 The validated runtime remains hidden Android Emulator (`-qt-hide-window`) → Emulator gRPC → MMAP framebuffer → AndroidView, with persistent geometry-safe gRPC input. v0.10.5 remains the proven startup/clean-launch sequencing baseline.

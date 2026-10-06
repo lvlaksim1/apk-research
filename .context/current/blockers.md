@@ -4,15 +4,19 @@ Last reconciled: 2026-10-07.
 
 ## Product blockers
 
-No known release-blocking product defect is active. v0.23.1 is published and all publication gates passed.
+No known release-blocking product defect is active. v0.23.1 is published, all publication gates passed, and the two owner-proven v0.23.0 Sidecar defects are owner-revalidated as corrected.
 
-## Owner-side revalidation
+## Continuous Screen promotion
 
-A new owner-provided v0.23.1 Research ZIP has not yet been inspected. CI/real-AVD proves the exact regression cases, but a real owner session is still valuable to confirm the previous 66-second pattern no longer reproduces and that Sidecar infrastructure is absent from ordinary app correlations.
+Continuous Screen remains experimental/non-canonical for one narrow reason: the supplied owner-side v0.23.1 session lasted about 138 s and did not cross the canonical `screenrecord` 170 s chunk boundary.
 
-## Continuous screen promotion
+The real archive already proves:
+- survival and resume after a 59.005 s no-frame interval;
+- no Sidecar leakage into ordinary app flow/action evidence;
+- clean completion;
+- close visual/timing equivalence with canonical screenrecord during the tested interval.
 
-Continuous Screen remains experimental/non-canonical. v0.23.1 fixes the observed idle timeout and evidence contamination, but promotion to canonical still requires separate owner-side A/B evidence and an explicit decision.
+The remaining promotion gate is long-session continuity across at least one canonical chunk rollover, followed by an explicit owner promotion decision.
 
 ## WHPX
 
