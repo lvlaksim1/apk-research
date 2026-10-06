@@ -2,18 +2,28 @@
 
 Last reconciled: 2026-10-06.
 
-## Product blockers
+## Verified owner-side defects
 
-No known product-code blocker is active. v0.23.0 is published and all publication gates passed.
+### Experimental continuous screen
 
-## Owner-side evidence
+A real v0.23 owner archive shows `failed-experimental`. It captured only about 10.04 s of media PTS while canonical screenrecord captured about 66.10 s. The host reports `Unable to read Android sidecar media stream`, stop statistics are absent and sidecar cleanup is incomplete.
 
-No owner-provided real v0.23.0 Research ZIP acceptance is recorded yet. This is useful validation of the real GUI navigation and transport-session presentation path but does not block further development because exact-SHA real-AVD Research ZIP acceptance passed.
+Code/evidence correlation identifies the immediate failure mechanism: the binary media socket retains the generic 8 s timeout, while the Android C2 encoder explicitly reports that `repeat-previous-frame-after` is unsupported. A static display can therefore legitimately produce no packets for more than 8 s, causing the host receiver to time out.
+
+### Sidecar network self-contamination
+
+The same archive proves that adb-reverse sidecar traffic is included as ordinary 127.0.0.1 TCP flows in `network-flows.json` and Timeline. Sidecar control+media account for 96.57% of TCP/UDP flow packets and 97.46% of TCP/UDP captured bytes, and the media flow is correlated with 15/16 user actions.
+
+Raw PCAP remains correct. The defect is in infrastructure-flow classification/presentation/correlation.
+
+## Canonical evidence health
+
+The required collectors are healthy: session complete, degraded=false, checksums valid, COLD launch, canonical screenrecord complete, tcpdump 0 kernel drops, socket attribution functioning, and no target-app crash/ANR found.
 
 ## Continuous screen promotion
 
-The sidecar MediaCodec continuous-screen collector remains experimental. CI/AVD proves transport, PTS progression, byte accounting and cleanup, but does not by itself justify replacing canonical screenrecord. Promotion requires separate owner-side A/B evidence and an explicit decision.
+Promotion is blocked. The collector must remain experimental/non-canonical until owner-side A/B evidence passes after correction.
 
 ## WHPX
 
-v0.23 WHPX run #119 is advisory/non-publication-gating. Queue/cancellation/failure there is infrastructure evidence unless a future claim explicitly depends on WHPX; it does not invalidate the successful v0.23 main pipeline.
+WHPX is advisory/non-publication-gating.

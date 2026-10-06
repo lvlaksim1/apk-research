@@ -52,7 +52,8 @@
     ".context/decisions/DEC-20261006-v022-release-baseline.md"
   ],
   "dialogues": [
-    ".context/dialogues/20261006-scrcpy-v5-applicability.md"
+    ".context/dialogues/20261006-scrcpy-v5-applicability.md",
+    ".context/dialogues/20261006-v023-owner-archive-acceptance.md"
   ],
   "history": [],
   "runtime": {

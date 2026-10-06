@@ -27,12 +27,27 @@ Packet Inspector resolves concrete PCAP packets back to existing archived Resear
 
 ### v0.23.0 Transport Session Evidence
 
-Packet Inspector now derives per-packet TCP sequence/acknowledgment numbers, flags, header length, receive window and payload length directly from observed TCP headers. A flow-level transport summary reports a complete three-way handshake only when SYN → SYN/ACK → ACK are actually present in capture order, and reports FIN/RST termination only when observed.
+Packet Inspector derives per-packet TCP sequence/acknowledgment numbers, flags, header length, receive window and payload length directly from observed TCP headers. A flow-level transport summary reports a complete three-way handshake only when SYN → SYN/ACK → ACK are actually present in capture order, and reports FIN/RST termination only when observed.
 
 Missing lifecycle packets are represented as `partial-or-not-observed-in-capture` or `not-observed-in-capture`; absence from PCAP is not evidence that the event did not occur. No TCP application-stream reconstruction or plaintext inference was introduced.
 
 - source: release commit `cde0b56b5332f0b601221c9157efbd90da18fc33` and pipeline #126
 - authority: verified-repository + verified-ci
+
+## Owner-side v0.23 real Research ZIP findings
+
+The owner supplied real archive `20261006T105244.785342Z-3076e6ba.research.zip`. All 31 checksummed artifacts verified. Session status is complete, degraded=false, target package is com.evrasia 2.8.4, launch is verified COLD, canonical screenrecord covers the launch and user interaction period, tcpdump reports 12429 captured packets and 0 kernel drops, and no app crash/ANR was observed.
+
+Two verified defects exist in the experimental continuous-screen path:
+
+1. Sidecar control/media adb-reverse loopback traffic is currently normalized as ordinary network flows. In this archive `flow-000001` and `flow-000002` are 127.0.0.1 sidecar flows on the dynamically allocated control/media ports. They account for 11,993 of 12,419 TCP/UDP flow packets (96.57%) and 7,208,463 of 7,396,346 TCP/UDP captured bytes (97.46%). The media flow is correlated with 15 of 16 user actions, polluting Timeline/Network/Packet analysis. Raw PCAP itself remains valid.
+
+2. Experimental continuous screen fails after about 10.04 s of media PTS. The sidecar encoder logs show `repeat-previous-frame-after` is unsupported by the C2 encoder, while the host media socket retains the generic 8 s socket timeout. The last media PTS maps to approximately 10:53:01.030Z and the first subsequent user action begins at target-estimated 10:53:09.655Z, an 8.624 s idle gap. This exceeds the socket timeout and is consistent with the recorded receiver error `Unable to read Android sidecar media stream`. Cleanup is incomplete and collector status is `failed-experimental`.
+
+The canonical screenrecord remains healthy and authoritative; therefore the overall Research Session remains complete despite the experimental collector failure.
+
+- source: owner-provided v0.23 Research ZIP plus main-branch continuous-screen/sidecar implementation
+- authority: owner-evidence + verified-repository
 
 ## Proven Android runtime baseline
 
@@ -43,10 +58,10 @@ The validated runtime remains hidden Android Emulator (`-qt-hide-window`) → Em
 
 ## Evidence semantics
 
-Raw PCAP remains the primary network source of truth. Package/socket ownership, normalized flows, Timeline correlation, QUIC/HTTP3 metadata, Evidence Explorer, Packet Inspector, packet/action links and transport-session summaries are derived/presentation evidence. Temporal adjacency and unobserved packets must never be promoted into stronger claims.
+Raw PCAP remains the primary network source of truth. Package/socket ownership, normalized flows, Timeline correlation, QUIC/HTTP3 metadata, Evidence Explorer, Packet Inspector, packet/action links and transport-session summaries are derived/presentation evidence. Temporal adjacency, infrastructure-induced traffic and unobserved packets must never be promoted into stronger claims.
 
-- source: verified repository implementation
-- authority: verified-repository
+- source: verified repository implementation and owner-side v0.23 archive
+- authority: verified-repository + owner-evidence
 
 ## Product UX and release contract
 
@@ -64,7 +79,7 @@ Audio Evidence and Virtual Display remain explicitly out of scope. scrcpy-style 
 
 ## WHPX
 
-WHPX acceptance remains advisory/non-publication-gating. v0.23 WHPX run #119 was queued independently of the successful release pipeline; its queue/result does not affect the verified v0.23 publication state.
+WHPX acceptance remains advisory/non-publication-gating.
 
-- source: repository workflow and GitHub Actions
-- authority: verified-repository + verified-ci
+- source: repository workflow
+- authority: verified-repository
