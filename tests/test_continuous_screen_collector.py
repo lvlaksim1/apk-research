@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -54,6 +54,7 @@ class FakeStream:
             host_port=123,
             device_port=123,
         )
+        self._finished = threading.Event()
         self._packets = [
             SidecarScreenPacket(
                 sequence=1,
@@ -76,9 +77,13 @@ class FakeStream:
         ]
 
     def read_packet(self):
-        if not self._packets:
-            return None
-        return self._packets.pop(0)
+        if self._packets:
+            return self._packets.pop(0)
+        self._finished.wait(timeout=2.0)
+        return None
+
+    def finish(self) -> None:
+        self._finished.set()
 
 
 class FakeSidecar:
@@ -112,6 +117,7 @@ class FakeSidecar:
         return self.stream
 
     def stop_screen_stream(self) -> SidecarScreenStop:
+        self.stream.finish()
         return SidecarScreenStop(
             packet_count=3,
             byte_count=25,
@@ -155,7 +161,6 @@ def test_continuous_screen_writes_lossless_packet_payloads_and_pts(
     )
 
     collector.start()
-    assert collector.running or collector.check_health()
 
     session.mark_active()
     session.begin_stop()

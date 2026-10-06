@@ -431,6 +431,10 @@ class ContinuousScreenCollector:
                 while True:
                     packet = self._stream.read_packet()
                     if packet is None:
+                        if not self._stop_requested:
+                            self._receiver_error = (
+                                "continuous screen stream ended unexpectedly"
+                            )
                         break
 
                     if packet.payload:
