@@ -773,6 +773,66 @@ class AdbClient:
             timeout=timeout,
         )
 
+    def push_file(
+        self,
+        serial: str,
+        local_path: str | os.PathLike[str],
+        remote_path: str,
+        *,
+        timeout: float = 120.0,
+    ) -> None:
+        remote_path = validate_remote_research_path(remote_path)
+        self.ensure_ready(serial)
+        local = Path(local_path)
+        if not local.is_file():
+            raise AdbError(
+                f"Local file does not exist: {local}"
+            )
+        self._run_checked(
+            ["-s", serial, "push", str(local), remote_path],
+            timeout=timeout,
+        )
+
+    def reverse_tcp(
+        self,
+        serial: str,
+        *,
+        device_port: int,
+        host_port: int,
+    ) -> None:
+        if not 1 <= int(device_port) <= 65535:
+            raise ValueError("device_port must be between 1 and 65535")
+        if not 1 <= int(host_port) <= 65535:
+            raise ValueError("host_port must be between 1 and 65535")
+        self.ensure_ready(serial)
+        self._run_checked(
+            [
+                "-s",
+                serial,
+                "reverse",
+                f"tcp:{int(device_port)}",
+                f"tcp:{int(host_port)}",
+            ]
+        )
+
+    def remove_reverse_tcp(
+        self,
+        serial: str,
+        device_port: int,
+    ) -> None:
+        if not 1 <= int(device_port) <= 65535:
+            raise ValueError("device_port must be between 1 and 65535")
+        self.ensure_ready(serial)
+        self._run_checked(
+            [
+                "-s",
+                serial,
+                "reverse",
+                "--remove",
+                f"tcp:{int(device_port)}",
+            ]
+        )
+
     def remove_remote_file(self, serial: str, remote_path: str) -> None:
         remote_path = validate_remote_research_path(remote_path)
         self.ensure_ready(serial)

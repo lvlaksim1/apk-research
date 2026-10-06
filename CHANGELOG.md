@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.19.0] - 2026-10-06
+
+### Android Sidecar Foundation
+
+- Adds a project-owned temporary Android `app_process` sidecar built from repository Java source into a DEX/JAR.
+- Packages the sidecar JAR into the standalone Windows application; no Java/JDK is required on the user's computer.
+- Deploys only under `/data/local/tmp/apk-research/sidecar` and removes the payload on teardown.
+- Uses host-listen-first `adb reverse` TCP setup before starting the Android process, eliminating a device-listener polling race.
+- Requires exact protocol and agent version agreement before the sidecar becomes usable.
+- Adds one long-lived socket with bounded `HELLO/READY`, `PING/PONG` and `STOP/BYE` messages.
+- Adds deterministic reverse-mapping and guest-file cleanup with explicit cleanup state.
+- Extends real AVD acceptance with full sidecar lifecycle verification and a post-sidecar gRPC/MMAP transport recheck.
+- Extends packaged self-test so a release cannot omit the bundled sidecar payload unnoticed.
+- Does not migrate any collector to the sidecar and does not change the proven v0.10.5 runtime/display/input path.
+- Audio Evidence and Virtual Display remain excluded.
+
 ## [0.18.0] - 2026-10-06
 
 ### Raw / Packet Inspector

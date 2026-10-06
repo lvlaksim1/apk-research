@@ -34,6 +34,12 @@ def main() -> int:
         manager = ComponentManager()
         print(f"apk-research {__version__}")
         print(manager.paths.root)
+        if getattr(sys, "frozen", False):
+            from apk_research.desktop.sidecar import (
+                resolve_agent_jar,
+            )
+
+            print(resolve_agent_jar())
         return 0
 
     if "--gui-smoke-test" in sys.argv:

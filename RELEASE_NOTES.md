@@ -1,33 +1,34 @@
-# apk-research v0.18.0
+# apk-research v0.19.0
 
-v0.18.0 adds the **Raw / Packet Inspector** and completes the in-app evidence path from a normalized flow to the concrete packet records in the original Research ZIP PCAP.
+v0.19.0 adds the **Android Sidecar Foundation**: a minimal, versioned, temporary `app_process` agent for future evidence collectors without changing the validated Emulator display/input runtime.
 
 ## Added
 
-- a dedicated `Packets` tab in the desktop GUI;
-- Evidence → Packets and Network → Packets navigation for a selected normalized flow;
-- direct sequential reading of `01_raw/network/traffic.pcap` from the Research ZIP;
-- bidirectional packet filtering using the same canonical TCP/UDP flow identity used by Network Analyzer;
-- per-packet target timestamp, direction, protocol, source/destination endpoints and captured/original lengths;
-- reproducible raw locators containing the original PCAP packet index plus record/frame byte offsets;
-- bounded raw-frame hex previews;
-- packet-level DNS/TLS SNI and already-supported QUIC/HTTP3 metadata where the bytes provide that evidence;
-- free-text packet search across IDs, timestamps, endpoints and protocol evidence.
+- project-owned Java sidecar source compiled to a DEX/JAR during release builds;
+- bundled `apk-research-agent.jar` inside the standalone Windows distribution;
+- deterministic deployment under `/data/local/tmp/apk-research/sidecar`;
+- host-listen-first TCP transport bridged by `adb reverse`, avoiding device-port readiness polling;
+- exact protocol-version and agent-version handshake;
+- a single persistent control socket with bounded line protocol;
+- `PING/PONG` health request with agent-side monotonic uptime;
+- graceful `STOP/BYE` shutdown;
+- deterministic removal of the adb reverse mapping and temporary agent JAR;
+- real-AVD lifecycle acceptance followed by a second gRPC/MMAP validation;
+- packaged self-test verification that the sidecar payload is present in the installed product.
 
-## Evidence semantics
+## Boundary
 
-Packet Inspector is presentation-only. It does not rewrite, extract or replace the PCAP as a new source of truth.
+The sidecar is infrastructure only in v0.19.0. No collector uses it yet.
 
-Encrypted payload is never presented as decoded plaintext. Existing Action ↔ Flow relationships remain `temporal-only` with `causal_claim=false`.
+It does **not** replace:
+- hidden Emulator → gRPC/MMAP → AndroidView display;
+- persistent Emulator gRPC input;
+- v0.10.5 startup/clean-launch sequencing;
+- current screenrecord capture;
+- raw PCAP/network collectors.
 
-## Compatibility boundary
-
-- no Research ZIP schema change;
-- no collector change;
-- no Android runtime change;
-- no change to v0.10.5 startup/clean-launch sequencing;
-- hidden Emulator → gRPC/MMAP → AndroidView remains the only supported live display path.
+Audio Evidence and Virtual Display remain out of scope.
 
 ## Validation
 
-Release validation requires the normal test suite, Windows GUI/package smoke, real AVD acceptance and the commit-triggered release pipeline.
+Stable publication requires normal CI, sidecar build, real AVD sidecar lifecycle acceptance, real Research ZIP acceptance, Windows standalone/GUI/installer smoke, clean-Windows provisioning and checksum verification.

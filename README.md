@@ -1,5 +1,13 @@
 # apk-research
 
+## v0.19.0 — Android Sidecar Foundation
+
+v0.19.0 introduces a project-owned temporary Android-side `app_process` agent as infrastructure for future collectors. The sidecar is built from repository Java source into a DEX/JAR during the release build, bundled inside the standalone Windows application, pushed only to `/data/local/tmp/apk-research/sidecar` when explicitly used, and removed during teardown.
+
+The host opens its localhost listener before creating an `adb reverse` mapping and launching `app_process`. The agent then connects back through that mapping, performs an exact protocol/agent-version handshake and keeps one long-lived socket for bounded commands. The v0.19 foundation implements only handshake, `PING/PONG` and graceful `STOP`; it does not collect evidence and does not take responsibility for display or input.
+
+Real-AVD acceptance proves the complete lifecycle `build → deploy → reverse → app_process → handshake → ping → stop → reverse removal → agent removal`, then re-validates the existing Emulator gRPC/MMAP transport. The hidden Emulator → gRPC/MMAP → AndroidView path and v0.10.5 startup/clean-launch sequencing remain unchanged.
+
 ## v0.18.0 — Raw / Packet Inspector
 
 v0.18.0 closes the last gap in the Unified Evidence Explorer chain: a normalized flow can now be opened as the concrete packets that form it inside the original `01_raw/network/traffic.pcap`.
