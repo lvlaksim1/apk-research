@@ -434,7 +434,7 @@ def test_tcp_transport_metadata_and_three_way_handshake_evidence() -> None:
     ]
 
     assert packet_transport_label(first) == "TCP:SYN"
-    assert "SYN" in packet_search_text(first)
+    assert "syn" in packet_search_text(first)
     details = format_packet_details(fourth)
     assert "TCP flags: ACK, PSH" in details
     assert "Sequence / ACK: 101 / 901" in details
