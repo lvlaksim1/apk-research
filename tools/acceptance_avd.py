@@ -433,6 +433,7 @@ def main() -> int:
         indexed_bytes = 0
         config_packets = 0
         media_packets = 0
+        eos_packets = 0
         previous_pts = None
         for record in continuous_records:
             size = int(record.get("size") or 0)
@@ -448,6 +449,8 @@ def main() -> int:
             expected_offset += size
             indexed_bytes += size
 
+            if record.get("end_of_stream") is True:
+                eos_packets += 1
             if record.get("codec_config") is True:
                 config_packets += 1
             elif size > 0:
@@ -466,6 +469,13 @@ def main() -> int:
         if media_packets != continuous_frame_count:
             raise RuntimeError(
                 "Continuous screen media frame count mismatch"
+            )
+        if (
+            eos_packets != 1
+            or continuous_records[-1].get("end_of_stream") is not True
+        ):
+            raise RuntimeError(
+                "Continuous screen stream has no unique terminal EOS record"
             )
         if (
             indexed_bytes != continuous_bytes
@@ -535,6 +545,7 @@ def main() -> int:
             "bytes_captured": continuous_bytes,
             "presentation_span_seconds": continuous_span,
             "config_packets": config_packets,
+            "eos_packets": eos_packets,
             "canonical_capture_span_seconds": (
                 screen_ab.get("canonical_capture_span_seconds")
             ),

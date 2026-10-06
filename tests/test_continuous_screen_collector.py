@@ -74,6 +74,12 @@ class FakeStream:
                 pts_us=2_500_000,
                 payload=b"frame-two",
             ),
+            SidecarScreenPacket(
+                sequence=4,
+                flags=4,
+                pts_us=0,
+                payload=b"",
+            ),
         ]
 
     def read_packet(self):
@@ -119,7 +125,7 @@ class FakeSidecar:
     def stop_screen_stream(self) -> SidecarScreenStop:
         self.stream.finish()
         return SidecarScreenStop(
-            packet_count=3,
+            packet_count=4,
             byte_count=25,
             first_pts_us=1_000_000,
             last_pts_us=2_500_000,
@@ -167,7 +173,7 @@ def test_continuous_screen_writes_lossless_packet_payloads_and_pts(
     result = collector.stop()
 
     assert result.status == "completed"
-    assert result.packet_count == 3
+    assert result.packet_count == 4
     assert result.media_frame_count == 2
     assert result.presentation_span_seconds == 1.5
     assert session.degraded is False
@@ -189,6 +195,8 @@ def test_continuous_screen_writes_lossless_packet_payloads_and_pts(
     assert records[1]["key_frame"] is True
     assert records[1]["raw_offset"] == len(b"config")
     assert records[2]["pts_us"] == 2_500_000
+    assert records[3]["end_of_stream"] is True
+    assert records[3]["size"] == 0
 
     metadata = json.loads(
         (

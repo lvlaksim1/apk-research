@@ -194,6 +194,12 @@ final class ScreenStreamer implements Runnable {
                     output.writeLong(info.presentationTimeUs);
                     output.writeInt(size);
 
+                    // packetCount is the binary protocol-record count, not
+                    // merely the count of records carrying payload. The final
+                    // MediaCodec EOS record is commonly zero-sized and is
+                    // still serialized/indexed by the host.
+                    packetCount += 1L;
+
                     if (size > 0) {
                         ByteBuffer copy = buffer.duplicate();
                         copy.position(info.offset);
@@ -202,7 +208,6 @@ final class ScreenStreamer implements Runnable {
                         copy.get(payload);
                         output.write(payload);
 
-                        packetCount += 1L;
                         byteCount += size;
                         if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
                             if (firstPtsUs < 0L) {
