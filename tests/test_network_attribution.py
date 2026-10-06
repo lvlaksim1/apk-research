@@ -442,3 +442,42 @@ def test_flow_inventory_counts_non_tcp_udp_packets() -> None:
         "non_tcp_udp_protocol_counts"
     ] == {"icmp": 1}
 
+
+
+
+def test_flow_inventory_excludes_marked_infrastructure_packets() -> None:
+    snapshots, summary = _raw_snapshot()
+    index = SocketAttributionIndex(summary, snapshots)
+
+    sidecar = {
+        "epoch": EPOCH_NS / 1_000_000_000 + 0.01,
+        "protocol": "tcp",
+        "src": "127.0.0.1",
+        "src_port": 50000,
+        "dst": "127.0.0.1",
+        "dst_port": 63576,
+        "captured_length": 4096,
+        "infrastructure": {
+            "kind": "apk-research-sidecar",
+            "evidence": "test",
+            "matched_ports": [63576],
+        },
+    }
+    real = _packet()
+    real["captured_length"] = 120
+
+    inventory = build_flow_inventory(
+        [sidecar, real],
+        index,
+    )
+
+    assert inventory["summary"]["source_packet_count"] == 2
+    assert inventory["summary"]["infrastructure_packet_count"] == 1
+    assert inventory["summary"]["infrastructure_bytes"] == 4096
+    assert inventory["summary"]["infrastructure_kind_counts"] == {
+        "apk-research-sidecar": 1,
+    }
+    assert inventory["summary"]["flow_packet_count"] == 1
+    assert len(inventory["flows"]) == 1
+    flow = inventory["flows"][0]
+    assert flow["remote_ip"] == "93.184.216.34"

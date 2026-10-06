@@ -101,7 +101,9 @@ def test_binary_screen_packet_parser_preserves_pts_and_flags() -> None:
             host_port=1,
             device_port=1,
         )
+        left.settimeout(0.01)
         stream = SidecarScreenStream(left, info)
+        assert left.gettimeout() is None
         payload = b"\x00\x00\x00\x01test"
         right.sendall(
             (1).to_bytes(4, "big")
