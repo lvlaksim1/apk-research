@@ -24,6 +24,7 @@ from apk_research.desktop.packet_inspector import (
     RAW_PCAP_ARTIFACT,
     format_packet_details,
     inspect_archive_flow,
+    packet_action_label,
     packet_metadata_label,
     packet_search_text,
 )
@@ -81,11 +82,16 @@ class PacketInspectorMainWindow(UnifiedEvidenceMainWindow):
         self.packet_load_selected = QPushButton(
             "Открыть пакеты выбранного flow"
         )
+        self.packet_open_timeline = QPushButton(
+            "Открыть действие в Timeline"
+        )
+        self.packet_open_timeline.setEnabled(False)
         self.packet_search = QLineEdit()
         self.packet_search.setPlaceholderText(
-            "packet / time / IP / port / DNS / SNI / QUIC / HTTP3"
+            "packet / time / IP / port / action / DNS / SNI / QUIC / HTTP3"
         )
         controls.addWidget(self.packet_load_selected)
+        controls.addWidget(self.packet_open_timeline)
         controls.addWidget(self.packet_search, 1)
         layout.addLayout(controls)
 
@@ -96,7 +102,7 @@ class PacketInspectorMainWindow(UnifiedEvidenceMainWindow):
         layout.addWidget(self.packet_summary)
 
         self.packet_table = QTableWidget()
-        self.packet_table.setColumnCount(8)
+        self.packet_table.setColumnCount(9)
         self.packet_table.setHorizontalHeaderLabels(
             [
                 "#",
@@ -106,6 +112,7 @@ class PacketInspectorMainWindow(UnifiedEvidenceMainWindow):
                 "Source",
                 "Destination",
                 "Captured",
+                "Action window",
                 "Protocol evidence",
             ]
         )
@@ -157,11 +164,14 @@ class PacketInspectorMainWindow(UnifiedEvidenceMainWindow):
         self.packet_load_selected.clicked.connect(
             self._open_current_packet_flow
         )
+        self.packet_open_timeline.clicked.connect(
+            self._open_packet_timeline
+        )
         self.packet_search.textChanged.connect(
             self._apply_packet_filter
         )
         self.packet_table.itemSelectionChanged.connect(
-            self._show_packet_details
+            self._on_packet_selection_changed
         )
 
     def _update_evidence_packet_button(self) -> None:
@@ -319,6 +329,7 @@ class PacketInspectorMainWindow(UnifiedEvidenceMainWindow):
                     packet.get("dst_port"),
                 ),
                 str(packet.get("captured_length") or 0),
+                packet_action_label(packet) or "—",
                 packet_metadata_label(packet),
             ]
             for column, value in enumerate(values):
@@ -336,6 +347,8 @@ class PacketInspectorMainWindow(UnifiedEvidenceMainWindow):
             f" • linktype {report.get('linktype') if report.get('linktype') is not None else '—'}"
             f" • PCAP {int(report.get('artifact_size') or 0)} bytes"
             f" • CRC32 {report.get('artifact_crc32') or '—'}"
+            f" • action windows {int(report.get('timeline_action_window_count') or 0)}"
+            f" • matched packets {int(report.get('packet_action_match_count') or 0)}"
         )
         self.tabs.setCurrentIndex(self.packet_tab_index)
         self._apply_packet_filter()
@@ -357,6 +370,47 @@ class PacketInspectorMainWindow(UnifiedEvidenceMainWindow):
             return None
         value = item.data(_ROLE_PACKET)
         return value if isinstance(value, dict) else None
+
+    def _selected_packet_action_id(self) -> str:
+        packet = self._selected_packet()
+        if not isinstance(packet, dict):
+            return ""
+        for value in packet.get("temporal_action_ids") or []:
+            action_id = str(value or "")
+            if action_id:
+                return action_id
+        return ""
+
+    def _update_packet_timeline_button(self) -> None:
+        self.packet_open_timeline.setEnabled(
+            bool(self._selected_packet_action_id())
+        )
+
+    def _on_packet_selection_changed(self) -> None:
+        self._show_packet_details()
+        self._update_packet_timeline_button()
+
+    def _open_packet_timeline(self) -> None:
+        action_id = self._selected_packet_action_id()
+        report = getattr(self, "_packet_report", None)
+        archive = (
+            str(report.get("archive") or "")
+            if isinstance(report, dict)
+            else ""
+        )
+        if not action_id or not archive:
+            return
+        if (
+            archive
+            == str(getattr(self, "_timeline_archive", "") or "")
+            and self._select_timeline_action(action_id)
+        ):
+            return
+        self._pending_timeline_action_id = action_id
+        self.controller._thread(
+            self._load_refined_timeline,
+            archive,
+        )
 
     def _show_packet_details(self) -> None:
         packet = self._selected_packet()

@@ -314,7 +314,14 @@ def main() -> int:
             raise RuntimeError(
                 "Packet Inspector acceptance has no normalized flow"
             )
-        inspected_flow = flow_records[0]
+        inspected_flow = next(
+            (
+                flow
+                for flow in flow_records
+                if flow.get("correlated_action_ids")
+            ),
+            flow_records[0],
+        )
         packet_report = inspect_archive_flow(
             Path(result.archive),
             inspected_flow,
@@ -334,6 +341,61 @@ def main() -> int:
             raise RuntimeError(
                 "Packet Inspector returned no packet records"
             )
+        if packet_report.get("correlation_type") != "temporal-only":
+            raise RuntimeError(
+                "Packet Inspector action relation is not temporal-only"
+            )
+        if packet_report.get("causal_claim") is not False:
+            raise RuntimeError(
+                "Packet Inspector must not claim packet/action causality"
+            )
+
+        correlated_ids = {
+            str(value)
+            for value in inspected_flow.get("correlated_action_ids") or []
+            if value
+        }
+        archived_action_ids = {
+            str(action.get("action_id") or "")
+            for action in archived_timeline.get("user_actions") or []
+            if isinstance(action, dict)
+        }
+        if correlated_ids:
+            if int(
+                packet_report.get("packet_action_match_count") or 0
+            ) <= 0:
+                raise RuntimeError(
+                    "Packet Inspector did not resolve an existing "
+                    "flow/action Timeline window"
+                )
+            for packet in inspected_packets:
+                for relation in packet.get("temporal_actions") or []:
+                    if not isinstance(relation, dict):
+                        raise RuntimeError(
+                            "Packet Inspector emitted invalid action relation"
+                        )
+                    action_id = str(
+                        relation.get("action_id") or ""
+                    )
+                    if action_id not in correlated_ids:
+                        raise RuntimeError(
+                            "Packet Inspector linked an action not correlated "
+                            "with the selected flow"
+                        )
+                    if action_id not in archived_action_ids:
+                        raise RuntimeError(
+                            "Packet Inspector linked an action missing from "
+                            "the archived Timeline"
+                        )
+                    if relation.get("attribution") != "temporal-only":
+                        raise RuntimeError(
+                            "Packet/action relation lost temporal-only semantics"
+                        )
+                    if relation.get("causal_claim") is not False:
+                        raise RuntimeError(
+                            "Packet/action relation claims causality"
+                        )
+
         first_packet = inspected_packets[0]
         if int(first_packet.get("pcap_record_offset") or -1) < 24:
             raise RuntimeError(
@@ -351,6 +413,14 @@ def main() -> int:
             "selected_packet_count": packet_report.get("selected_packet_count"),
             "pcap_packet_count": packet_report.get("total_packet_count"),
             "pcap_crc32": packet_report.get("artifact_crc32"),
+            "timeline_action_windows": packet_report.get(
+                "timeline_action_window_count"
+            ),
+            "matched_packets": packet_report.get(
+                "packet_action_match_count"
+            ),
+            "correlation_type": packet_report.get("correlation_type"),
+            "causal_claim": packet_report.get("causal_claim"),
         }, ensure_ascii=False))
 
         with zipfile.ZipFile(result.archive) as archive:

@@ -5,9 +5,11 @@ import struct
 
 from apk_research.desktop.packet_inspector import (
     RAW_PCAP_ARTIFACT,
+    correlate_packets_with_timeline,
     flow_connection_key,
     format_packet_details,
     inspect_pcap_flow,
+    packet_action_label,
     packet_search_text,
 )
 
@@ -186,3 +188,96 @@ def test_packet_details_preserve_raw_locator_and_encryption_boundary() -> None:
     assert "frame byte offset: 40" in details
     assert "Encrypted payload is not presented as plaintext" in details
     assert "api.example.test" in packet_search_text(packet)
+
+
+
+def _timeline_for_flow(flow_id: str = "flow-000001") -> dict:
+    return {
+        "schema_version": "0.4",
+        "user_actions": [
+            {
+                "action_id": "action-000001",
+                "action": "tap",
+                "correlation": {
+                    "target_started_utc_estimate": "2023-11-14T22:13:20.000000Z",
+                    "target_finished_utc_estimate": "2023-11-14T22:13:20.100000Z",
+                    "window": {
+                        "actual_after_seconds": 0.5,
+                        "exclusive_until_next_action": True,
+                    },
+                    "causal_confidence": "medium",
+                    "causal_claim": False,
+                    "attribution": "temporal-only",
+                    "network": {
+                        "flow_ids": [flow_id],
+                    },
+                },
+            }
+        ],
+    }
+
+
+def test_packet_action_correlation_uses_exported_timeline_window_only() -> None:
+    first = _ipv4_udp(
+        b"\x0a\x00\x02\x0f",
+        b"\x08\x08\x08\x08",
+        53000,
+        53,
+        _dns_query("api.example.test"),
+    )
+    second = _ipv4_udp(
+        b"\x08\x08\x08\x08",
+        b"\x0a\x00\x02\x0f",
+        53,
+        53000,
+        b"response",
+    )
+    report = inspect_pcap_flow(
+        io.BytesIO(_pcap(first, second)),
+        _flow(),
+    )
+
+    correlated = correlate_packets_with_timeline(
+        report,
+        _timeline_for_flow(),
+    )
+
+    assert correlated["correlation_type"] == "temporal-only"
+    assert correlated["causal_claim"] is False
+    assert correlated["timeline_action_window_count"] == 1
+    assert correlated["packet_action_match_count"] == 1
+
+    first_packet, second_packet = correlated["packets"]
+    assert first_packet["temporal_action_ids"] == [
+        "action-000001"
+    ]
+    assert first_packet["temporal_relation"] == "inside-action-window"
+    assert first_packet["causal_claim"] is False
+    assert "action-000001" in packet_action_label(first_packet)
+    assert "action-000001" in packet_search_text(first_packet)
+
+    assert second_packet["temporal_action_ids"] == []
+    assert second_packet["temporal_relation"] == "none"
+
+
+def test_packet_action_correlation_requires_same_flow_reference() -> None:
+    frame = _ipv4_udp(
+        b"\x0a\x00\x02\x0f",
+        b"\x08\x08\x08\x08",
+        53000,
+        53,
+        _dns_query("api.example.test"),
+    )
+    report = inspect_pcap_flow(
+        io.BytesIO(_pcap(frame)),
+        _flow(),
+    )
+
+    correlated = correlate_packets_with_timeline(
+        report,
+        _timeline_for_flow("flow-other"),
+    )
+
+    assert correlated["timeline_action_window_count"] == 0
+    assert correlated["packet_action_match_count"] == 0
+    assert correlated["packets"][0]["temporal_action_ids"] == []
