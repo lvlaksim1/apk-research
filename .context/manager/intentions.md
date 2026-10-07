@@ -1,8 +1,5 @@
 # Manager intentions and commitments
 
-## Completed — Continuous Screen stabilization and role selection
-Status: completed.
-
 ## Completed — v0.24 Unified Session Evidence
 Status: completed and released.
 
@@ -16,21 +13,25 @@ Status: completed and released.
 Status: completed and released.
 
 ## Completed — v0.28 Direct GitHub Self-Update
-Status: completed and released as v0.28.0.
+Status: completed and released.
 
-Owner directive: add Settings controls to search for a new version and update directly from the latest GitHub release.
+## Completed — v0.29 corrective usability/runtime release
+Status: completed and released as v0.29.0.
 
-Delivered:
-- explicit `Проверить обновления` action;
-- hidden-until-needed `Обновить до <version>` control;
-- latest stable GitHub Release discovery;
-- exact installer/SHA256SUMS asset validation;
-- direct download with local SHA-256 and size verification;
-- detached wait → install-in-place → restart handoff on Windows;
-- update blocking during research/managed operations;
-- unit and GUI smoke coverage.
+Owner directives covered by v0.29:
+- replace the technical placeholder icon with a proper application icon;
+- fix XAPK installation failures caused by ABI mismatch/selection;
+- expose an obvious way to install and run apps in the emulator and open Android home;
+- ensure the installer updates the existing installation rather than uninstalling/reinstalling it.
 
-Completion evidence: PR #19 gates passed; main pipeline #138 passed on exact SHA `df2faf74a707cf99afa366433c34dc89cec37dcc`; GitHub Release v0.28.0 is published.
+Delivered and verified:
+- project-owned Windows icon;
+- ABI-aware XAPK split filtering and clear mismatch diagnostics;
+- explicit install/launch/home controls;
+- explicit in-place installer update contract;
+- full CI, real AVD, Windows desktop/installer, clean-Windows provisioning and release publication.
+
+Completion evidence: PR #20 gates passed; main pipeline #139 passed on exact SHA `81a565dbc3b4c41712b8a6e3c3ba8020060ff5a2`; GitHub Release v0.29.0 is published.
 
 ## Active — continuity and release integrity
 Status: active.

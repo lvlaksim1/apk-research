@@ -1,6 +1,6 @@
 # Latest Handoff
 
-Generation: 18
+Generation: 19
 Date: 2026-10-07
 
 Persistent manager: `apk-research-project-manager`.
@@ -9,26 +9,23 @@ Authority:
 - manager state: `context`;
 - product: `main`.
 
-Verified product baseline is **apk-research v0.28.0** at `df2faf74a707cf99afa366433c34dc89cec37dcc`.
+Verified product baseline is **apk-research v0.29.0** at `81a565dbc3b4c41712b8a6e3c3ba8020060ff5a2`.
 
-Installer: `apk-research-setup_v0.28.0.exe`.
-SHA-256: `9c5444503b6306497ebe5acac87040830d0eefa2fbdb16c06cd521b50f8bd61e`.
-Size: 36,436,053 bytes.
-Release published: 2026-10-07T12:31:51Z.
+Installer: `apk-research-setup_v0.29.0.exe`.
+SHA-256: `a6277849cc9ced994cb439698f84d3376cadf373fa3358d1e0e8e16b69f216c5`.
+Size: 36,475,884 bytes.
+Release published: 2026-10-07T14:02:55Z.
 
-v0.28.0 adds verified direct GitHub self-update:
-- Settings button to check latest stable release;
-- update button appears only for a newer version;
-- exact versioned installer + SHA256SUMS are required;
-- installer downloads directly from GitHub and is locally SHA-256/size verified;
-- detached Windows handoff waits for app exit, silently updates same directory, then restarts;
-- no background polling;
-- update is blocked during active research/managed operations.
+v0.29.0 delivers:
+- new application icon used by window, EXE, installer and shortcuts;
+- ABI-aware XAPK split selection and readable mismatch diagnostics;
+- explicit install/launch/Android-home controls;
+- in-place installer update mode without uninstall-first behavior.
 
-PR #19 and main pipeline #138 passed all mandatory gates, including CI, real XAPK installation, real AVD Research ZIP acceptance, Windows GUI/installer, clean-Windows provisioning and release publication.
+PR #20 and main pipeline #139 passed all mandatory gates, including CI, real XAPK installation, real AVD Research ZIP acceptance, Windows GUI/installer, clean-Windows provisioning and release publication.
 
-Important bootstrap: v0.27.0 and older do not contain the updater, so v0.28.0 must be installed manually once. From v0.28.0 onward this update path is available.
+WHPX remains advisory/non-publication-gating.
 
 Protected evidence/runtime semantics remain unchanged.
 
-No v0.29 or later feature stage is active. Await owner direction.
+No v0.30 or later feature stage is active. Await owner direction.

@@ -2,16 +2,14 @@
 
 ## Product baseline and latest release
 
-The product authority is `main`. The current verified product baseline and latest published release are **apk-research v0.28.0** at `df2faf74a707cf99afa366433c34dc89cec37dcc`.
+The product authority is `main`. The current verified product baseline and latest published release are **apk-research v0.29.0** at `81a565dbc3b4c41712b8a6e3c3ba8020060ff5a2`.
 
-Release asset `apk-research-setup_v0.28.0.exe` has SHA-256 `9c5444503b6306497ebe5acac87040830d0eefa2fbdb16c06cd521b50f8bd61e` and size 36,436,053 bytes. GitHub Release v0.28.0 was published on 2026-10-07 for the exact release SHA after main pipeline #138 passed CI, real AVD Research ZIP acceptance, real XAPK install acceptance, Windows standalone/self-test/GUI/installer checks, clean-Windows managed Android provisioning, checksum verification and release publication.
+Release asset `apk-research-setup_v0.29.0.exe` has SHA-256 `a6277849cc9ced994cb439698f84d3376cadf373fa3358d1e0e8e16b69f216c5` and size 36,475,884 bytes. GitHub Release v0.29.0 was published on 2026-10-07 after main pipeline #139 passed all mandatory release gates for the exact release SHA.
 
-The public `releases/latest` endpoint returns v0.28.0 with the exact versioned installer and `SHA256SUMS.txt`, matching the runtime update-discovery contract.
-
-- source: GitHub main, PR #19, main pipeline #138 and GitHub Release v0.28.0, reconciled 2026-10-07
+- source: GitHub main, PR #20, main pipeline #139 and GitHub Release v0.29.0, reconciled 2026-10-07
 - authority: owner-directive + verified-repository + verified-ci
 
-## Completed roadmap through v0.28
+## Completed roadmap through v0.29
 
 - v0.18.0: Raw / Packet Inspector.
 - v0.19.0: Android sidecar foundation.
@@ -23,15 +21,20 @@ The public `releases/latest` endpoint returns v0.28.0 with the exact versioned i
 - v0.24.0: Unified Session Evidence.
 - v0.25.0: Transport and Protocol Analysis.
 - v0.26.0: Investigator Workspace.
-- v0.27.0: first-class APK/XAPK package intake.
+- v0.27.0: APK/XAPK package intake.
 - v0.28.0: verified direct GitHub self-update.
+- v0.29.0: application icon, ABI-aware XAPK install, explicit emulator app controls, and in-place update mode.
 
-## v0.28 update behavior
+## v0.29 corrective behavior
 
-Update discovery is explicit/user-triggered, not background polling. A newer stable release is offered only when GitHub provides a strict semantic version, the exact `apk-research-setup_v<version>.exe`, and `SHA256SUMS.txt`.
+The desktop UI separates file selection from installation and exposes explicit controls to install into the emulator, launch the installed app, and open the Android home screen.
 
-The downloaded installer is size-checked and SHA-256 checked locally. A detached Windows handoff waits for the running process to exit, installs into the same directory and restarts the executable. Research/managed-operation activity blocks update installation.
+XAPK installation is ABI-aware: emulator ABI properties are read before installation; APK native-code metadata is parsed with aapt2; incompatible ABI splits are excluded; genuinely incompatible packages are rejected with explicit package/emulator ABI diagnostics instead of surfacing raw INSTALL_FAILED_NO_MATCHING_ABIS.
+
+The Windows package now uses a project-owned icon across the Qt window, executable, installer and resulting shortcuts.
+
+Self-update remains SHA-256 verified, but the installer is now explicitly invoked in update mode and reuses the existing installation location/tasks under the same AppId rather than uninstalling first.
 
 ## Protected semantics/runtime
 
-All v0.24-v0.27 evidence and package-intake semantics remain unchanged. Raw PCAP remains authoritative; action/network links remain temporal-only/non-causal; protocol analysis remains captured-packets-only; analyst workspace metadata is not evidence. Hidden Emulator → gRPC/MMAP → AndroidView, v0.10.5 startup sequencing and the accepted dual-source screen model remain protected. Audio Evidence and user-facing Virtual Display remain out of scope. WHPX remains advisory/non-publication-gating.
+Research capture, Research ZIP schemas, RAW PCAP authority, evidence semantics, hidden Emulator → gRPC/MMAP → AndroidView, v0.10.5 startup sequencing and the accepted dual-source screen model are unchanged. Audio Evidence and user-facing Virtual Display remain out of scope. WHPX remains advisory/non-publication-gating.

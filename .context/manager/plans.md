@@ -22,10 +22,11 @@
 - v0.26 — Investigator Workspace — COMPLETE and RELEASED.
 - v0.27 — APK/XAPK Package Intake — COMPLETE and RELEASED.
 - v0.28 — Direct GitHub Self-Update — COMPLETE and RELEASED.
+- v0.29 — Icon + ABI-aware XAPK + explicit emulator controls + in-place updater — COMPLETE and RELEASED.
 
 ## Next planning state
 
-No subsequent feature stage is authorized at this checkpoint. Start future product work from verified v0.28.0 / `df2faf74a707cf99afa366433c34dc89cec37dcc` after a new owner direction.
+No subsequent feature stage is authorized at this checkpoint. Start future product work from verified v0.29.0 / `81a565dbc3b4c41712b8a6e3c3ba8020060ff5a2` after a new owner direction.
 
 ## Explicit exclusions
 
