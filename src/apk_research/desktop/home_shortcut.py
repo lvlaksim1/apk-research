@@ -295,6 +295,14 @@ def ensure_shortcut_in_database(
         )
         connection.commit()
 
+        # Launcher3 keeps this database in WAL mode. Force every
+        # committed page back into the main .db before the caller
+        # copies that file to Android; otherwise the new shortcut may
+        # exist only in a local -wal sidecar and be lost on transfer.
+        connection.execute(
+            "PRAGMA wal_checkpoint(TRUNCATE)"
+        ).fetchone()
+
         check = connection.execute(
             "PRAGMA integrity_check"
         ).fetchone()
