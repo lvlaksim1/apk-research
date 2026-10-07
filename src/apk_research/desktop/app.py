@@ -7,8 +7,8 @@ from PySide6.QtWidgets import QApplication
 from apk_research.desktop.android_runtime import (
     AndroidRuntime,
 )
-from apk_research.desktop.unified_evidence_v024 import (
-    UnifiedEvidenceV024MainWindow,
+from apk_research.desktop.investigator_workspace_v026_window import (
+    InvestigatorWorkspaceV026MainWindow,
 )
 
 
@@ -30,6 +30,6 @@ def main() -> int:
     )
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    window = UnifiedEvidenceV024MainWindow()
+    window = InvestigatorWorkspaceV026MainWindow()
     window.show()
     return app.exec()
