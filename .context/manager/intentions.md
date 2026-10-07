@@ -29,6 +29,16 @@ Consequences:
 - do not merge the old experimental branch as-is;
 - the removed separate Android Home button remains removed unless explicitly requested otherwise.
 
+## Active — decrypted HTTPS traffic display
+Status: active owner requirement.
+
+Required behavior:
+- apk-research must display decrypted HTTPS application traffic, not merely TLS/QUIC metadata;
+- show HTTP request and response details including URL, method/status, headers and body where captured;
+- keep passive RAW PCAP authoritative and separate from active interception evidence;
+- clearly record when interception/proxy/certificate handling may alter application network behavior;
+- treat certificate-pinned/custom-trust applications as a separate capability tier rather than claiming universal decryption prematurely.
+
 ## Active — continuity and release integrity
 Status: active.
 
