@@ -1,6 +1,6 @@
 # Latest Handoff
 
-Generation: 15
+Generation: 16
 Date: 2026-10-07
 
 Persistent manager: `apk-research-project-manager`.
@@ -9,24 +9,34 @@ Authority:
 - manager state: `context`;
 - product: `main`.
 
-Verified product baseline is **apk-research v0.25.0** at `3717210a9db3074569602afc336380fd26598dd7`.
+Verified product baseline is **apk-research v0.26.0** at `cbf6d177e67cd56e980319ab654da2f27a73176a`.
 
-Installer: `apk-research-setup_v0.25.0.exe`.
-SHA-256: `f9a2a92e02b5a1da9f6b8be39d3967a54292d8c04ad20926cba2361f3d560bb7`.
-Size: 36,384,738 bytes.
-Release published: 2026-10-07T02:37:51Z.
+Installer: `apk-research-setup_v0.26.0.exe`.
+SHA-256: `f5ce59d8c51263fd61d425422ee4e3f5a471592c35d1a19f9a1317161e8affb6`.
+Size: 36,409,960 bytes.
+Release published: 2026-10-07T03:32:51Z.
 
-v0.25.0 delivers capture-bounded Transport and Protocol Analysis in Packet Inspector: TCP sequence/ACK/window observations and lifecycle boundaries, DNS, observed TLS hello metadata, QUIC Initial/SNI/ALPN, observable HTTP/HTTP3 indicators and conservative ordered transaction grouping. RAW PCAP remains authoritative, missing data is never synthesized and encrypted bytes are never presented as plaintext.
+Main pipeline #135 executed on the exact release SHA. CI, real AVD Research ZIP acceptance, Windows standalone/self-test/GUI smoke, installer build/install/smoke and clean-Windows Android provisioning passed before publication.
 
-Protected semantics/runtime:
-- raw PCAP authoritative;
+v0.26.0 delivers Investigator Workspace:
+- global investigation search and intersecting filters;
+- stable EV navigation references;
+- bookmarks and named evidence sets outside immutable Research ZIP;
+- reverse navigation to Session Evidence / Timeline / Evidence / Packets / screen;
+- Markdown/JSON report export retaining source-navigation identifiers;
+- no evidence-strength or causal upgrade.
+
+The owner-agreed three-stage roadmap `v0.24 → v0.25 → v0.26` is complete.
+
+Protected semantics:
+- raw PCAP is authoritative;
 - Action ↔ Flow and Packet ↔ Action remain `temporal-only`, `causal_claim=false`;
-- screen links remain time-aligned navigation;
-- process/socket confidence is unchanged by navigation;
-- protocol intelligence is capture-bounded;
-- hidden Emulator → gRPC/MMAP → AndroidView remains live display;
+- screen links are time-aligned navigation, not causality;
+- protocol analysis remains `captured-packets-only`;
+- EV references/bookmarks/sets/reports are analyst navigation/organization metadata, not new evidence;
+- hidden Emulator → gRPC/MMAP → AndroidView remains live display/input;
 - v0.10.5 startup/clean-launch sequencing remains protected;
 - Continuous Screen is stable continuous/timeline evidence; Android screenrecord remains high-resolution evidence;
 - Audio Evidence and user-facing Virtual Display remain out of scope.
 
-Owner has directed execution of the next roadmap stage: **v0.26 Investigator Workspace**. Build it as a workflow/presentation layer over v0.24/v0.25 evidence: behavior overview, global search/filters, bookmarks/evidence sets, reports and reverse navigation to exact source evidence.
+No v0.27 implementation or other new roadmap stage is active. Await the owner's next development direction.

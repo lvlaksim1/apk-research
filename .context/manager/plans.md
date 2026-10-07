@@ -20,19 +20,23 @@
 - v0.23.1 — Sidecar evidence isolation + idle stability — COMPLETE.
 - v0.24 — Unified Session Evidence — COMPLETE and RELEASED.
 - v0.25 — Transport and Protocol Analysis — COMPLETE and RELEASED.
+- v0.26 — Investigator Workspace — COMPLETE and RELEASED.
 
-## Active roadmap stage — v0.26 Investigator Workspace
+The owner-agreed consolidated roadmap `v0.24 → v0.25 → v0.26` is complete.
 
-The owner directed execution. Build the investigation workflow on top of existing evidence, rather than changing capture/runtime foundations:
-- a coherent behavior/session overview assembled from already observed actions, process/socket attribution, network/protocol evidence and screen timing;
-- global search across investigation evidence;
-- filters by time, process, remote endpoint, protocol and action;
-- bookmarks and saved evidence sets with stable references back to existing evidence identifiers;
-- report generation from selected evidence;
-- reverse navigation from each report/evidence-set item back to the exact source view/item where possible;
-- explicit labels for observed fact, established technical relationship, temporal relationship and analyst selection; no causal upgrade.
+## v0.26 delivered model
 
-Implementation should reuse v0.24 Session Evidence/Evidence Explorer and v0.25 Packet Inspector analysis rather than duplicating parsers or capture logic.
+Investigator Workspace is a presentation/workflow layer over existing evidence. It adds global investigation search/filtering, stable EV navigation keys, analyst bookmarks/evidence sets, reverse navigation and report export. It does not create stronger forensic facts or modify the Research ZIP.
+
+## Next planning state
+
+No new product stage is authorized at this checkpoint.
+
+When the owner directs further development:
+- start from verified v0.26.0 / `cbf6d177e67cd56e980319ab654da2f27a73176a`;
+- preserve all current evidence authority and non-causality boundaries;
+- treat any Continuous Screen sole-source replacement as a separate quality/revalidation project;
+- do not add Audio Evidence or user-facing Virtual Display unless the owner explicitly changes scope.
 
 ## Explicit exclusions
 
