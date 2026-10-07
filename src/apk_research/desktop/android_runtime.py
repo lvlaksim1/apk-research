@@ -894,7 +894,9 @@ class AndroidRuntime:
                     "sh",
                     "-c",
                     (
-                        f"cat {staging} > {remote_database} "
+                        f"rm -f {remote_database}-wal "
+                        f"{remote_database}-shm "
+                        f"&& cat {staging} > {remote_database} "
                         f"&& sync && rm -f {staging}"
                     ),
                     timeout=20.0,
