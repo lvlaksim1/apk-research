@@ -1,0 +1,63 @@
+name: Temporary v0.24 doc sync
+
+on:
+  push:
+    branches:
+      - feature/v0.24-unified-evidence
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.24-unified-evidence
+          fetch-depth: 1
+      - name: Prepend v0.24 release documentation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          updates = {
+              "README.md": """# apk-research\n\n## v0.24.0 — Unified Session Evidence\n\nv0.24.0 объединяет существующие Timeline, Evidence Explorer, Packet Inspector, socket/process attribution и экранные источники в одну сквозную систему навигации. Новый раздел `Session Evidence` связывает `screen ↔ action ↔ flow ↔ packet ↔ process/socket ↔ raw` и показывает тип/силу каждой связи.\n\nContinuous Screen после двух реальных owner-side проверок больше не считается экспериментальным по надёжности: он является штатным непрерывным/timeline источником, а Android `screenrecord` остаётся высокодетальным 1080×1920 источником. Привязка Continuous Screen к target UTC выводится из архивируемого device realtime↔elapsed преобразования; это `time-aligned-navigation`, а не доказательство причинности.\n\nRaw PCAP остаётся авторитетным. Action ↔ Flow и Packet ↔ Action остаются `temporal-only` / `causal_claim=false`. Hidden Emulator → gRPC/MMAP → AndroidView и v0.10.5 startup/clean-launch sequencing не меняются. Подробный контракт: `docs/V0.24_UNIFIED_EVIDENCE.md`.\n\n""",
+              "REFACTORING.md": """# Refactoring and Architecture Log\n\n## v0.24.0 — Unified Session Evidence\n\n### Scope\n\nv0.24 is a presentation/navigation layer over existing evidence. It does not replace RAW artifacts or introduce a stronger causal model. The new session graph joins target-time screen locators, archived user actions, canonical normalized flows, raw-PCAP packet locators and existing process/socket attribution.\n\n### Screen-time invariant\n\nContinuous Screen MediaCodec PTS remains device elapsed-time evidence. UTC navigation is derived only when an archived realtime↔elapsed transform exists in canonical `screenrecord` timing; otherwise a legacy boundary anchor is explicitly marked estimated. Screen links are `time-aligned-navigation` with `causal_claim=false`.\n\n### Reverse attribution invariant\n\nThe new Process/Socket reverse index groups flows only by the attribution already present in `network-flows.json`; it preserves UID/PID/inode/confidence/evidence and never upgrades attribution strength.\n\n### Dual-source screen role\n\nOwner-side v0.23.1 idle and rollover tests proved Continuous Screen continuity, including coverage inside a canonical screenrecord rollover gap. v0.24 records it as stable continuous/timeline evidence (`experimental=false`) while retaining Android `screenrecord` as the high-resolution source. Sole-source replacement remains a future quality/revalidation decision.\n\n### Runtime boundary\n\nRaw PCAP remains authoritative; Action ↔ Flow stays `temporal-only`; hidden Emulator → gRPC/MMAP → AndroidView and v0.10.5 startup sequencing remain unchanged.\n\n""",
+              "CHANGELOG.md": """# Changelog\n\n## [0.24.0] - 2026-10-07\n\n### Unified Session Evidence\n\n- Adds the `Session Evidence` chronological cross-navigation view.\n- Connects screen ↔ action ↔ normalized flow ↔ packet ↔ process/socket ↔ raw evidence.\n- Adds Packet → Evidence, Packet → screen, Timeline → screen and Evidence → Session Evidence/screen navigation.\n- Adds a reverse Process/Socket index that exposes all flows carrying the existing attribution without increasing its confidence.\n- Maps Continuous Screen device PTS to target UTC using archived screenrecord realtime↔elapsed timing and labels the result as time-aligned navigation, never causality.\n- Explicitly reports high-resolution screenrecord coverage gaps while retaining Continuous Screen navigation through those gaps.\n- Promotes Continuous Screen metadata to stable continuous/timeline evidence after owner-side idle and rollover validation; Android screenrecord remains the 1080×1920 high-resolution companion source.\n- Preserves RAW PCAP authority, Action ↔ Flow `temporal-only` / `causal_claim=false`, v0.10.5 launch sequencing and the hidden Emulator → gRPC/MMAP runtime.\n\n""",
+          }
+
+          for name, prefix in updates.items():
+              path = Path(name)
+              current = path.read_text(encoding="utf-8")
+              marker = {
+                  "README.md": "## v0.24.0 — Unified Session Evidence",
+                  "REFACTORING.md": "## v0.24.0 — Unified Session Evidence",
+                  "CHANGELOG.md": "## [0.24.0] - 2026-10-07",
+              }[name]
+              if marker in current:
+                  continue
+              first_line, _, remainder = current.partition("\n")
+              expected = prefix.splitlines()[0]
+              if first_line.strip() != expected.strip():
+                  raise SystemExit(f"Unexpected {name} heading: {first_line!r}")
+              prefix_without_heading = prefix.split("\n", 1)[1]
+              path.write_text(
+                  first_line + "\n" + prefix_without_heading + remainder.lstrip("\n"),
+                  encoding="utf-8",
+                  newline="\n",
+              )
+      - name: Commit documentation sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- README.md REFACTORING.md CHANGELOG.md; then
+            echo "Documentation already synchronized"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md REFACTORING.md CHANGELOG.md
+          git commit -m "Docs: add v0.24 release sections"
+          git push origin HEAD:feature/v0.24-unified-evidence
