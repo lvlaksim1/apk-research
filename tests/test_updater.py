@@ -10,7 +10,7 @@ from apk_research.desktop.updater import (
     DownloadedUpdate,
     ReleaseInfo,
     UpdateError,
-    build_windows_update_script,
+    build_installer_arguments,
     check_latest_release,
     download_release,
     is_newer_version,
@@ -210,23 +210,27 @@ def test_download_release_rejects_bad_checksum(
         )
 
 
-def test_windows_update_script_waits_installs_and_restarts(
+def test_installer_arguments_use_direct_update_mode(
     tmp_path: Path,
 ) -> None:
-    installer = tmp_path / "apk-research-setup_v0.28.0.exe"
-    install_dir = tmp_path / "Program Files" / "apk-research"
-    restart = install_dir / "apk-research.exe"
+    install_dir = (
+        tmp_path / "Program Files" / "apk-research"
+    )
+    log_path = tmp_path / "installer.log"
 
-    script = build_windows_update_script(
-        current_pid=4321,
-        installer_path=installer,
+    arguments = build_installer_arguments(
         install_dir=install_dir,
-        restart_exe=restart,
+        log_path=log_path,
     )
 
-    assert "Wait-Process -Id 4321" in script
-    assert "/VERYSILENT" in script
-    assert "/SUPPRESSMSGBOXES" in script
-    assert "/UPDATE=1" in script
-    assert f'/DIR="{install_dir}"' in script
-    assert "Start-Process -FilePath $restart" in script
+    assert "/VERYSILENT" in arguments
+    assert "/SUPPRESSMSGBOXES" in arguments
+    assert "/NORESTART" in arguments
+    assert "/CLOSEAPPLICATIONS" in arguments
+    assert "/UPDATE=1" in arguments
+    assert f"/DIR={install_dir}" in arguments
+    assert f"/LOG={log_path}" in arguments
+    assert not any(
+        "powershell" in value.lower()
+        for value in arguments
+    )
