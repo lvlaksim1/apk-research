@@ -109,11 +109,16 @@ def _default_sidecar_factory(
 
 
 class ContinuousScreenCollector:
-    """Experimental sidecar MediaCodec screen evidence captured beside screenrecord.
+    """Stable sidecar MediaCodec source for continuous/timeline screen evidence.
 
-    The existing chunked screenrecord collector remains canonical. Failure of
-    this experimental collector is preserved in metadata but does not degrade
-    the Research Session.
+    Owner-side idle and chunk-rollover validation proved this stream remains
+    continuous where chunked Android screenrecord may have a rollover gap.
+    Android screenrecord remains the high-resolution screen-evidence source;
+    failure here stays non-degrading so the two sources remain independent.
+
+    The legacy ``failed-experimental`` status string is retained for Research
+    ZIP compatibility with v0.20-v0.23 readers. The metadata role/experimental
+    flags are authoritative for the current product classification.
     """
 
     NAME = "continuous_screen"
@@ -514,11 +519,13 @@ class ContinuousScreenCollector:
 
     def _write_metadata(self) -> None:
         value: dict[str, object] = {
-            "schema_version": "0.1",
+            "schema_version": "0.2",
             "collector": self.NAME,
             "backend": self.BACKEND,
             "canonical": False,
-            "experimental": True,
+            "experimental": False,
+            "evidence_role": "stable-continuous-timeline",
+            "high_resolution_companion": "adb-screenrecord",
             "codec": "h264",
             "requested": {
                 "width": self.width,
@@ -531,7 +538,8 @@ class ContinuousScreenCollector:
                     "on the Android target"
                 ),
                 "clock_domain": (
-                    "device-media-presentation; not converted to UTC"
+                    "device-media-presentation; UTC navigation is derived "
+                    "from archived screenrecord realtime/elapsed timing"
                 ),
                 "agent_start_clock": (
                     "Android SystemClock.elapsedRealtimeNanos"
@@ -570,8 +578,9 @@ class ContinuousScreenCollector:
             "availability_error": self._availability_error,
             "receiver_error": self._receiver_error,
             "evidence_boundary": (
-                "Experimental parallel capture. Chunked Android screenrecord "
-                "remains the canonical required screen evidence."
+                "Stable continuous/timeline screen evidence. Chunked Android "
+                "screenrecord remains the high-resolution companion source; "
+                "neither source replaces the live gRPC/MMAP display path."
             ),
         }
         _write_json_atomic(
