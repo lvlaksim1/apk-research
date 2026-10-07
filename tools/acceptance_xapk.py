@@ -196,6 +196,30 @@ def main() -> int:
             )
 
         try:
+            launcher_probe = _run(
+                [
+                    str(adb),
+                    "-s",
+                    SERIAL,
+                    "shell",
+                    "sh",
+                    "-c",
+                    "echo HOME=$(cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME 2>/dev/null); "
+                    "echo SHORTCUT_HELP_BEGIN; cmd shortcut help 2>&1 | head -80; echo SHORTCUT_HELP_END; "
+                    "echo LAUNCHER_DBS_BEGIN; ls -la /data/user/0/com.android.launcher3/databases 2>&1; echo LAUNCHER_DBS_END; "
+                    "echo FAVORITES_BEGIN; content query --uri content://com.android.launcher3.settings/favorites 2>&1 | head -40; echo FAVORITES_END",
+                ]
+            )
+            print(
+                json.dumps(
+                    {
+                        "event": "launcher_shortcut_probe",
+                        "output": launcher_probe.stdout,
+                    },
+                    ensure_ascii=False,
+                )
+            )
+
             installed = runtime.install_package(xapk, progress)
             if installed != PACKAGE:
                 raise RuntimeError(
