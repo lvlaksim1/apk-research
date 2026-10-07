@@ -1,6 +1,6 @@
 # Latest Handoff
 
-Generation: 12
+Generation: 13
 Date: 2026-10-07
 
 Persistent manager: `apk-research-project-manager`.
@@ -39,7 +39,10 @@ Remaining product-role boundary:
 - Continuous Screen current profile: 540×960 / 2 Mbit/s;
 - canonical screenrecord: 1080×1920.
 
-Manager recommendation: Continuous Screen can leave purely experimental reliability status and become a stable continuous/timeline evidence source, while canonical high-resolution screenrecord remains until either the owner chooses that dual-source role or Sidecar quality is raised/revalidated for sole-source replacement.
+Owner decision accepted on 2026-10-07:
+- Continuous Screen is the stable continuous/timeline screen-evidence source;
+- canonical Android screenrecord remains the high-resolution source;
+- future sole-source replacement is deferred until Sidecar capture quality is raised and revalidated.
 
 Protected baselines:
 - raw PCAP is authoritative;
@@ -48,4 +51,4 @@ Protected baselines:
 - v0.10.5 startup/clean-launch sequencing remains protected;
 - Audio Evidence and user-facing Virtual Display remain out of scope.
 
-No v0.24 implementation is active.
+No v0.24 implementation is active. The screen-evidence question is closed for the current roadmap; next work returns to Stage E.

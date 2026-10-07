@@ -107,3 +107,16 @@ A separate quality boundary remains: Continuous Screen is currently 540×960 at 
 
 - source: owner-provided v0.23.1 Research ZIP `20261006T231833.446176Z-710dfbe4.research.zip`, inspected 2026-10-07
 - authority: owner-evidence + verified-archive-analysis
+
+
+## Continuous Screen accepted product role
+
+The owner accepted the dual-source screen-evidence model on 2026-10-07:
+- Continuous Screen is a stable continuous/timeline source;
+- canonical Android screenrecord remains the high-resolution source;
+- sole-source replacement is deferred until Continuous Screen quality is raised and revalidated.
+
+This is a product-role decision, not a change to the proven gRPC/MMAP live display path.
+
+- source: explicit owner directive 2026-10-07
+- authority: owner-directive

@@ -22,17 +22,18 @@ Owner archives prove:
 - clean H.264 decode/collector shutdown;
 - Sidecar infrastructure isolation from ordinary derived app network evidence.
 
-## Proposed — Continuous Screen product-role decision
+## Completed — Continuous Screen product-role decision
 
-Status: proposed; owner decision required.
+Status: completed by explicit owner decision.
 
-The mechanism is technically validated, but the current Sidecar capture profile is 540×960 / 2 Mbit/s versus canonical screenrecord at 1080×1920. Recommend either:
-- stable continuous/timeline evidence with canonical high-resolution screenrecord retained; or
-- raise Sidecar resolution/quality and revalidate performance/storage before replacing screenrecord as sole canonical screen evidence.
+Accepted dual-source role:
+- Continuous Screen is the stable continuous/timeline screen-evidence source;
+- canonical Android screenrecord remains the high-resolution source;
+- sole-source replacement is deferred until Continuous Screen quality is raised and revalidated.
 
 ## Active — evidence-preserving Stage E continuation
 
-Status: active after the owner resolves the Continuous Screen product role.
+Status: active.
 
 Continue deeper evidence intelligence from the verified v0.23.1 baseline, preserving RAW-first provenance, capture-bounded semantics and explicit confidence boundaries.
 

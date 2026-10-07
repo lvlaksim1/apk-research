@@ -61,10 +61,14 @@ Technical continuity validation is complete.
 
 Hidden Emulator → gRPC/MMAP → AndroidView and v0.10.5 clean-launch sequencing remain unchanged.
 
-Canonical screenrecord remains authoritative for high-resolution screen evidence pending an explicit owner product-role decision. Continuous Screen is technically validated for stability/continuity but currently records 540×960 / 2 Mbit/s versus canonical 1080×1920, so sole-source promotion would reduce spatial detail.
+The owner accepted a dual-source screen-evidence model:
+- Continuous Screen is the stable continuous/timeline source;
+- canonical screenrecord remains the high-resolution source.
+
+Continuous Screen currently records 540×960 / 2 Mbit/s versus canonical 1080×1920, so sole-source replacement remains deferred pending a future quality uplift and revalidation.
 
 ## Development status
 
-v0.23.1 is complete, published and owner-revalidated. No v0.24 implementation is active. The remaining Continuous Screen item is a product-role/quality decision, not another continuity test.
+v0.23.1 is complete, published and owner-revalidated. No v0.24 implementation is active. The Continuous Screen question is closed for the current roadmap. Development may return to Stage E evidence intelligence.
 
 Audio Evidence and Virtual Display remain out of scope.

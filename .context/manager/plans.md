@@ -23,11 +23,11 @@
 
 The technical validation plan is complete. Idle survival, long-session operation and canonical chunk-rollover continuity all passed on owner evidence.
 
-Next action is an owner product-role decision, not another continuity experiment:
-- recommended conservative option: remove the "experimental" reliability classification and use Continuous Screen as the stable continuous/timeline screen source while retaining canonical 1080×1920 screenrecord for high-resolution evidence;
-- replacement option: first raise Sidecar capture from 540×960 / 2 Mbit/s to a forensic-resolution profile and revalidate resource/storage behavior before making it the sole canonical screen source.
+The owner accepted the dual-source product role:
+- Continuous Screen is now the stable continuous/timeline screen source;
+- canonical 1080×1920 screenrecord remains the high-resolution source.
 
-Do not silently trade away screen evidence resolution merely to eliminate chunk rotation.
+No further screen-validation work is required before resuming the Stage E roadmap. Any future attempt to make Continuous Screen the sole canonical source must first raise its capture quality and revalidate resource/storage behavior and forensic detail.
 
 ## Stage E continuation
 

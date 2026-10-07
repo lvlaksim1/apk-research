@@ -49,7 +49,8 @@
     ".context/decisions/DEC-20261005-project-manager-bootstrap.md",
     ".context/decisions/DEC-20261006-scrcpy-derived-scope.md",
     ".context/decisions/DEC-20261006-v018-release-baseline.md",
-    ".context/decisions/DEC-20261006-v022-release-baseline.md"
+    ".context/decisions/DEC-20261006-v022-release-baseline.md",
+    ".context/decisions/DEC-20261007-continuous-screen-dual-source-role.md"
   ],
   "dialogues": [
     ".context/dialogues/20261006-scrcpy-v5-applicability.md",

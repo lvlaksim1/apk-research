@@ -6,20 +6,15 @@ Last reconciled: 2026-10-07.
 
 No known release-blocking product defect is active. v0.23.1 is published and the Sidecar corrective behavior is owner-revalidated.
 
-## Continuous Screen product role
+## Continuous Screen
 
-There is no remaining stability/continuity blocker. Owner-side validation proves:
-- 59.005 s idle/no-frame survival and resume;
-- successful >170 s operation;
-- uninterrupted evidence through canonical screenrecord chunk rotation;
-- clean decode/shutdown;
-- Sidecar infrastructure isolation from ordinary derived network evidence.
+No current blocker remains.
 
-The remaining issue is evidence quality/role, not reliability. Current Continuous Screen capture is 540×960 / 2 Mbit/s; canonical screenrecord is 1080×1920. Replacing canonical screenrecord outright at the current profile would reduce spatial evidence detail by 4× in pixel count.
+The owner accepted the dual-source role:
+- Continuous Screen: stable continuous/timeline screen evidence;
+- canonical screenrecord: high-resolution screen evidence.
 
-An explicit owner decision is required:
-- retain screenrecord as canonical high-resolution evidence and promote Continuous Screen as a stable continuous/timeline source; or
-- raise/revalidate Continuous Screen quality before considering sole canonical replacement.
+A future sole-source replacement would require a separate quality uplift from the current 540×960 / 2 Mbit/s profile and renewed performance/storage/forensic-detail validation, but this is not required for the current roadmap.
 
 ## WHPX
 
