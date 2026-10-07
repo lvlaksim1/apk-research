@@ -37,6 +37,16 @@ On 2026-10-08 the owner explicitly cancelled the previously open requirement to 
 
 That work is no longer active and is not a blocker.
 
+## Active development direction
+
+The owner clarified that the next required product capability is display of decrypted HTTPS traffic inside apk-research.
+
+The target is actual HTTP transaction content where decryption succeeds: URL, method/status, headers and request/response bodies. Existing TLS/QUIC metadata from passive PCAP analysis does not satisfy this requirement.
+
+Passive RAW PCAP remains an independent source of truth. HTTPS interception is an active research technique and its use/effects must be recorded explicitly.
+
+Certificate pinning/custom trust and HTTP/3/QUIC are separate capability tiers and must not be overclaimed.
+
 ## Development status
 
-v0.29.2 is the verified baseline. No broader roadmap stage or additional product feature is currently active.
+v0.29.2 is the verified baseline. HTTPS traffic inspection is the active next product stage.
