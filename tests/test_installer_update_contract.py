@@ -20,8 +20,12 @@ def test_full_and_update_installers_share_identity() -> None:
     assert "apk-research-setup_v{#MyAppVersion}" in full
     assert "apk-research-update_v{#MyAppVersion}" in update
     assert "UsePreviousAppDir=no" in full
-    assert "UsePreviousAppDir=yes" in update
+    assert "UsePreviousAppDir=no" in update
     assert "InitializeSetup(): Boolean" in update
+    assert (
+        "{localappdata}\\Programs\\apk-research\\{#MyAppExeName}"
+        in update
+    )
     assert "Для первой установки используйте полный установщик" in update
 
 
