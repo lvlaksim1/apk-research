@@ -2,14 +2,14 @@
 
 ## Product baseline and latest release
 
-The product authority is `main`. The current verified product baseline and latest published release are **apk-research v0.29.0** at `81a565dbc3b4c41712b8a6e3c3ba8020060ff5a2`.
+The product authority is `main`. The current verified product baseline and latest published release are **apk-research v0.29.1** at `ae4450ba662299c30199742ba4b1d2bbcdb27601`.
 
-Release asset `apk-research-setup_v0.29.0.exe` has SHA-256 `a6277849cc9ced994cb439698f84d3376cadf373fa3358d1e0e8e16b69f216c5` and size 36,475,884 bytes. GitHub Release v0.29.0 was published on 2026-10-07 after main pipeline #139 passed all mandatory release gates for the exact release SHA.
+Release asset `apk-research-setup_v0.29.1.exe` has SHA-256 `f853d8672dd4f0c5e80ed39c4b538d38d25b52ea6be8a1cbee3ba03f3e194e49` and size 36,474,197 bytes. GitHub Release v0.29.1 was published on 2026-10-07 after main pipeline #140 passed all mandatory release gates for the exact release SHA.
 
-- source: GitHub main, PR #20, main pipeline #139 and GitHub Release v0.29.0, reconciled 2026-10-07
+- source: GitHub main, PR #21, main pipeline #140 and GitHub Release v0.29.1, reconciled 2026-10-07
 - authority: owner-directive + verified-repository + verified-ci
 
-## Completed roadmap through v0.29
+## Completed roadmap through v0.29.1
 
 - v0.18.0: Raw / Packet Inspector.
 - v0.19.0: Android sidecar foundation.
@@ -23,17 +23,18 @@ Release asset `apk-research-setup_v0.29.0.exe` has SHA-256 `a6277849cc9ced994cb4
 - v0.26.0: Investigator Workspace.
 - v0.27.0: APK/XAPK package intake.
 - v0.28.0: verified direct GitHub self-update.
-- v0.29.0: application icon, ABI-aware XAPK install, explicit emulator app controls, and in-place update mode.
+- v0.29.0: icon, ABI-aware XAPK install, explicit emulator controls, in-place update mode.
+- v0.29.1: reliable self-update process handoff.
 
-## v0.29 corrective behavior
+## v0.29.1 updater correction
 
-The desktop UI separates file selection from installation and exposes explicit controls to install into the emulator, launch the installed app, and open the Android home screen.
+Owner-side validation showed that v0.28/v0.29 could discover, download and verify a release, announce restart, exit, and then fail silently before installer execution. Root cause was architectural: post-exit work was delegated to a hidden PowerShell relay, so relay failure became invisible after the GUI closed.
 
-XAPK installation is ABI-aware: emulator ABI properties are read before installation; APK native-code metadata is parsed with aapt2; incompatible ABI splits are excluded; genuinely incompatible packages are rejected with explicit package/emulator ABI diagnostics instead of surfacing raw INSTALL_FAILED_NO_MATCHING_ABIS.
+v0.29.1 removes that relay. The verified Inno Setup executable is launched directly before the GUI exits. Inno Setup owns the successful relaunch of apk-research after updating the same installation directory. Persistent handoff and installer logs are written under local application data.
 
-The Windows package now uses a project-owned icon across the Qt window, executable, installer and resulting shortcuts.
+Windows CI now reproduces the owner failure boundary by installing published v0.29.0, invoking the production updater from a short-lived Python process, allowing that process to exit, and then checking no faster than every five seconds that the installed executable reports v0.29.1. This acceptance passed.
 
-Self-update remains SHA-256 verified, but the installer is now explicitly invoked in update mode and reuses the existing installation location/tasks under the same AppId rather than uninstalling first.
+The first release-pipeline AVD attempt had one unrelated Continuous Screen `failed-experimental` result while the session itself completed, ZIP validation passed, XAPK acceptance passed and Packet Inspector passed. The exact AVD job was rerun and passed. Treat the first result as a transient/non-reproduced screen-collector failure, not as evidence of a v0.29.1 updater defect.
 
 ## Protected semantics/runtime
 

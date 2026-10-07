@@ -6,8 +6,9 @@
 2. Work on a dedicated feature/fix branch.
 3. Make the minimum coherent change with explicit boundaries.
 4. Run unit/compile plus relevant real-AVD and Windows verification.
-5. Publish stable releases only through the commit-triggered main pipeline.
-6. Persist verified findings and reseal manager state.
+5. For updater changes, require a real installed-version upgrade acceptance that survives parent-process exit.
+6. Publish stable releases only through the commit-triggered main pipeline.
+7. Persist verified findings and reseal manager state.
 
 ## Completed roadmap
 
@@ -23,10 +24,11 @@
 - v0.27 — APK/XAPK Package Intake — COMPLETE and RELEASED.
 - v0.28 — Direct GitHub Self-Update — COMPLETE and RELEASED.
 - v0.29 — Icon + ABI-aware XAPK + explicit emulator controls + in-place updater — COMPLETE and RELEASED.
+- v0.29.1 — Reliable updater handoff — COMPLETE and RELEASED.
 
 ## Next planning state
 
-No subsequent feature stage is authorized at this checkpoint. Start future product work from verified v0.29.0 / `81a565dbc3b4c41712b8a6e3c3ba8020060ff5a2` after a new owner direction.
+No subsequent feature stage is authorized at this checkpoint. Start future product work from verified v0.29.1 / `ae4450ba662299c30199742ba4b1d2bbcdb27601` after a new owner direction.
 
 ## Explicit exclusions
 

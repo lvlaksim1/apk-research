@@ -16,22 +16,22 @@ Status: completed and released.
 Status: completed and released.
 
 ## Completed — v0.29 corrective usability/runtime release
-Status: completed and released as v0.29.0.
+Status: completed and released.
 
-Owner directives covered by v0.29:
-- replace the technical placeholder icon with a proper application icon;
-- fix XAPK installation failures caused by ABI mismatch/selection;
-- expose an obvious way to install and run apps in the emulator and open Android home;
-- ensure the installer updates the existing installation rather than uninstalling/reinstalling it.
+## Completed — v0.29.1 reliable updater handoff
+Status: completed and released.
 
-Delivered and verified:
-- project-owned Windows icon;
-- ABI-aware XAPK split filtering and clear mismatch diagnostics;
-- explicit install/launch/home controls;
-- explicit in-place installer update contract;
-- full CI, real AVD, Windows desktop/installer, clean-Windows provisioning and release publication.
+Owner-reported defect: update download and verification completed, restart was announced, GUI closed, but installation/restart did not occur.
 
-Completion evidence: PR #20 gates passed; main pipeline #139 passed on exact SHA `81a565dbc3b4c41712b8a6e3c3ba8020060ff5a2`; GitHub Release v0.29.0 is published.
+Delivered:
+- removed hidden PowerShell relay from the updater;
+- directly launches the verified Inno Setup process before GUI exit;
+- lets Inno Setup own the post-update relaunch;
+- persists handoff and installer logs;
+- adds real Windows parent-exit upgrade acceptance from public v0.29.0 to the candidate release;
+- preserves same-AppId in-place update semantics and SHA-256 verification.
+
+Completion evidence: PR #21 gates passed; main pipeline #140 passed on exact SHA `ae4450ba662299c30199742ba4b1d2bbcdb27601`; GitHub Release v0.29.1 is published.
 
 ## Active — continuity and release integrity
 Status: active.

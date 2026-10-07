@@ -4,17 +4,15 @@ Last reconciled: 2026-10-07.
 
 ## Product blockers
 
-No known release-blocking product defect is active. v0.29.0 is published and all mandatory release gates passed on exact SHA `81a565dbc3b4c41712b8a6e3c3ba8020060ff5a2`.
+No known release-blocking product defect is active. v0.29.1 is published and all mandatory release gates passed on exact SHA `ae4450ba662299c30199742ba4b1d2bbcdb27601`.
 
-## XAPK architecture boundary
+## Update bootstrap boundary
 
-ABI-aware selection now prevents known incompatible split APKs from being passed to install-multiple and gives explicit diagnostics when the package has no ABI compatible with the emulator.
+The broken relay exists in already-installed v0.28.0/v0.29.0 binaries. Those binaries cannot be repaired retroactively by a release they fail to launch. A user affected by that defect must manually install v0.29.1 once. From v0.29.1 onward the corrected direct-installer handoff is present.
 
-If a future XAPK uses packaging conventions not represented by aapt2 native-code metadata, treat that as a new compatibility case rather than weakening validation.
+## Continuous Screen
 
-## Update boundary
-
-v0.28.0+ can self-update through Settings. v0.29.0 changes the install path to explicit in-place update mode; the updater still requires the verified installer and SHA256SUMS.
+One release-pipeline attempt reported `failed-experimental` while the session/ZIP and other acceptance layers passed. An exact rerun passed. No reproducible screen-collector regression is currently established.
 
 ## WHPX
 

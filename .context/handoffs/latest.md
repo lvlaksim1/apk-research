@@ -1,6 +1,6 @@
 # Latest Handoff
 
-Generation: 19
+Generation: 20
 Date: 2026-10-07
 
 Persistent manager: `apk-research-project-manager`.
@@ -9,23 +9,22 @@ Authority:
 - manager state: `context`;
 - product: `main`.
 
-Verified product baseline is **apk-research v0.29.0** at `81a565dbc3b4c41712b8a6e3c3ba8020060ff5a2`.
+Verified product baseline is **apk-research v0.29.1** at `ae4450ba662299c30199742ba4b1d2bbcdb27601`.
 
-Installer: `apk-research-setup_v0.29.0.exe`.
-SHA-256: `a6277849cc9ced994cb439698f84d3376cadf373fa3358d1e0e8e16b69f216c5`.
-Size: 36,475,884 bytes.
-Release published: 2026-10-07T14:02:55Z.
+Installer: `apk-research-setup_v0.29.1.exe`.
+SHA-256: `f853d8672dd4f0c5e80ed39c4b538d38d25b52ea6be8a1cbee3ba03f3e194e49`.
+Size: 36,474,197 bytes.
+Release published: 2026-10-07T14:37:24Z.
 
-v0.29.0 delivers:
-- new application icon used by window, EXE, installer and shortcuts;
-- ABI-aware XAPK split selection and readable mismatch diagnostics;
-- explicit install/launch/Android-home controls;
-- in-place installer update mode without uninstall-first behavior.
+v0.29.1 fixes the owner-reported updater failure after GUI exit:
+- hidden PowerShell relay removed;
+- verified installer launched directly;
+- Inno Setup owns successful relaunch;
+- persistent handoff/installer logs added;
+- Windows acceptance proves v0.29.0 → v0.29.1 update survives initiating-process exit.
 
-PR #20 and main pipeline #139 passed all mandatory gates, including CI, real XAPK installation, real AVD Research ZIP acceptance, Windows GUI/installer, clean-Windows provisioning and release publication.
+Main pipeline #140 passed all mandatory gates after one exact AVD rerun. The first AVD attempt had a non-reproduced Continuous Screen failure while the session/ZIP and other layers passed; the rerun passed.
 
-WHPX remains advisory/non-publication-gating.
+Important: installed v0.28.0/v0.29.0 contains the old broken relay, so an affected user must manually install v0.29.1 once. Future updates can then use the corrected mechanism.
 
-Protected evidence/runtime semantics remain unchanged.
-
-No v0.30 or later feature stage is active. Await owner direction.
+No later feature stage is active. Await owner direction.
