@@ -83,7 +83,7 @@ jobs:
           set -euxo pipefail
           mkdir -p "$ANDROID_AVD_HOME"
           AVDMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name avdmanager | sort | tail -n 1)"
-          test -n "$AVDMANAGER"
+          test -n "$AVDMMANAGER" || AVDMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name avdmanager | sort | tail -n 1)"
           echo no | "$AVDMANAGER" create avd --force --name apk_research_api35 --package "system-images;android-35;default;x86_64"
           "$ANDROID_HOME/emulator/emulator" -list-avds
           find "$ANDROID_AVD_HOME" -maxdepth 2 -type f -print
@@ -92,7 +92,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          nohup "$ANDROID_HOME/emulator/emulator"             @apk_research_api35             -port 5554             -no-window             -gpu auto             -grpc 8554             -no-snapshot             -noaudio             -no-boot-anim             -wipe-data             > emulator.log 2>&1 &
+          nohup "$ANDROID_HOME/emulator/emulator" @apk_research_api35 -port 5554 -no-window -gpu auto -grpc 8554 -no-snapshot -noaudio -no-boot-anim -wipe-data > emulator.log 2>&1 &
           echo $! > emulator.pid
 
           sleep 5
@@ -158,6 +158,9 @@ jobs:
       - name: Validate live Emulator gRPC transport after sidecar
         run: python tools/check_emulator_grpc.py --port 8554
 
+      - name: Validate real HTTPS interception
+        run: python tools/acceptance_https.py
+
       - name: Run real XAPK install acceptance
         run: python tools/acceptance_xapk.py
 
@@ -166,9 +169,6 @@ jobs:
 
       - name: Verify generated Research ZIP again
         run: python -m apk_research research-zip-verify acceptance-output/apk-research-acceptance.research.zip --json
-
-      - name: Validate real HTTPS interception
-        run: python tools/acceptance_https.py
 
       - name: Stop emulator
         if: always()
