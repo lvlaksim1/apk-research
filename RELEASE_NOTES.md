@@ -1,41 +1,38 @@
-# apk-research v0.26.0 — Investigator Workspace
+# apk-research v0.27.0 — APK/XAPK Package Intake
 
-v0.26.0 turns the existing Unified Session Evidence and Packet Inspector layers into an investigator workflow while preserving the verified capture/runtime baseline and evidence authority boundaries.
+v0.27.0 adds first-class XAPK input while preserving the verified Android runtime, research capture path and evidence semantics.
 
-## Investigator Workspace
+## APK/XAPK selection
 
-- Adds a dedicated `Investigator` tab over the existing v0.24/v0.25 evidence model.
-- Provides global search and intersecting filters by time, event kind, protocol, process/PID/inode, remote endpoint, action and evidence class.
-- Assigns reproducible `EV-...` navigation references to existing evidence rows; these references are navigation keys, not new evidence.
-- Preserves the original relation type/strength and never upgrades `causal_claim`.
+- The desktop file picker accepts both `.apk` and `.xapk`.
+- Single APK files keep the established `adb install -r -t -g` installation path.
+- XAPK files are treated as ZIP containers and only APK/OBB payloads are materialized.
 
-## Bookmarks and evidence sets
+## XAPK validation and split installation
 
-- Adds bookmarks for interesting evidence rows.
-- Adds named evidence sets for assembling a focused investigation subset.
-- Stores user workspace state in a separate `<research.zip>.investigator.json` file next to the archive.
-- Never opens or rewrites the immutable Research ZIP to store analyst organization state.
-- Prunes stale references when a workspace state no longer resolves against the current evidence model.
+- Every APK part is inspected independently with `aapt2 dump badging`.
+- All APK parts must have the same package name and compatible versionCode.
+- Exactly one base APK without a split name is required.
+- Duplicate split names and mixed-package containers are rejected.
+- Multi-APK XAPK packages are installed atomically with `adb install-multiple -r -t -g`, with the base APK first.
 
-## Reverse navigation
+## OBB payloads
 
-- Investigator rows can navigate back to Session Evidence, Timeline, Evidence Explorer, Packet Inspector and screen context using the existing action/flow/time identifiers.
-- Evidence-set entries retain their exact `EV-...` reference and can return to the corresponding source evidence.
-- Navigation remains presentation-only and does not increase attribution confidence or establish causality.
+- OBB files are copied only after successful APK installation.
+- The destination is derived from the verified package name: `/sdcard/Android/obb/<package>/`.
+- OBB transfer failures stop package preparation rather than silently starting research with incomplete assets.
 
-## Reports
+## Container safety
 
-- Generates a report from the active evidence set.
-- Supports Markdown and JSON export.
-- Every report item retains its EV reference, time, action/flow identifiers, protocols/endpoints/processes, relation type/strength and source-navigation identifiers.
-- Inclusion in a report is explicitly analyst selection, not a new forensic fact.
+- Rejects absolute paths and path traversal entries.
+- Rejects encrypted ZIP members.
+- Applies bounded APK/OBB counts and extracted-size limits.
+- Rejects damaged/non-ZIP XAPK input.
+- Temporary extraction is removed after installation or failure.
 
-## Evidence boundaries
+## Compatibility
 
-- Raw `01_raw/network/traffic.pcap` remains authoritative network evidence.
-- Action ↔ Flow and Packet ↔ Action remain temporal-only with `causal_claim=false`.
-- Screen navigation remains time-aligned and non-causal.
-- v0.25 protocol analysis remains `captured-packets-only`.
-- Missing packets/events/plaintext/causality are never synthesized.
-- Hidden Emulator → gRPC/MMAP → AndroidView, v0.10.5 startup/clean-launch sequencing and the accepted dual-source screen model remain unchanged.
-- Audio Evidence and user-facing Virtual Display remain out of scope.
+- Hidden Emulator → gRPC/MMAP → AndroidView is unchanged.
+- v0.10.5 startup/clean-launch sequencing is unchanged.
+- Research ZIP schemas, RAW PCAP authority, evidence attribution and non-causality boundaries are unchanged.
+- The accepted dual-source screen model is unchanged.
