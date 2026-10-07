@@ -231,6 +231,7 @@ def download_release(
     root = Path(
         tempfile.mkdtemp(prefix="apk-research-update-")
     )
+    root.mkdir(parents=True, exist_ok=True)
     partial = root / (release.installer_name + ".part")
     final = root / release.installer_name
     hasher = hashlib.sha256()
