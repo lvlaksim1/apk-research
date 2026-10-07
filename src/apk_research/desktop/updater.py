@@ -312,6 +312,7 @@ def build_windows_update_script(
         "/SUPPRESSMSGBOXES",
         "/NORESTART",
         "/SP-",
+        "/UPDATE=1",
         f'/DIR="{install_dir}"',
     ]
     ps_args = ",".join(_ps_quote(value) for value in arguments)
