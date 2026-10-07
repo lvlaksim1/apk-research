@@ -1,6 +1,6 @@
 # Current Project State
 
-Last reconciled: 2026-10-07.
+Last reconciled: 2026-10-08.
 
 ## Product
 
@@ -10,10 +10,11 @@ Last reconciled: 2026-10-07.
 - Update installer: `apk-research-update_v0.29.2.exe`.
 - Setup SHA-256: `6acc5b72337faa92cfd930ed88151445fb218eb580b54eb4e5f65112b457c1f0`.
 - Update SHA-256: `812382bbf61613f296e011c4fead9d5ede00bab9fb44679c76a6b27a542d4821`.
+- Latest release target verified live on 2026-10-08: exact main SHA above.
 
 ## v0.29.2
 
-The Windows packaging/update path now matches MailRu Desktop structurally: distinct Setup and Update installers, direct Windows-shell launch of Update, same AppId, fixed per-user install directory, and Inno-owned shortcut recreation.
+The Windows packaging/update path matches MailRu Desktop structurally: distinct Setup and Update installers, direct Windows-shell launch of Update, same AppId, fixed per-user install directory, and Inno-owned Windows shortcut recreation.
 
 SHA-256 verification remains mandatory and validates both published installers.
 
@@ -21,7 +22,7 @@ The explicit Android Home button is removed.
 
 ## Verification
 
-PR #24 and main pipeline #141 passed:
+PR #24 is merged at the exact baseline SHA and main pipeline #141 passed:
 - full CI;
 - real AVD acceptance;
 - Windows standalone and GUI smoke;
@@ -30,6 +31,12 @@ PR #24 and main pipeline #141 passed:
 - clean-Windows Android provisioning;
 - GitHub Release publication.
 
+## Open Android UX requirement
+
+Owner still requires the installed APK/XAPK application to appear as a launch shortcut on the managed Android home screen after installation.
+
+That behavior is not part of v0.29.2. Prior Launcher3 provider/database experiments were intentionally not merged because real-AVD post-reload verification was not reliable.
+
 ## Development status
 
-v0.29.2 is the verified baseline. No later feature stage is active.
+v0.29.2 is the verified baseline. The next bounded task is the Android home-screen shortcut feature only; no broader roadmap stage is active.

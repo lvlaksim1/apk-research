@@ -58,7 +58,8 @@
   "dialogues": [
     ".context/dialogues/20261006-scrcpy-v5-applicability.md",
     ".context/dialogues/20261006-v023-owner-archive-acceptance.md",
-    ".context/dialogues/20261007-v0231-long-screen-acceptance.md"
+    ".context/dialogues/20261007-v0231-long-screen-acceptance.md",
+    ".context/dialogues/20261008-v0292-chat-transition.md"
   ],
   "history": [],
   "runtime": {
@@ -107,7 +108,7 @@
     "external_gate_reconciliation_required": true,
     "manager_state_coherence_required": true
   },
-  "updated_at": "2026-10-07",
+  "updated_at": "2026-10-08",
   "context_version": "2.0.0-dev",
   "context_capsule_version": "1.3.1",
   "project_manager_version": "2.0.0-dev"

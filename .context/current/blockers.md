@@ -1,16 +1,28 @@
 # Current Blockers and Unknowns
 
-Last reconciled: 2026-10-07.
+Last reconciled: 2026-10-08.
 
 ## Release blockers
 
-None known. v0.29.2 is published and all mandatory gates passed.
+None for the published v0.29.2 baseline.
 
-## Android home-screen shortcut
+## Android home-screen shortcut — open
 
-The prior experimental attempt to programmatically pin an installed Android application to Launcher3's workspace is not part of v0.29.2 and was not merged. MailRu Desktop's shortcut mechanism is a Windows Inno Setup shortcut mechanism and does not solve Android Launcher3 pinning.
+Owner requirement: successful APK/XAPK installation should leave a visible launch shortcut on the managed Android home screen, with no separate Home button.
 
-If the owner still requires forced Android-home placement, treat that as a separate product feature with its own validated mechanism rather than mixing it into Windows installer work.
+What has been learned:
+- MailRu Desktop shortcut handling is a Windows/Inno mechanism and does not provide an Android analogue.
+- Managed Android 15 uses Launcher3.
+- Legacy `INSTALL_SHORTCUT` broadcast is not a valid modern solution.
+- Direct LauncherProvider insertion returned success-like behavior but the shortcut was not reliably present after Launcher3 reconciliation.
+- Direct Launcher3 SQLite manipulation exposed WAL/cache/reload ordering issues; experimental versions were not sufficiently reliable and were not merged.
+- Some early synthetic XAPK acceptance packages were not representative launchable apps; later acceptance work moved toward a real MainActivity/DEX package.
+
+Do not treat a successful provider/database write alone as acceptance. The gate must prove a stable, visible, launchable shortcut after Launcher3 has settled.
+
+## Experimental branch
+
+The prior Launcher3 experiment branch is research history only. It must not be merged into main as-is. Future work should start from the verified v0.29.2 baseline and reuse only individually proven findings.
 
 ## WHPX
 
