@@ -1,5 +1,35 @@
 # Refactoring and Architecture Log
 
+## v0.27.0 — APK/XAPK Package Intake
+
+### Scope boundary
+
+v0.27 changes only application-package intake before a research session begins. It adds XAPK handling while preserving the verified Android runtime, collectors, Research ZIP schemas and evidence semantics.
+
+### Package-identity invariant
+
+XAPK is treated as an untrusted ZIP container. Package identity is not taken from vendor metadata. Every APK member is inspected with `aapt2 dump badging`; installation requires one package name, compatible versionCode values, exactly one base APK without a split name and no duplicate split names.
+
+### Split-install invariant
+
+A single APK keeps the established `adb install -r -t -g` path. A validated multi-APK XAPK is installed in one `adb install-multiple -r -t -g` transaction with the base APK first. apk-research never guesses a base from filenames and never mixes APK parts from different packages.
+
+### OBB invariant
+
+OBB data is copied only after successful APK installation to `/sdcard/Android/obb/<verified package>/`. The target directory is derived from the package identity proven by aapt2, not from an XAPK manifest or archive path.
+
+### Container-safety invariant
+
+Absolute paths, `..` traversal, encrypted ZIP members, damaged containers, excessive member counts and excessive extracted APK/OBB size are rejected. Temporary extraction is deleted after success or failure.
+
+### Acceptance boundary
+
+Unit tests cover base/split validation, mixed-package rejection, path traversal, `install-multiple`, OBB copy and single-APK regression. Real AVD acceptance builds and signs a synthetic APK, packages it into XAPK with OBB, installs it through the same `AndroidRuntime.install_package()` path, verifies package/OBB on-device, removes it, and then runs the normal Research ZIP acceptance.
+
+### Compatibility boundary
+
+Hidden Emulator → gRPC/MMAP → AndroidView, v0.10.5 startup/clean-launch sequencing, RAW PCAP authority, attribution/non-causality boundaries and the dual-source screen model are unchanged.
+
 ## v0.26.0 — Investigator Workspace
 
 ### Scope boundary
