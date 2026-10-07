@@ -322,3 +322,21 @@ def ensure_shortcut_in_database(
         return "created"
     finally:
         connection.close()
+
+
+def database_has_package_shortcut(
+    database: Path,
+    package_name: str,
+) -> bool:
+    connection = sqlite3.connect(
+        f"file:{database}?mode=ro",
+        uri=True,
+    )
+    try:
+        favorites = _database_favorites(connection)
+        return has_package_shortcut(
+            favorites,
+            package_name,
+        )
+    finally:
+        connection.close()
