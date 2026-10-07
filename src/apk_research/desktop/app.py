@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from apk_research.desktop.android_runtime import (
@@ -10,6 +12,28 @@ from apk_research.desktop.android_runtime import (
 from apk_research.desktop.investigator_workspace_v026_window import (
     InvestigatorWorkspaceV026MainWindow,
 )
+
+
+def _application_icon() -> QIcon:
+    candidates: list[Path] = []
+    bundle_root = getattr(sys, "_MEIPASS", None)
+    if bundle_root:
+        candidates.append(
+            Path(bundle_root)
+            / "apk_research"
+            / "resources"
+            / "apk-research-icon.png"
+        )
+    candidates.append(
+        Path(__file__).resolve().parents[3]
+        / "build"
+        / "app-icon"
+        / "apk-research-icon.png"
+    )
+    for path in candidates:
+        if path.is_file():
+            return QIcon(str(path))
+    return QIcon()
 
 
 def main() -> int:
@@ -30,6 +54,11 @@ def main() -> int:
     )
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+    icon = _application_icon()
+    if not icon.isNull():
+        app.setWindowIcon(icon)
     window = InvestigatorWorkspaceV026MainWindow()
+    if not icon.isNull():
+        window.setWindowIcon(icon)
     window.show()
     return app.exec()
