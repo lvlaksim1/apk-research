@@ -1,5 +1,32 @@
 # Refactoring and Architecture Log
 
+## v0.29.2 — Managed Launcher shortcut after install
+
+### UI boundary
+
+The explicit Android-home button is removed. There is no user-facing Home action in apk-research.
+
+### Shortcut invariant
+
+After successful package installation, apk-research:
+1. resolves the package MAIN/LAUNCHER activity;
+2. resolves the managed HOME launcher;
+3. requires the managed `com.android.launcher3` environment;
+4. reads current Launcher3 favorites through `content://com.android.launcher3.settings/favorites`;
+5. avoids creating a duplicate if the package already has a workspace entry;
+6. selects a free workspace cell from the active Launcher3 grid;
+7. inserts an application item with a normal MAIN/LAUNCHER intent;
+8. re-queries the provider and requires the package entry to exist;
+9. reloads Launcher3 and returns to the home screen.
+
+### Safety boundary
+
+This is a managed-emulator feature. apk-research does not patch unknown launcher databases and does not simulate drag gestures. If the target package has no launcher activity or the managed launcher contract is unavailable, installation surfaces an explicit error instead of pretending the shortcut exists.
+
+### Compatibility boundary
+
+Package ABI validation, OBB handling, direct GitHub updater, capture runtime, Research ZIP and evidence semantics are unchanged.
+
 ## v0.29.1 — Reliable update process handoff
 
 ### Direct-installer invariant

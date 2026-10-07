@@ -1,5 +1,13 @@
 # apk-research
 
+## v0.29.2 — Automatic Home Shortcut
+
+v0.29.2 removes the redundant «Открыть главный экран Android» control and makes installation itself complete the expected emulator workflow.
+
+After a successful APK/XAPK install, apk-research resolves the package launcher activity, writes a non-duplicating application shortcut into the managed Launcher3 workspace, verifies the record, reloads Launcher3 and returns to the Android home screen so the installed application is immediately visible.
+
+The implementation is restricted to the managed Android Emulator/Launcher3 environment owned by apk-research. It does not emulate drag gestures and does not modify arbitrary third-party launchers.
+
 ## v0.29.1 — Reliable Self-Update Handoff
 
 v0.29.1 исправляет сбой автоматического обновления, при котором apk-research успешно находил и скачивал новый релиз, сообщал о перезапуске, закрывался, но установщик больше не запускался.

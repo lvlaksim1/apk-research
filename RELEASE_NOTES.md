@@ -1,29 +1,30 @@
-# apk-research v0.29.1 — Reliable Self-Update Handoff
+# apk-research v0.29.2 — Automatic Home Shortcut
 
-v0.29.1 fixes the automatic-update failure where the application downloaded and verified a new release, announced restart, closed, and then nothing else happened.
+v0.29.2 completes the emulator installation workflow requested by the owner.
 
-## Update handoff
+## Simplified controls
 
-- Removes the hidden PowerShell relay entirely.
-- Launches the already verified Inno Setup package directly.
-- Closes apk-research only after the installer process has been created successfully.
-- Lets Inno Setup relaunch the installed application after a successful update.
-- Keeps the same installation directory and same AppId; no uninstall-first step is introduced.
+- Removes «Открыть главный экран Android».
+- Keeps «Установить в эмулятор».
+- Keeps «Запустить приложение».
 
-## Diagnostics
+## Home shortcut after install
 
-- Writes a handoff log before closing.
-- Passes a persistent installer log path to Inno Setup.
-- A future installation failure therefore leaves useful evidence even if apk-research is no longer running.
+After a successful APK/XAPK install, apk-research automatically:
+- resolves the installed package launcher activity;
+- adds a non-duplicate shortcut to a free Launcher3 home-screen cell;
+- verifies the shortcut record;
+- reloads the managed launcher and shows the Android home screen.
 
-## Windows acceptance
+The shortcut uses the application label reported by `aapt2` and launches the package's standard MAIN/LAUNCHER activity.
 
-The build now performs an end-to-end upgrade test:
-1. install published v0.29.0;
-2. verify the installed version;
-3. invoke the candidate updater through production Python code;
-4. allow that initiating process to exit;
-5. wait in five-second intervals;
-6. verify that the installed application becomes v0.29.1.
+## Verification
 
-All previous CI, real AVD, XAPK, Windows GUI/installer and clean-Windows checks remain required.
+The real Android AVD acceptance uses a synthetic launchable XAPK and requires the installed package to appear in the Launcher3 favorites model after installation.
+
+## Compatibility
+
+- ABI-aware XAPK handling is unchanged.
+- OBB deployment is unchanged.
+- v0.29.1 self-update handoff is unchanged.
+- Research capture and all evidence semantics are unchanged.

@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.29.2] - 2026-10-07
+
+### Changed
+- Removed the «Открыть главный экран Android» button and its controller action.
+- APK/XAPK installation now creates a launch shortcut directly on the managed Android home screen.
+
+### Added
+- Launcher3 workspace discovery through the managed launcher content provider.
+- Free-cell selection with duplicate prevention for installed package shortcuts.
+- Application label extraction from `aapt2 dump badging`.
+- Real AVD acceptance that requires the installed XAPK package to have a launcher shortcut after installation.
+
+### Unchanged
+- ABI-aware XAPK selection, updater behavior, research collectors and forensic evidence semantics.
+
 ## [0.29.1] - 2026-10-07
 
 ### Fixed
