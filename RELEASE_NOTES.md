@@ -1,39 +1,41 @@
-# apk-research v0.25.0 — Transport and Protocol Analysis
+# apk-research v0.26.0 — Investigator Workspace
 
-v0.25.0 extends Packet Inspector with capture-bounded transport and protocol analysis while preserving the v0.24 unified evidence model and the raw-PCAP authority boundary.
+v0.26.0 turns the existing Unified Session Evidence and Packet Inspector layers into an investigator workflow while preserving the verified capture/runtime baseline and evidence authority boundaries.
 
-## TCP capture evidence
+## Investigator Workspace
 
-- Reports whether a plain SYN and FIN/RST are actually present in the selected capture.
-- Adds per-direction observations for sequence ranges, ACK values and advertised windows.
-- Flags repeated and overlapping observed sequence ranges, observed sequence gaps, repeated ACK values and zero-window packets.
-- Explicitly distinguishes observation from inference: a gap is not automatically packet loss, a repeated range is not automatically a network retransmission, and missing start/end markers mean only “not observed in this capture”.
+- Adds a dedicated `Investigator` tab over the existing v0.24/v0.25 evidence model.
+- Provides global search and intersecting filters by time, event kind, protocol, process/PID/inode, remote endpoint, action and evidence class.
+- Assigns reproducible `EV-...` navigation references to existing evidence rows; these references are navigation keys, not new evidence.
+- Preserves the original relation type/strength and never upgrades `causal_claim`.
 
-## DNS, TLS and QUIC
+## Bookmarks and evidence sets
 
-- Decodes complete DNS questions and supported resource records directly from captured bytes.
-- Groups a DNS query/response transaction only when one selected flow contains one unambiguous query and one response with the same transaction identifier.
-- Parses observed TLS ClientHello/ServerHello metadata, including SNI, ALPN, supported/selected version and selected cipher suite when the bytes are available.
-- Performs bounded contiguous TCP-payload reconstruction so a TLS hello split across captured segments can be recognized when no observed sequence gap intervenes.
-- Aggregates the existing QUIC v1/v2 Initial evidence, SNI and ALPN; HTTP/3 is reported only when `h3` is actually observed in ALPN.
+- Adds bookmarks for interesting evidence rows.
+- Adds named evidence sets for assembling a focused investigation subset.
+- Stores user workspace state in a separate `<research.zip>.investigator.json` file next to the archive.
+- Never opens or rewrites the immutable Research ZIP to store analyst organization state.
+- Prunes stale references when a workspace state no longer resolves against the current evidence model.
 
-## Observable HTTP
+## Reverse navigation
 
-- Recognizes complete cleartext HTTP/1.0 and HTTP/1.1 request/response headers and the cleartext HTTP/2 connection preface.
-- Forms a request/response transaction only for one unambiguous complete request and one complete response in opposite directions.
-- Encrypted application bytes are never represented as plaintext.
+- Investigator rows can navigate back to Session Evidence, Timeline, Evidence Explorer, Packet Inspector and screen context using the existing action/flow/time identifiers.
+- Evidence-set entries retain their exact `EV-...` reference and can return to the corresponding source evidence.
+- Navigation remains presentation-only and does not increase attribution confidence or establish causality.
 
-## Packet Inspector integration
+## Reports
 
-- Each inspected flow now contains a structured `protocol_analysis` report with `evidence_basis=captured-packets-only` and `causal_claim=false`.
-- The Packets view includes a dedicated v0.25 analysis pane and richer per-packet protocol evidence.
-- Search covers observed HTTP/TLS/ACK/sequence evidence in addition to the existing DNS/SNI/QUIC fields.
+- Generates a report from the active evidence set.
+- Supports Markdown and JSON export.
+- Every report item retains its EV reference, time, action/flow identifiers, protocols/endpoints/processes, relation type/strength and source-navigation identifiers.
+- Inclusion in a report is explicitly analyst selection, not a new forensic fact.
 
 ## Evidence boundaries
 
 - Raw `01_raw/network/traffic.pcap` remains authoritative network evidence.
-- Packet/action links remain temporal-only and never claim causality.
-- Absence from the analysis means only “not observed in the selected capture”.
-- Missing packets, missing protocol messages, plaintext and causality are never synthesized.
-- v0.10.5 startup/clean-launch sequencing and the hidden Emulator → gRPC/MMAP → AndroidView live display path remain unchanged.
+- Action ↔ Flow and Packet ↔ Action remain temporal-only with `causal_claim=false`.
+- Screen navigation remains time-aligned and non-causal.
+- v0.25 protocol analysis remains `captured-packets-only`.
+- Missing packets/events/plaintext/causality are never synthesized.
+- Hidden Emulator → gRPC/MMAP → AndroidView, v0.10.5 startup/clean-launch sequencing and the accepted dual-source screen model remain unchanged.
 - Audio Evidence and user-facing Virtual Display remain out of scope.
