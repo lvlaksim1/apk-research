@@ -1,0 +1,154 @@
+name: Temporary v0.25 integration
+
+on:
+  push:
+    branches:
+      - feature/v0.25-transport-protocol-analysis
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.25-transport-protocol-analysis
+          fetch-depth: 1
+
+      - name: Integrate v0.25 analyzer
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              if old not in text:
+                  raise SystemExit(f"patch target not found: {label}")
+              return text.replace(old, new, 1)
+
+          protocol_path = Path("src/apk_research/desktop/protocol_analysis_v025.py")
+          text = protocol_path.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              '        label = data[cursor : cursor + length].decode(\n            "idna",\n            errors="replace",\n        )',
+              '        label = data[cursor : cursor + length].decode(\n            "ascii",\n            errors="replace",\n        )',
+              "DNS label codec",
+          )
+          protocol_path.write_text(text, encoding="utf-8", newline="\n")
+
+          inspector_path = Path("src/apk_research/desktop/packet_inspector.py")
+          text = inspector_path.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              'from apk_research.quic import QuicFlowInspector\n',
+              'from apk_research.quic import QuicFlowInspector\nfrom apk_research.desktop.protocol_analysis_v025 import (\n    FlowProtocolAnalyzer,\n    format_packet_protocol_evidence,\n    protocol_packet_label,\n)\n',
+              "packet inspector import",
+          )
+          text = replace_once(
+              text,
+              '    quic = QuicFlowInspector() if target_key[0] == "udp" else None\n',
+              '    quic = QuicFlowInspector() if target_key[0] == "udp" else None\n    protocol_analyzer = FlowProtocolAnalyzer(target_key[0])\n',
+              "flow analyzer init",
+          )
+          text = replace_once(
+              text,
+              '        direction = _packet_direction(packet, flow)\n        epoch = seconds + fraction / scale\n        metadata = _packet_metadata(decoded, direction, quic)\n',
+              '        direction = _packet_direction(packet, flow)\n        epoch = seconds + fraction / scale\n        transport_payload = decoded.get("payload")\n        if not isinstance(transport_payload, bytes):\n            transport_payload = b""\n        metadata = _packet_metadata(decoded, direction, quic)\n',
+              "captured transport payload",
+          )
+          text = replace_once(
+              text,
+              '        selected.append(\n            {\n                "packet_id": f"packet-{packet_index:06d}",',
+              '        packet_record = {\n                "packet_id": f"packet-{packet_index:06d}",',
+              "packet record start",
+          )
+          text = replace_once(
+              text,
+              '                **metadata,\n                **transport_metadata,\n            }\n        )\n\n    transport_session = build_transport_session(\n',
+              '                **metadata,\n                **transport_metadata,\n        }\n        protocol_analyzer.observe(packet_record, transport_payload)\n        selected.append(packet_record)\n\n    protocol_analysis = protocol_analyzer.finalize(selected)\n    transport_session = build_transport_session(\n',
+              "packet analyzer observation",
+          )
+          text = replace_once(
+              text,
+              '        "transport_session": transport_session,\n        "selected_packet_count": len(selected),',
+              '        "transport_session": transport_session,\n        "protocol_analysis": protocol_analysis,\n        "selected_packet_count": len(selected),',
+              "flow protocol report",
+          )
+          text = replace_once(
+              text,
+              '    return " ".join(values).lower()\n\n\ndef packet_action_label',
+              '    protocol_label = protocol_packet_label(packet)\n    if protocol_label:\n        values.append(protocol_label)\n    return " ".join(values).lower()\n\n\ndef packet_action_label',
+              "packet search protocol label",
+          )
+          text = replace_once(
+              text,
+              '    if alpn:\n        parts.append("ALPN:" + ",".join(alpn))\n    return " • ".join(parts)\n',
+              '    if alpn:\n        parts.append("ALPN:" + ",".join(alpn))\n    extended = protocol_packet_label(packet)\n    if extended:\n        parts.append(extended)\n    return " • ".join(parts)\n',
+              "packet metadata protocol label",
+          )
+          text = replace_once(
+              text,
+              '    if packet.get("hex_preview_truncated"):\n',
+              '    protocol_lines = format_packet_protocol_evidence(packet)\n    if packet.get("hex_preview_truncated"):\n',
+              "packet detail protocol lines",
+          )
+          text = replace_once(
+              text,
+              '            *transport_lines,\n            "",\n            "Timeline relation:",',
+              '            *transport_lines,\n            "",\n            "v0.25 protocol observations:",\n            *(protocol_lines or ["  no additional structured protocol evidence in this packet"]),\n            "",\n            "Timeline relation:",',
+              "packet detail protocol section",
+          )
+          inspector_path.write_text(text, encoding="utf-8", newline="\n")
+
+          window_path = Path("src/apk_research/desktop/packet_window.py")
+          text = window_path.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              'from apk_research.desktop.packet_inspector import (\n',
+              'from apk_research.desktop.protocol_analysis_v025 import (\n    format_protocol_analysis,\n)\nfrom apk_research.desktop.packet_inspector import (\n',
+              "packet window protocol formatter import",
+          )
+          text = replace_once(
+              text,
+              '            "packet / time / IP / port / action / DNS / SNI / QUIC / HTTP3"\n',
+              '            "packet / time / IP / port / action / DNS / TLS / QUIC / HTTP3 / HTTP / ACK / sequence"\n',
+              "packet search placeholder",
+          )
+          text = replace_once(
+              text,
+              '        self.packet_summary.setWordWrap(True)\n        layout.addWidget(self.packet_summary)\n\n        self.packet_table = QTableWidget()\n',
+              '        self.packet_summary.setWordWrap(True)\n        layout.addWidget(self.packet_summary)\n\n        self.protocol_analysis = QPlainTextEdit()\n        self.protocol_analysis.setReadOnly(True)\n        self.protocol_analysis.setMaximumHeight(220)\n        self.protocol_analysis.setPlaceholderText(\n            "v0.25: выберите поток для анализа транспорта и протоколов."\n        )\n        layout.addWidget(self.protocol_analysis)\n\n        self.packet_table = QTableWidget()\n',
+              "protocol analysis pane",
+          )
+          text = replace_once(
+              text,
+              '            "Transport-session статус описывает только наблюдённые TCP flags: отсутствие события "\n            "в capture не доказывает, что его не было."\n',
+              '            "v0.25 анализирует только захваченные байты: разрывы sequence, повторы ACK и диапазонов "\n            "остаются наблюдениями захвата, а не доказанной потерей/повторной передачей. "\n            "Зашифрованные прикладные данные не выдаются за открытый текст."\n',
+              "v0.25 evidence note",
+          )
+          text = replace_once(
+              text,
+              '    def _on_packet_ready(self, report: dict) -> None:\n        self._packet_report = report\n        packets = [\n',
+              '    def _on_packet_ready(self, report: dict) -> None:\n        self._packet_report = report\n        self.protocol_analysis.setPlainText(\n            format_protocol_analysis(report.get("protocol_analysis"))\n        )\n        packets = [\n',
+              "protocol analysis presentation",
+          )
+          window_path.write_text(text, encoding="utf-8", newline="\n")
+
+      - name: Compile source and tests
+        run: python -m compileall -q src tests
+
+      - name: Run v0.25 focused tests
+        run: python -m pytest -q tests/test_protocol_analysis_v025.py
+
+      - name: Commit verified integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/apk_research/desktop/protocol_analysis_v025.py src/apk_research/desktop/packet_inspector.py src/apk_research/desktop/packet_window.py
+          git diff --cached --quiet && exit 0
+          git commit -m "v0.25: integrate transport and protocol analysis"
+          git push origin HEAD:feature/v0.25-transport-protocol-analysis
