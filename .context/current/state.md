@@ -31,12 +31,12 @@ PR #24 is merged at the exact baseline SHA and main pipeline #141 passed:
 - clean-Windows Android provisioning;
 - GitHub Release publication.
 
-## Open Android UX requirement
+## Owner cancellation
 
-Owner still requires the installed APK/XAPK application to appear as a launch shortcut on the managed Android home screen after installation.
+On 2026-10-08 the owner explicitly cancelled the previously open requirement to place installed APK/XAPK applications as shortcuts on the managed Android home screen.
 
-That behavior is not part of v0.29.2. Prior Launcher3 provider/database experiments were intentionally not merged because real-AVD post-reload verification was not reliable.
+That work is no longer active and is not a blocker.
 
 ## Development status
 
-v0.29.2 is the verified baseline. The next bounded task is the Android home-screen shortcut feature only; no broader roadmap stage is active.
+v0.29.2 is the verified baseline. No broader roadmap stage or additional product feature is currently active.
