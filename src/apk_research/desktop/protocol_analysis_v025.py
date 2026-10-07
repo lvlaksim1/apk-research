@@ -846,6 +846,7 @@ class FlowProtocolAnalyzer:
     @staticmethod
     def _dns_transactions(packets: list[dict[str, Any]]) -> list[dict[str, Any]]:
         groups: dict[int, list[dict[str, Any]]] = defaultdict(list)
+        positions = {id(packet): index for index, packet in enumerate(packets)}
         for packet in packets:
             dns = packet.get("dns_message")
             if isinstance(dns, dict):
@@ -854,7 +855,12 @@ class FlowProtocolAnalyzer:
         for message_id, items in groups.items():
             queries = [item for item in items if item["dns_message"].get("kind") == "query"]
             responses = [item for item in items if item["dns_message"].get("kind") == "response"]
-            if len(queries) == 1 and len(responses) == 1:
+            ordered_pair = (
+                len(queries) == 1
+                and len(responses) == 1
+                and positions[id(queries[0])] < positions[id(responses[0])]
+            )
+            if ordered_pair:
                 query = queries[0]
                 response = responses[0]
                 questions = query["dns_message"].get("questions") or []
@@ -870,7 +876,7 @@ class FlowProtocolAnalyzer:
                             else ""
                         ),
                         "confidence": "HIGH",
-                        "basis": "matching DNS transaction id in one selected flow",
+                        "basis": "matching DNS transaction id with query-before-response capture order in one selected flow",
                     }
                 )
             else:
@@ -881,13 +887,14 @@ class FlowProtocolAnalyzer:
                         "query_packet_ids": [_packet_id(item) for item in queries],
                         "response_packet_ids": [_packet_id(item) for item in responses],
                         "confidence": "LOW",
-                        "basis": "capture contains no unique query/response pair for this id",
+                        "basis": "capture contains no unique capture-ordered query/response pair for this id",
                     }
                 )
         return sorted(transactions, key=lambda value: int(value["id"]))
 
     @staticmethod
     def _http_transactions(packets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        positions = {id(packet): index for index, packet in enumerate(packets)}
         requests = [
             packet
             for packet in packets
@@ -904,7 +911,10 @@ class FlowProtocolAnalyzer:
             return []
         request = requests[0]
         response = responses[0]
-        if _direction(request) == _direction(response):
+        if (
+            _direction(request) == _direction(response)
+            or positions[id(request)] >= positions[id(response)]
+        ):
             return []
         return [
             {
@@ -915,7 +925,7 @@ class FlowProtocolAnalyzer:
                 "target": request["http_metadata"].get("target"),
                 "status_code": response["http_metadata"].get("status"),
                 "confidence": "HIGH",
-                "basis": "exactly one complete cleartext request and one complete cleartext response in opposite directions",
+                "basis": "exactly one complete cleartext request-before-response pair in opposite directions",
             }
         ]
 
