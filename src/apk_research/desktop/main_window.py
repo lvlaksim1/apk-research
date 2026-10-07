@@ -319,12 +319,6 @@ class MainWindow(QMainWindow):
             self.launch_package_button
         )
         apk_layout.addLayout(install_buttons)
-        self.android_home_button = QPushButton(
-            "Открыть главный экран Android"
-        )
-        apk_layout.addWidget(
-            self.android_home_button
-        )
         apk_layout.addWidget(
             self.package_label
         )
@@ -769,9 +763,6 @@ class MainWindow(QMainWindow):
         )
         self.launch_package_button.clicked.connect(
             self.controller.launch_installed_package
-        )
-        self.android_home_button.clicked.connect(
-            self.controller.show_android_home
         )
         self.prepare_button.clicked.connect(
             self._prepare_environment
@@ -1272,10 +1263,6 @@ class MainWindow(QMainWindow):
             and not self._research_active
             and bool(self.controller.package_name)
         )
-        self.android_home_button.setEnabled(
-            not busy
-            and not self._research_active
-        )
         self.prepare_button.setEnabled(
             not busy
             and not self._research_active
@@ -1431,7 +1418,6 @@ class MainWindow(QMainWindow):
         self.choose_apk_button.setEnabled(False)
         self.install_package_button.setEnabled(False)
         self.launch_package_button.setEnabled(False)
-        self.android_home_button.setEnabled(False)
         self.status_network.setText(
             "● PCAP записывается"
         )
@@ -1500,7 +1486,6 @@ class MainWindow(QMainWindow):
         self.launch_package_button.setEnabled(
             bool(self.controller.package_name)
         )
-        self.android_home_button.setEnabled(True)
         self.status_network.setText(
             "● PCAP сохранён"
         )
