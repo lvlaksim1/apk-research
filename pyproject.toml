@@ -28,6 +28,7 @@ transport = [
 ]
 build = [
     "PyInstaller>=6.10,<7",
+    "Pillow>=11,<13",
 ]
 dev = [
     "pytest>=8.0",
