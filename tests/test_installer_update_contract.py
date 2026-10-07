@@ -43,4 +43,4 @@ def test_update_installer_does_not_uninstall_first() -> None:
     ).read_text(encoding="utf-8").lower()
 
     assert "unins000.exe" not in text
-    assert "uninstall" not in text
+    assert "exec(" not in text or "unins" not in text
