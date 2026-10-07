@@ -7,9 +7,10 @@ name = "apk-research"
 version = "0.29.2"
 description = "Self-contained Windows desktop environment for reproducible Android application research"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "cryptography>=43,<47",
+    "mitmproxy==12.2.3",
 ]
 
 [project.scripts]
