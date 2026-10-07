@@ -36,6 +36,11 @@ def parse_launcher_favorites(output: str) -> tuple[LauncherFavorite, ...]:
         line = raw.strip()
         if not _ROW_PREFIX_RE.match(line):
             continue
+        line = _ROW_PREFIX_RE.sub(
+            "",
+            line,
+            count=1,
+        )
 
         values: dict[str, int] = {}
         valid = True
