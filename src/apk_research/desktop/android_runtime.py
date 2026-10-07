@@ -890,14 +890,16 @@ class AndroidRuntime:
                         )
                     )
 
+                remote_database_q = shlex.quote(
+                    remote_database
+                )
+                staging_q = shlex.quote(staging)
                 replaced = self._adb_shell(
-                    "sh",
-                    "-c",
                     (
-                        f"rm -f {remote_database}-wal "
-                        f"{remote_database}-shm "
-                        f"&& cat {staging} > {remote_database} "
-                        f"&& sync && rm -f {staging}"
+                        f"rm -f {remote_database_q}-wal; "
+                        f"rm -f {remote_database_q}-shm; "
+                        f"cat {staging_q} > {remote_database_q} "
+                        f"&& sync && rm -f {staging_q}"
                     ),
                     timeout=20.0,
                     check=False,
