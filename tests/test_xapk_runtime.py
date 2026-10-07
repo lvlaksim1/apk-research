@@ -92,6 +92,11 @@ def test_install_xapk_uses_install_multiple_and_pushes_obb(
 
     monkeypatch.setattr(runtime, "_run", fake_run)
     monkeypatch.setattr(runtime, "_adb_shell", fake_shell)
+    monkeypatch.setattr(
+        runtime,
+        "device_abis",
+        lambda: ("arm64-v8a",),
+    )
 
     package = runtime.install_package(archive_path)
 
@@ -171,6 +176,11 @@ def test_install_xapk_rejects_mixed_packages_before_install(
         raise AssertionError(cmd)
 
     monkeypatch.setattr(runtime, "_run", fake_run)
+    monkeypatch.setattr(
+        runtime,
+        "device_abis",
+        lambda: ("x86_64",),
+    )
 
     with pytest.raises(
         AndroidRuntimeError,
@@ -213,7 +223,79 @@ def test_single_apk_keeps_single_install_path(
         raise AssertionError(cmd)
 
     monkeypatch.setattr(runtime, "_run", fake_run)
+    monkeypatch.setattr(
+        runtime,
+        "device_abis",
+        lambda: ("x86_64",),
+    )
 
     assert runtime.install_package(apk) == "com.example.app"
     install = next(command for command in commands if "install" in command)
     assert "install-multiple" not in install
+
+
+def test_install_xapk_filters_incompatible_abi_split(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    runtime = _runtime(tmp_path)
+    archive_path = tmp_path / "multi-abi.xapk"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("base.apk", b"base")
+        archive.writestr("config.arm64_v8a.apk", b"arm64")
+        archive.writestr("config.x86_64.apk", b"x86")
+
+    commands: list[list[str]] = []
+
+    def fake_run(command, *, timeout, check=True):
+        cmd = [str(item) for item in command]
+        commands.append(cmd)
+        if "aapt2" in Path(cmd[0]).name.lower():
+            name = Path(cmd[-1]).name
+            if name == "base.apk":
+                output = (
+                    "package: name='com.example.app' "
+                    "versionCode='42'\n"
+                )
+            elif "arm64" in name:
+                output = (
+                    "package: name='com.example.app' "
+                    "versionCode='42' split='config.arm64_v8a'\n"
+                    "native-code: 'arm64-v8a'\n"
+                )
+            else:
+                output = (
+                    "package: name='com.example.app' "
+                    "versionCode='42' split='config.x86_64'\n"
+                    "native-code: 'x86_64'\n"
+                )
+            return subprocess.CompletedProcess(
+                cmd, 0, stdout=output, stderr=""
+            )
+        if "install-multiple" in cmd:
+            return subprocess.CompletedProcess(
+                cmd, 0, stdout="Success\n", stderr=""
+            )
+        raise AssertionError(cmd)
+
+    monkeypatch.setattr(runtime, "_run", fake_run)
+    monkeypatch.setattr(
+        runtime,
+        "device_abis",
+        lambda: ("x86_64", "x86"),
+    )
+
+    assert runtime.install_package(archive_path) == "com.example.app"
+    install = next(
+        command
+        for command in commands
+        if "install-multiple" in command
+    )
+    assert any(
+        value.endswith("config.x86_64.apk")
+        for value in install
+    )
+    assert not any(
+        value.endswith("config.arm64_v8a.apk")
+        for value in install
+    )
