@@ -307,8 +307,9 @@ def build_installer_arguments(
     *,
     install_dir: Path,
     log_path: Path,
+    relaunch: bool = True,
 ) -> list[str]:
-    return [
+    arguments = [
         "/VERYSILENT",
         "/SUPPRESSMSGBOXES",
         "/NORESTART",
@@ -318,6 +319,9 @@ def build_installer_arguments(
         f"/DIR={install_dir}",
         f"/LOG={log_path}",
     ]
+    if not relaunch:
+        arguments.append("/NORELAUNCH=1")
+    return arguments
 
 
 def launch_update_after_exit(
@@ -326,6 +330,7 @@ def launch_update_after_exit(
     current_pid: int,
     install_dir: Path,
     restart_exe: Path,
+    relaunch: bool = True,
 ) -> None:
     del current_pid
     del restart_exe
@@ -345,6 +350,7 @@ def launch_update_after_exit(
     arguments = build_installer_arguments(
         install_dir=target_dir,
         log_path=log_path,
+        relaunch=relaunch,
     )
 
     handoff_log = log_path.with_name(
