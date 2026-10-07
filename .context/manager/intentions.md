@@ -4,33 +4,37 @@
 Status: completed.
 
 ## Completed — v0.24 Unified Session Evidence
-Status: completed and released as v0.24.0.
+Status: completed and released.
 
 ## Completed — v0.25 Transport and Protocol Analysis
-Status: completed and released as v0.25.0.
+Status: completed and released.
 
 ## Completed — v0.26 Investigator Workspace
-Status: completed and released as v0.26.0.
+Status: completed and released.
 
 ## Completed — v0.27 APK/XAPK Package Intake
-Status: completed and released as v0.27.0.
+Status: completed and released.
 
-Owner authorization: add XAPK support while continuing development from the verified v0.26.0 baseline.
+## Completed — v0.28 Direct GitHub Self-Update
+Status: completed and released as v0.28.0.
+
+Owner directive: add Settings controls to search for a new version and update directly from the latest GitHub release.
 
 Delivered:
-- unified APK/XAPK file selection;
-- safe XAPK materialization with traversal/encryption/size/count guards;
-- aapt2 validation of one base plus compatible split APKs;
-- `adb install-multiple` for split packages;
-- OBB deployment after successful package installation;
-- unchanged single-APK installation path;
-- unit/regression coverage and real AVD XAPK install acceptance.
+- explicit `Проверить обновления` action;
+- hidden-until-needed `Обновить до <version>` control;
+- latest stable GitHub Release discovery;
+- exact installer/SHA256SUMS asset validation;
+- direct download with local SHA-256 and size verification;
+- detached wait → install-in-place → restart handoff on Windows;
+- update blocking during research/managed operations;
+- unit and GUI smoke coverage.
 
-Completion evidence: PR #18 gates passed; after one release-documentation-only correction, main pipeline #137 passed for exact SHA `f6a39f21583273f91b192d14fa258bc1e7613a93`; GitHub Release v0.27.0 is published.
+Completion evidence: PR #19 gates passed; main pipeline #138 passed on exact SHA `df2faf74a707cf99afa366433c34dc89cec37dcc`; GitHub Release v0.28.0 is published.
 
 ## Active — continuity and release integrity
 Status: active.
 
-Reconcile live `main`, releases and CI before consequential changes; preserve all evidence semantics, the protected runtime path, dual-source screen model and commit-triggered release gates.
+Reconcile live product/release/CI before consequential changes and preserve all verified evidence/runtime boundaries.
 
-No additional product stage is active after v0.27.0 unless the owner defines the next goal.
+No later product stage is active unless the owner defines it.

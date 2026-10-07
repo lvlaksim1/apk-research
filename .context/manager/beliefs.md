@@ -2,16 +2,16 @@
 
 ## Product baseline and latest release
 
-The product authority is `main`. The current verified product baseline and latest published release are **apk-research v0.27.0** at commit `f6a39f21583273f91b192d14fa258bc1e7613a93`.
+The product authority is `main`. The current verified product baseline and latest published release are **apk-research v0.28.0** at `df2faf74a707cf99afa366433c34dc89cec37dcc`.
 
-Release asset `apk-research-setup_v0.27.0.exe` has SHA-256 `19d5ca4fe75ed24bd65d1f89e70c56c0e89e91b9ee9894b44722ea0535834e34` and size 36,414,204 bytes. GitHub Release v0.27.0 was published on 2026-10-07 for the exact release SHA after main pipeline #137 passed CI, real AVD Research ZIP acceptance, real XAPK install acceptance, Windows standalone/self-test/GUI/installer checks and clean-Windows managed Android provisioning.
+Release asset `apk-research-setup_v0.28.0.exe` has SHA-256 `9c5444503b6306497ebe5acac87040830d0eefa2fbdb16c06cd521b50f8bd61e` and size 36,436,053 bytes. GitHub Release v0.28.0 was published on 2026-10-07 for the exact release SHA after main pipeline #138 passed CI, real AVD Research ZIP acceptance, real XAPK install acceptance, Windows standalone/self-test/GUI/installer checks, clean-Windows managed Android provisioning, checksum verification and release publication.
 
-The first post-merge publication attempt at `a89a11db586ae2254e2dfffdd5744fca3ce5d912` failed only at the release-documentation gate. Product/AVD/Windows gates were already green. Commit `f6a39f21583273f91b192d14fa258bc1e7613a93` corrected the release contract (REFACTORING documentation and package version declaration), after which pipeline #137 passed and published v0.27.0.
+The public `releases/latest` endpoint returns v0.28.0 with the exact versioned installer and `SHA256SUMS.txt`, matching the runtime update-discovery contract.
 
-- source: GitHub main, PR #18, main pipelines and GitHub Release v0.27.0, reconciled 2026-10-07
-- authority: verified-repository + verified-ci
+- source: GitHub main, PR #19, main pipeline #138 and GitHub Release v0.28.0, reconciled 2026-10-07
+- authority: owner-directive + verified-repository + verified-ci
 
-## Completed roadmap through v0.27
+## Completed roadmap through v0.28
 
 - v0.18.0: Raw / Packet Inspector.
 - v0.19.0: Android sidecar foundation.
@@ -19,31 +19,19 @@ The first post-merge publication attempt at `a89a11db586ae2254e2dfffdd5744fca3ce
 - v0.21.0: interaction completeness.
 - v0.22.0: Packet ↔ Action temporal evidence.
 - v0.23.0: Transport Session Evidence.
-- v0.23.1: Sidecar infrastructure isolation + idle stability.
+- v0.23.1: Sidecar isolation + idle stability.
 - v0.24.0: Unified Session Evidence.
 - v0.25.0: Transport and Protocol Analysis.
 - v0.26.0: Investigator Workspace.
 - v0.27.0: first-class APK/XAPK package intake.
+- v0.28.0: verified direct GitHub self-update.
 
-## v0.27 APK/XAPK intake
+## v0.28 update behavior
 
-The owner authorized XAPK support as the next product stage. v0.27.0 accepts both APK and XAPK from the desktop UI.
+Update discovery is explicit/user-triggered, not background polling. A newer stable release is offered only when GitHub provides a strict semantic version, the exact `apk-research-setup_v<version>.exe`, and `SHA256SUMS.txt`.
 
-XAPK is treated as an untrusted ZIP container:
-- only APK/OBB payloads are materialized;
-- unsafe traversal paths and encrypted members are rejected;
-- all APK parts are inspected with aapt2;
-- exactly one base APK is required;
-- split APKs must share package name and versionCode;
-- duplicate split names and mixed-package bundles are rejected;
-- multi-part packages install with `adb install-multiple`;
-- OBB files are copied only after successful APK installation to `/sdcard/Android/obb/<package>`;
-- ordinary single APK retains the established single-`adb install` path.
+The downloaded installer is size-checked and SHA-256 checked locally. A detached Windows handoff waits for the running process to exit, installs into the same directory and restarts the executable. Research/managed-operation activity blocks update installation.
 
-Main pipeline #137 includes an explicit real-AVD XAPK installation acceptance step and it passed.
+## Protected semantics/runtime
 
-## Evidence semantics and protected runtime
-
-Raw PCAP remains authoritative. Action ↔ Flow and Packet ↔ Action remain temporal-only with `causal_claim=false`. Screen links remain time-aligned and non-causal. Protocol analysis remains captured-packets-only. Investigator organization metadata is not evidence.
-
-The accepted dual-source screen model remains active. Hidden Emulator → gRPC/MMAP → AndroidView and v0.10.5 startup/clean-launch sequencing remain protected. Audio Evidence and user-facing Virtual Display remain out of scope. WHPX remains advisory/non-publication-gating.
+All v0.24-v0.27 evidence and package-intake semantics remain unchanged. Raw PCAP remains authoritative; action/network links remain temporal-only/non-causal; protocol analysis remains captured-packets-only; analyst workspace metadata is not evidence. Hidden Emulator → gRPC/MMAP → AndroidView, v0.10.5 startup sequencing and the accepted dual-source screen model remain protected. Audio Evidence and user-facing Virtual Display remain out of scope. WHPX remains advisory/non-publication-gating.
