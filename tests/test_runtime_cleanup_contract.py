@@ -59,10 +59,14 @@ def test_dead_desktop_helpers_stay_removed() -> None:
     assert "_press_pos" not in view
 
 
-def test_workflows_have_no_manual_dispatch() -> None:
+def test_manual_dispatch_is_limited_to_storage_maintenance() -> None:
     workflows = ROOT / ".github" / "workflows"
+    manual_dispatch = []
     for path in workflows.glob("*.yml"):
-        assert "workflow_dispatch" not in path.read_text(encoding="utf-8")
+        if "workflow_dispatch" in path.read_text(encoding="utf-8"):
+            manual_dispatch.append(path.name)
+
+    assert manual_dispatch == ["repository-storage.yml"]
 
 
 def test_legacy_cleanup_shims_stay_removed() -> None:
