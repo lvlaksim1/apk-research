@@ -20,6 +20,9 @@ from PySide6.QtWidgets import (
 from apk_research.desktop.evidence_navigation_window import (
     UnifiedEvidenceMainWindow,
 )
+from apk_research.desktop.protocol_analysis_v025 import (
+    format_protocol_analysis,
+)
 from apk_research.desktop.packet_inspector import (
     RAW_PCAP_ARTIFACT,
     format_packet_details,
@@ -88,7 +91,7 @@ class PacketInspectorMainWindow(UnifiedEvidenceMainWindow):
         self.packet_open_timeline.setEnabled(False)
         self.packet_search = QLineEdit()
         self.packet_search.setPlaceholderText(
-            "packet / time / IP / port / action / DNS / SNI / QUIC / HTTP3"
+            "packet / time / IP / port / action / DNS / TLS / QUIC / HTTP3 / HTTP / ACK / sequence"
         )
         controls.addWidget(self.packet_load_selected)
         controls.addWidget(self.packet_open_timeline)
@@ -100,6 +103,14 @@ class PacketInspectorMainWindow(UnifiedEvidenceMainWindow):
         )
         self.packet_summary.setWordWrap(True)
         layout.addWidget(self.packet_summary)
+
+        self.protocol_analysis = QPlainTextEdit()
+        self.protocol_analysis.setReadOnly(True)
+        self.protocol_analysis.setMaximumHeight(220)
+        self.protocol_analysis.setPlaceholderText(
+            "v0.25: выберите поток для анализа транспорта и протоколов."
+        )
+        layout.addWidget(self.protocol_analysis)
 
         self.packet_table = QTableWidget()
         self.packet_table.setColumnCount(9)
@@ -141,8 +152,9 @@ class PacketInspectorMainWindow(UnifiedEvidenceMainWindow):
         note = QLabel(
             "Packet Inspector читает существующий traffic.pcap напрямую из Research ZIP. "
             "Он не создаёт новую forensic-истину и не трактует зашифрованные байты как plaintext. "
-            "Transport-session статус описывает только наблюдённые TCP flags: отсутствие события "
-            "в capture не доказывает, что его не было."
+            "v0.25 анализирует только захваченные байты: разрывы sequence, повторы ACK и диапазонов "
+            "остаются наблюдениями захвата, а не доказанной потерей/повторной передачей. "
+            "Зашифрованные прикладные данные не выдаются за открытый текст."
         )
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -309,6 +321,9 @@ class PacketInspectorMainWindow(UnifiedEvidenceMainWindow):
 
     def _on_packet_ready(self, report: dict) -> None:
         self._packet_report = report
+        self.protocol_analysis.setPlainText(
+            format_protocol_analysis(report.get("protocol_analysis"))
+        )
         packets = [
             packet
             for packet in report.get("packets") or []

@@ -9,6 +9,11 @@ from typing import Any, BinaryIO
 
 from apk_research.network_attribution import canonical_connection_key
 from apk_research.quic import QuicFlowInspector
+from apk_research.desktop.protocol_analysis_v025 import (
+    FlowProtocolAnalyzer,
+    format_packet_protocol_evidence,
+    protocol_packet_label,
+)
 from apk_research.timeline import (
     TIMELINE_ARTIFACT,
     _decode_ip,
@@ -636,6 +641,7 @@ def inspect_pcap_flow(
     total_packets = 0
     logical_offset = 24
     quic = QuicFlowInspector() if target_key[0] == "udp" else None
+    protocol_analyzer = FlowProtocolAnalyzer(target_key[0])
 
     while True:
         record_offset = logical_offset
@@ -685,6 +691,9 @@ def inspect_pcap_flow(
 
         direction = _packet_direction(packet, flow)
         epoch = seconds + fraction / scale
+        transport_payload = decoded.get("payload")
+        if not isinstance(transport_payload, bytes):
+            transport_payload = b""
         metadata = _packet_metadata(decoded, direction, quic)
         transport_metadata = _transport_metadata(
             network_payload,
@@ -696,8 +705,7 @@ def inspect_pcap_flow(
             hex_preview_bytes,
         )
         packet_index = total_packets
-        selected.append(
-            {
+        packet_record = {
                 "packet_id": f"packet-{packet_index:06d}",
                 "packet_index": packet_index,
                 "target_utc": _iso_epoch(epoch),
@@ -721,9 +729,11 @@ def inspect_pcap_flow(
                 "hex_preview_truncated": truncated,
                 **metadata,
                 **transport_metadata,
-            }
-        )
+        }
+        protocol_analyzer.observe(packet_record, transport_payload)
+        selected.append(packet_record)
 
+    protocol_analysis = protocol_analyzer.finalize(selected)
     transport_session = build_transport_session(
         selected,
         target_key[0],
@@ -733,6 +743,7 @@ def inspect_pcap_flow(
         "protocol": target_key[0],
         "packets": selected,
         "transport_session": transport_session,
+        "protocol_analysis": protocol_analysis,
         "selected_packet_count": len(selected),
         "total_packet_count": total_packets,
         "linktype": linktype,
@@ -840,6 +851,9 @@ def packet_search_text(packet: dict[str, Any]) -> str:
         for item in packet.get("temporal_action_labels") or []
         if item
     )
+    protocol_label = protocol_packet_label(packet)
+    if protocol_label:
+        values.append(protocol_label)
     return " ".join(values).lower()
 
 
@@ -890,6 +904,9 @@ def packet_metadata_label(packet: dict[str, Any]) -> str:
     alpn = [str(item) for item in packet.get("quic_alpn") or [] if item]
     if alpn:
         parts.append("ALPN:" + ",".join(alpn))
+    extended = protocol_packet_label(packet)
+    if extended:
+        parts.append(extended)
     return " • ".join(parts)
 
 
@@ -921,6 +938,7 @@ def format_packet_details(
             f"UDP length: {packet.get('udp_length') if packet.get('udp_length') is not None else '—'}",
             f"UDP checksum: {packet.get('udp_checksum') if packet.get('udp_checksum') is not None else '—'}",
         ]
+    protocol_lines = format_packet_protocol_evidence(packet)
     if packet.get("hex_preview_truncated"):
         preview += "\n… preview truncated; locator still points to the complete raw packet"
 
@@ -957,6 +975,9 @@ def format_packet_details(
             f"Captured / original: {packet.get('captured_length') or 0} / {packet.get('original_length') or 0} bytes",
             f"Protocol evidence: {metadata}",
             *transport_lines,
+            "",
+            "Наблюдения протоколов v0.25:",
+            *(protocol_lines or ["  no additional structured protocol evidence in this packet"]),
             "",
             "Timeline relation:",
             *action_lines,

@@ -1,39 +1,39 @@
-# apk-research v0.24.0 — Unified Session Evidence
+# apk-research v0.25.0 — Transport and Protocol Analysis
 
-v0.24.0 turns the existing Timeline, Evidence Explorer, Packet Inspector, socket attribution and dual-source screen evidence into one cross-navigable investigation model.
+v0.25.0 extends Packet Inspector with capture-bounded transport and protocol analysis while preserving the v0.24 unified evidence model and the raw-PCAP authority boundary.
 
-## Unified Session Evidence
+## TCP capture evidence
 
-- Adds a `Session Evidence` view with one chronological table over existing Research Timeline events.
-- Each row can expose the linked action, normalized flow(s), packet counts, process/socket ownership and time-aligned screen evidence.
-- Navigation now connects Timeline ↔ Evidence ↔ Packets ↔ screen moments instead of leaving those views as separate analysis islands.
-- Evidence Explorer gains a reverse Process/Socket index so one attributed inode/process can reveal all related flows and their action/raw paths.
+- Reports whether a plain SYN and FIN/RST are actually present in the selected capture.
+- Adds per-direction observations for sequence ranges, ACK values and advertised windows.
+- Flags repeated and overlapping observed sequence ranges, observed sequence gaps, repeated ACK values and zero-window packets.
+- Explicitly distinguishes observation from inference: a gap is not automatically packet loss, a repeated range is not automatically a network retransmission, and missing start/end markers mean only “not observed in this capture”.
 
-## Screen evidence navigation
+## DNS, TLS and QUIC
 
-- Continuous Screen device MediaCodec PTS is mapped to target UTC for navigation using the realtime↔elapsed transform already archived by high-resolution Android `screenrecord` frame timing.
-- The screen locator shows the nearest Continuous Screen packet/frame and the matching high-resolution screenrecord chunk/relative time when covered.
-- During a canonical screenrecord rollover gap, navigation explicitly reports the high-resolution coverage gap while still locating Continuous Screen evidence.
-- Screen links are `time-aligned-navigation`; they never claim that a screen change caused a packet/action or vice versa.
+- Decodes complete DNS questions and supported resource records directly from captured bytes.
+- Groups a DNS query/response transaction only when one selected flow contains one unambiguous query and one response with the same transaction identifier.
+- Parses observed TLS ClientHello/ServerHello metadata, including SNI, ALPN, supported/selected version and selected cipher suite when the bytes are available.
+- Performs bounded contiguous TCP-payload reconstruction so a TLS hello split across captured segments can be recognized when no observed sequence gap intervenes.
+- Aggregates the existing QUIC v1/v2 Initial evidence, SNI and ALPN; HTTP/3 is reported only when `h3` is actually observed in ALPN.
 
-## Continuous Screen product role
+## Observable HTTP
 
-Owner-side v0.23.1 validation proved idle survival and uninterrupted coverage across the 170-second canonical screenrecord chunk rollover. v0.24.0 therefore records Continuous Screen as a stable continuous/timeline source rather than an experimental source.
+- Recognizes complete cleartext HTTP/1.0 and HTTP/1.1 request/response headers and the cleartext HTTP/2 connection preface.
+- Forms a request/response transaction only for one unambiguous complete request and one complete response in opposite directions.
+- Encrypted application bytes are never represented as plaintext.
 
-The dual-source boundary remains deliberate:
-- Continuous Screen: stable uninterrupted temporal coverage at the current 540×960 / 2 Mbit/s profile;
-- Android `screenrecord`: high-resolution 1080×1920 screen evidence.
+## Packet Inspector integration
 
-Continuous Screen still does not replace the proven hidden Emulator → gRPC/MMAP → AndroidView live display path.
+- Each inspected flow now contains a structured `protocol_analysis` report with `evidence_basis=captured-packets-only` and `causal_claim=false`.
+- The Packets view includes a dedicated v0.25 analysis pane and richer per-packet protocol evidence.
+- Search covers observed HTTP/TLS/ACK/sequence evidence in addition to the existing DNS/SNI/QUIC fields.
 
 ## Evidence boundaries
 
 - Raw `01_raw/network/traffic.pcap` remains authoritative network evidence.
-- Action ↔ Flow and Packet ↔ Action remain temporal relations with `causal_claim=false`.
-- Flow ↔ Process/Socket displays the existing attribution confidence; reverse indexing does not strengthen that confidence.
-- Screen ↔ event/packet links are navigation by aligned target time, not causal inference.
-- Encrypted traffic is not represented as plaintext and absent packets/events are not synthesized.
-
-## Runtime and scope
-
-The v0.10.5 startup/clean-launch sequencing and hidden Emulator → gRPC/MMAP → AndroidView runtime remain unchanged. Audio Evidence and user-facing Virtual Display remain out of scope.
+- Packet/action links remain temporal-only and never claim causality.
+- Absence from the analysis means only “not observed in the selected capture”.
+- Missing packets, missing protocol messages, plaintext and causality are never synthesized.
+- v0.10.5 startup/clean-launch sequencing and the hidden Emulator → gRPC/MMAP → AndroidView live display path remain unchanged.
+- Audio Evidence and user-facing Virtual Display remain out of scope.

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.25.0] - 2026-10-07
+
+### Transport and Protocol Analysis
+
+- Adds capture-bounded TCP sequence/ACK/window observations, including explicit missing-start/missing-end semantics.
+- Flags repeated and overlapping observed sequence ranges, observed sequence gaps, repeated ACK values and zero-window packets without automatically converting them into packet-loss/retransmission claims.
+- Adds structured DNS message decoding and only groups a query/response pair when the selected flow contains one unambiguous matching transaction.
+- Adds observed TLS ClientHello/ServerHello metadata and bounded contiguous TCP-payload analysis without plaintext synthesis.
+- Aggregates existing QUIC Initial/SNI/ALPN evidence into the selected-flow report and reports HTTP/3 only from observed `h3` ALPN.
+- Adds cleartext HTTP/1.x and h2c evidence only when complete captured bytes support it; ambiguous request/response pairing is not synthesized.
+- Integrates the report into Packet Inspector search, packet details and a dedicated flow-analysis pane.
+- Extends real-AVD acceptance to require the v0.25 evidence contract on the generated Research ZIP.
+- Preserves RAW PCAP authority, Packet ↔ Action temporal-only semantics, `causal_claim=false`, v0.10.5 startup sequencing and the hidden Emulator → gRPC/MMAP runtime.
+
 ## [0.24.0] - 2026-10-07
 
 ### Unified Session Evidence

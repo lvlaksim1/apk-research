@@ -1,5 +1,23 @@
 # Refactoring and Architecture Log
 
+## v0.25.0 — Transport and Protocol Analysis
+
+### Evidence model
+
+v0.25 remains a derived analysis layer over the authoritative raw PCAP. It introduces no stronger causal model and no replacement evidence artifact. The selected-flow report declares `evidence_basis=captured-packets-only` and `causal_claim=false`.
+
+### TCP observation boundary
+
+Sequence ranges, ACK values and advertised windows are analyzed in capture order. Repeated/overlapping sequence ranges and gaps are observations about captured sequence space only. They are deliberately not promoted into definitive packet-loss or retransmission claims because capture loss, out-of-order delivery and an already-active connection can produce similar observations. Missing SYN/FIN/RST is represented as possible missing capture start/end, never as proof of non-occurrence.
+
+### Protocol boundary
+
+DNS is decoded only from complete captured messages. TLS metadata is decoded only from complete records/hellos available per packet or from bounded contiguous observed TCP payload. QUIC reuses the existing authenticated Initial parser; HTTP/3 is derived only from observed ALPN. Cleartext HTTP grouping is deliberately narrow and emitted only for one unambiguous complete request/response pair in opposite directions.
+
+### Compatibility boundary
+
+RAW PCAP authority, Packet ↔ Action temporal-only correlation, v0.10.5 startup/clean-launch sequencing and hidden Emulator → gRPC/MMAP → AndroidView remain unchanged. Audio Evidence and user-facing Virtual Display remain out of scope.
+
 ## v0.24.0 — Unified Session Evidence
 
 ### Scope
