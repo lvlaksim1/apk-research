@@ -1,0 +1,40 @@
+name: Temporary v0.24 acceptance sync
+
+on:
+  push:
+    branches:
+      - feature/v0.24-unified-evidence
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.24-unified-evidence
+          fetch-depth: 1
+      - name: Align Continuous Screen acceptance contract
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("tools/acceptance_avd.py")
+          text = path.read_text(encoding="utf-8")
+          old = '''        if continuous_metadata.get("experimental") is not True:\n            raise RuntimeError(\n                "Continuous screen evidence is not marked experimental"\n            )\n'''
+          new = '''        if continuous_metadata.get("experimental") is not False:\n            raise RuntimeError(\n                "Continuous screen evidence must be marked stable/non-experimental"\n            )\n        if (\n            continuous_metadata.get("evidence_role")\n            != "stable-continuous-timeline"\n        ):\n            raise RuntimeError(\n                "Continuous screen evidence role is not stable-continuous-timeline"\n            )\n        if continuous_metadata.get("schema_version") != "0.2":\n            raise RuntimeError(\n                "Continuous screen evidence metadata is not schema 0.2"\n            )\n'''
+          if old not in text:
+              raise SystemExit("Expected legacy Continuous Screen acceptance block was not found")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8", newline="\n")
+      - name: Commit acceptance sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/acceptance_avd.py
+          git commit -m "Tests: align AVD acceptance with stable Continuous Screen role"
+          git push origin HEAD:feature/v0.24-unified-evidence
