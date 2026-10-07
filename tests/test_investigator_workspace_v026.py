@@ -165,6 +165,19 @@ def test_report_keeps_navigation_refs_and_no_causal_upgrade():
     assert "do not establish causality" in markdown
 
 
+def test_report_ignores_unknown_navigation_refs():
+    model = build_workspace_model(_model())
+    valid = model["rows"][0]["ref"]
+    report = build_report_data(
+        model,
+        [valid, "EV-UNKNOWN"],
+        archive="sample.research.zip",
+    )
+
+    assert report["item_count"] == 1
+    assert [item["ref"] for item in report["items"]] == [valid]
+
+
 def test_workspace_state_is_external_to_research_zip():
     path = workspace_state_path("C:/research/sample.research.zip")
     assert path.name == "sample.research.zip.investigator.json"
