@@ -19,14 +19,14 @@ Stable releases publish:
 
 The application updater uses only the dedicated Update asset.
 
-## Next product work
+## Current product work
 
-The outstanding owner-requested corrective feature is Android home-screen placement after APK/XAPK installation:
-- keep the Home button removed;
-- do not modify the verified Windows Setup/Update architecture;
-- do not merge the abandoned Launcher3 experimental branch;
-- start from v0.29.2 on a clean branch;
-- first select a mechanism that is actually supported by the managed Android/Launcher3 environment;
-- acceptance must install a genuinely launchable APK/XAPK on the real managed AVD and prove the resulting shortcut is visible/launchable after Launcher3 stabilization, not merely that a database/provider write returned success.
+No additional product feature stage is currently authorized.
 
-No broader v0.30 feature stage is authorized.
+The Android home-screen shortcut requirement was cancelled by the owner on 2026-10-08 and must not be resumed without a new explicit directive.
+
+Until a new owner task arrives:
+- treat v0.29.2 as the verified baseline;
+- preserve the separate Setup/Update installer contract;
+- keep «Открыть главный экран Android» removed;
+- preserve ABI-aware XAPK handling and all evidence/runtime invariants.
