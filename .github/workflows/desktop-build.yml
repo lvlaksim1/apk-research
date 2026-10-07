@@ -63,6 +63,9 @@ jobs:
       - name: Run tests
         run: python -m pytest -q
 
+      - name: Build application icon
+        run: python tools/build_app_icon.py
+
       - name: Resolve live Android component catalog
         run: python tools/check_desktop_android_components.py
 
