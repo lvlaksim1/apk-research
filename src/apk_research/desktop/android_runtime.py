@@ -20,6 +20,13 @@ from apk_research.desktop.components import (
 from apk_research.desktop.emulator_grpc import (
     EmulatorGrpcClient,
 )
+from apk_research.desktop.package_input import (
+    ApkBadging,
+    PackageInputError,
+    materialize_android_package,
+    parse_apk_badging,
+    validate_apk_set,
+)
 
 RuntimeProgress = Callable[
     [str, int | None, int | None],
@@ -619,10 +626,10 @@ class AndroidRuntime:
             raise
         return "wipe-data"
 
-    def package_name_from_apk(
+    def _apk_badging(
         self,
         apk_path: str | os.PathLike[str],
-    ) -> str:
+    ) -> ApkBadging:
         apk = Path(apk_path).expanduser().resolve()
         if not apk.is_file():
             raise AndroidRuntimeError(f"APK не найден: {apk}")
@@ -639,50 +646,153 @@ class AndroidRuntime:
             ],
             timeout=30.0,
         )
-        return parse_aapt_package_name(result.stdout)
+        try:
+            return parse_apk_badging(result.stdout, apk)
+        except PackageInputError as exc:
+            raise AndroidRuntimeError(str(exc)) from exc
+
+    def package_name_from_apk(
+        self,
+        apk_path: str | os.PathLike[str],
+    ) -> str:
+        return self._apk_badging(apk_path).package_name
+
+    def install_package(
+        self,
+        package_path: str | os.PathLike[str],
+        progress: RuntimeProgress | None = None,
+    ) -> str:
+        source = Path(package_path).expanduser().resolve()
+        try:
+            context = materialize_android_package(source)
+            with context as materialized:
+                badgings = [
+                    self._apk_badging(path)
+                    for path in materialized.apk_files
+                ]
+                try:
+                    package, ordered = validate_apk_set(badgings)
+                except PackageInputError as exc:
+                    raise AndroidRuntimeError(str(exc)) from exc
+
+                apk_files = [
+                    item.path
+                    for item in ordered
+                ]
+                self._emit(
+                    progress,
+                    (
+                        f"Установка {source.name}"
+                        if materialized.source_format == "apk"
+                        else (
+                            f"Установка XAPK {source.name}: "
+                            f"{len(apk_files)} APK-частей"
+                        )
+                    ),
+                    None,
+                    None,
+                )
+
+                if len(apk_files) == 1:
+                    command = [
+                        str(self.paths.adb),
+                        "-s",
+                        self.SERIAL,
+                        "install",
+                        "-r",
+                        "-t",
+                        "-g",
+                        str(apk_files[0]),
+                    ]
+                else:
+                    command = [
+                        str(self.paths.adb),
+                        "-s",
+                        self.SERIAL,
+                        "install-multiple",
+                        "-r",
+                        "-t",
+                        "-g",
+                        *[
+                            str(path)
+                            for path in apk_files
+                        ],
+                    ]
+
+                result = self._run(
+                    command,
+                    timeout=300.0,
+                )
+                combined = (
+                    result.stdout + "\n" + result.stderr
+                ).lower()
+                if "success" not in combined:
+                    raise AndroidRuntimeError(
+                        "Android не подтвердил установку пакета: "
+                        f"{result.stdout.strip()} "
+                        f"{result.stderr.strip()}"
+                    )
+
+                if materialized.obb_files:
+                    remote_dir = (
+                        f"/sdcard/Android/obb/{package}"
+                    )
+                    self._emit(
+                        progress,
+                        (
+                            "Перенос OBB: "
+                            f"{len(materialized.obb_files)} файл(ов)"
+                        ),
+                        None,
+                        None,
+                    )
+                    self._adb_shell(
+                        "mkdir",
+                        "-p",
+                        remote_dir,
+                        timeout=20.0,
+                    )
+                    for index, obb in enumerate(
+                        materialized.obb_files,
+                        start=1,
+                    ):
+                        self._emit(
+                            progress,
+                            f"OBB {index}/"
+                            f"{len(materialized.obb_files)}: "
+                            f"{obb.name}",
+                            index,
+                            len(materialized.obb_files),
+                        )
+                        self._run(
+                            [
+                                str(self.paths.adb),
+                                "-s",
+                                self.SERIAL,
+                                "push",
+                                str(obb),
+                                f"{remote_dir}/{obb.name}",
+                            ],
+                            timeout=300.0,
+                        )
+
+                self._emit(
+                    progress,
+                    f"Пакет установлен: {package}",
+                    None,
+                    None,
+                )
+                return package
+        except PackageInputError as exc:
+            raise AndroidRuntimeError(str(exc)) from exc
 
     def install_apk(
         self,
         apk_path: str | os.PathLike[str],
         progress: RuntimeProgress | None = None,
     ) -> str:
-        apk = Path(apk_path).expanduser().resolve()
-        package = self.package_name_from_apk(apk)
-        self._emit(
-            progress,
-            f"Установка {apk.name}",
-            None,
-            None,
-        )
-        result = self._run(
-            [
-                str(self.paths.adb),
-                "-s",
-                self.SERIAL,
-                "install",
-                "-r",
-                "-t",
-                "-g",
-                str(apk),
-            ],
-            timeout=180.0,
-        )
-        combined = (
-            result.stdout + "\n" + result.stderr
-        ).lower()
-        if "success" not in combined:
-            raise AndroidRuntimeError(
-                "Android не подтвердил установку APK: "
-                f"{result.stdout.strip()} "
-                f"{result.stderr.strip()}"
-            )
-        self._emit(
-            progress,
-            f"APK установлен: {package}",
-            None,
-            None,
-        )
-        return package
+        """Backward-compatible wrapper for the unified APK/XAPK installer."""
+        return self.install_package(apk_path, progress)
 
     def screen_frames(
         self,
