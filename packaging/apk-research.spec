@@ -11,10 +11,27 @@ agent_jar = (
     / "android-sidecar"
     / "apk-research-agent.jar"
 )
+app_icon_ico = (
+    project_root
+    / "build"
+    / "app-icon"
+    / "apk-research.ico"
+)
+app_icon_png = (
+    project_root
+    / "build"
+    / "app-icon"
+    / "apk-research-icon.png"
+)
 if not agent_jar.is_file():
     raise RuntimeError(
         "Android sidecar agent was not built: "
         + str(agent_jar)
+    )
+if not app_icon_ico.is_file() or not app_icon_png.is_file():
+    raise RuntimeError(
+        "Application icon was not built: "
+        + str(app_icon_ico)
     )
 
 a = Analysis(
@@ -24,6 +41,10 @@ a = Analysis(
     datas=[
         (
             str(agent_jar),
+            "apk_research/resources",
+        ),
+        (
+            str(app_icon_png),
             "apk_research/resources",
         ),
     ],
@@ -58,6 +79,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=str(app_icon_ico),
 )
 coll = COLLECT(
     exe,
