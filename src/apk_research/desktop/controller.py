@@ -122,7 +122,7 @@ class DesktopController(QObject):
             or not self.package_name
         ):
             self.error.emit(
-                "Сначала выберите и подготовьте APK"
+                "Сначала выберите и подготовьте APK/XAPK"
             )
             return
         if (
@@ -510,7 +510,7 @@ class DesktopController(QObject):
             self._start_screen_stream(
                 wait_for_first_frame=True,
             )
-            package = self.runtime.install_apk(
+            package = self.runtime.install_package(
                 path,
                 self._progress_callback,
             )
