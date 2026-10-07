@@ -23,9 +23,11 @@ from apk_research.desktop.emulator_grpc import (
     EmulatorGrpcClient,
 )
 from apk_research.desktop.home_shortcut import (
-    ensure_shortcut_in_database,
+    build_launch_intent,
+    choose_home_cell,
     has_package_shortcut,
-    launcher_database_from_listing,
+    launcher_grid_from_listing,
+    next_favorite_id,
     parse_launcher_favorites,
 )
 from apk_research.desktop.package_input import (
@@ -792,128 +794,75 @@ class AndroidRuntime:
             timeout=10.0,
             check=False,
         )
-        database_name, columns, rows = (
-            launcher_database_from_listing(
-                listing.stdout
-            )
+        columns, rows = launcher_grid_from_listing(
+            listing.stdout
         )
-        remote_database = (
-            f"{database_dir}/{database_name}"
+        screen, cell_x, cell_y = choose_home_cell(
+            favorites,
+            columns=columns,
+            rows=rows,
         )
+        item_id = next_favorite_id(favorites)
+        intent = build_launch_intent(
+            package_name,
+            component,
+        )
+        shortcut_label = (
+            label.strip()
+            if label.strip()
+            else package_name
+        )
+        modified = int(time.time() * 1000)
 
-        self._adb_shell(
-            "am",
-            "start",
-            "-a",
-            "android.settings.SETTINGS",
+        binds = [
+            f"_id:i:{item_id}",
+            f"title:s:{shortcut_label}",
+            f"intent:s:{intent}",
+            "container:i:-100",
+            f"screen:i:{screen}",
+            f"cellX:i:{cell_x}",
+            f"cellY:i:{cell_y}",
+            "spanX:i:1",
+            "spanY:i:1",
+            "itemType:i:0",
+            "appWidgetId:i:-1",
+            f"modified:l:{modified}",
+            "restored:i:0",
+            "profileId:i:0",
+            "rank:i:0",
+            "options:i:0",
+            "appWidgetSource:i:-1",
+        ]
+        parts = [
+            "content",
+            "insert",
+            "--uri",
+            uri,
+        ]
+        for value in binds:
+            parts.extend(["--bind", value])
+
+        # adb shell does not preserve a host-side sh -c argument vector.
+        # Send one fully quoted Android shell command so semicolons inside
+        # the launcher intent remain data rather than shell separators.
+        shell_command = " ".join(
+            shlex.quote(value)
+            for value in parts
+        )
+        inserted = self._adb_shell(
+            shell_command,
             timeout=15.0,
             check=False,
         )
-        self._adb_shell(
-            "am",
-            "force-stop",
-            launcher_package,
-            timeout=10.0,
-            check=False,
-        )
-
-        state = "created"
-        with tempfile.TemporaryDirectory(
-            prefix="apk-research-launcher-"
-        ) as temporary:
-            local_database = (
-                Path(temporary) / database_name
+        if inserted.returncode != 0:
+            raise AndroidRuntimeError(
+                "Launcher3 отклонил создание ярлыка: "
+                + (
+                    inserted.stderr.strip()
+                    or inserted.stdout.strip()
+                    or "нет диагностики"
+                )
             )
-            pulled = self._run(
-                [
-                    str(self.paths.adb),
-                    "-s",
-                    self.SERIAL,
-                    "pull",
-                    remote_database,
-                    str(local_database),
-                ],
-                timeout=30.0,
-                check=False,
-            )
-            if (
-                pulled.returncode != 0
-                or not local_database.is_file()
-            ):
-                raise AndroidRuntimeError(
-                    "Не удалось получить базу рабочего стола Launcher3: "
-                    + (
-                        pulled.stderr.strip()
-                        or pulled.stdout.strip()
-                        or remote_database
-                    )
-                )
-
-            try:
-                state = ensure_shortcut_in_database(
-                    local_database,
-                    package_name=package_name,
-                    label=label,
-                    component=component,
-                    columns=columns,
-                    rows=rows,
-                )
-            except (OSError, ValueError) as exc:
-                raise AndroidRuntimeError(
-                    "Не удалось подготовить ярлык Launcher3: "
-                    + str(exc)
-                ) from exc
-
-            if state == "created":
-                staging = (
-                    "/data/local/tmp/"
-                    "apk-research-launcher.db"
-                )
-                pushed = self._run(
-                    [
-                        str(self.paths.adb),
-                        "-s",
-                        self.SERIAL,
-                        "push",
-                        str(local_database),
-                        staging,
-                    ],
-                    timeout=30.0,
-                    check=False,
-                )
-                if pushed.returncode != 0:
-                    raise AndroidRuntimeError(
-                        "Не удалось вернуть базу Launcher3 на Android: "
-                        + (
-                            pushed.stderr.strip()
-                            or pushed.stdout.strip()
-                            or "нет диагностики"
-                        )
-                    )
-
-                remote_database_q = shlex.quote(
-                    remote_database
-                )
-                staging_q = shlex.quote(staging)
-                replaced = self._adb_shell(
-                    (
-                        f"rm -f {remote_database_q}-wal; "
-                        f"rm -f {remote_database_q}-shm; "
-                        f"cat {staging_q} > {remote_database_q} "
-                        f"&& sync && rm -f {staging_q}"
-                    ),
-                    timeout=20.0,
-                    check=False,
-                )
-                if replaced.returncode != 0:
-                    raise AndroidRuntimeError(
-                        "Не удалось обновить базу рабочего стола Launcher3: "
-                        + (
-                            replaced.stderr.strip()
-                            or replaced.stdout.strip()
-                            or "нет диагностики"
-                        )
-                    )
 
         self._adb_shell(
             "input",
@@ -940,7 +889,7 @@ class AndroidRuntime:
             package_name,
         ):
             raise AndroidRuntimeError(
-                "Launcher3 не подтвердил ярлык после перезапуска "
+                "Launcher3 не подтвердил создание ярлыка "
                 f"для {package_name}. Ответ: "
                 + (
                     verify.stderr.strip()
@@ -948,7 +897,7 @@ class AndroidRuntime:
                     or "пустой"
                 )
             )
-        return state
+        return "created"
 
     def install_package(
         self,
