@@ -18,18 +18,16 @@ Delivered:
 
 Completion evidence: PR #24 and main pipeline #141 passed mandatory CI/AVD/Windows/release gates.
 
-## Active — Android home-screen shortcut after APK/XAPK install
-Status: open owner requirement; not released.
+## Cancelled — Android home-screen shortcut after APK/XAPK install
+Status: cancelled by owner on 2026-10-08.
 
-Required behavior:
-- after successful APK/XAPK installation, the Android application launch shortcut should be visible on the managed Android home screen;
-- there must be no separate user-facing Home button.
+The owner explicitly withdrew the requirement to place the installed APK/XAPK application on the managed Android home screen.
 
-Important history:
-- direct LauncherProvider insertion and direct Launcher3 database manipulation were researched on the managed Android 15 AVD;
-- those experimental implementations were not merged because the final shortcut state was not reliably verified across Launcher3 reload/reconciliation;
+Consequences:
+- this is no longer an active commitment or blocker;
+- do not resume the prior Launcher3 shortcut experiments;
 - do not merge the old experimental branch as-is;
-- continue this as a narrowly scoped Android-emulator feature from the verified v0.29.2 baseline.
+- the removed separate Android Home button remains removed unless explicitly requested otherwise.
 
 ## Active — continuity and release integrity
 Status: active.
