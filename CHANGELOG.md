@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.27.0] - 2026-10-07
+
+### APK/XAPK Package Intake
+
+- Adds first-class APK/XAPK selection in the desktop application.
+- Preserves the existing single-APK `adb install -r -t -g` path.
+- Safely materializes only APK and OBB members from XAPK ZIP containers.
+- Validates every APK with `aapt2`, requiring one base APK, one package identity and compatible versionCode values.
+- Installs base + split APKs atomically through `adb install-multiple`.
+- Copies OBB payloads to the verified package's `/sdcard/Android/obb/<package>/` directory.
+- Rejects path traversal, encrypted members, damaged containers, duplicate splits and mixed-package XAPK input.
+- Adds unit/runtime regression coverage while preserving the verified AVD research and Windows release baselines.
+
 ## [0.26.0] - 2026-10-07
 
 ### Investigator Workspace

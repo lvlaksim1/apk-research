@@ -180,10 +180,10 @@ class MainWindow(QMainWindow):
         self.apk_path = QLineEdit()
         self.apk_path.setReadOnly(True)
         self.apk_path.setPlaceholderText(
-            "APK ещё не выбран"
+            "APK/XAPK ещё не выбран"
         )
         self.choose_apk_button = QPushButton(
-            "Выбрать APK…"
+            "Выбрать APK/XAPK…"
         )
         self.choose_apk_button.setMinimumHeight(
             38
@@ -215,7 +215,7 @@ class MainWindow(QMainWindow):
         self.status_adb = QLabel("○ ADB")
         self.status_root = QLabel("○ Root")
         self.status_network = QLabel("○ PCAP")
-        self.status_package = QLabel("○ APK")
+        self.status_package = QLabel("○ APK/XAPK")
         statuses = [
             self.status_android,
             self.status_adb,
@@ -713,9 +713,9 @@ class MainWindow(QMainWindow):
     def _choose_apk(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Выберите APK",
+            "Выберите APK или XAPK",
             "",
-            "Android APK (*.apk)",
+            "Пакеты Android (*.apk *.xapk)",
         )
         if not path:
             return
@@ -726,7 +726,7 @@ class MainWindow(QMainWindow):
             "Package: определение…"
         )
         self.start_button.setEnabled(False)
-        self.status_package.setText("◌ APK")
+        self.status_package.setText("◌ APK/XAPK")
         self.controller.prepare_apk(path)
 
     def _prepare_environment(self) -> None:
@@ -931,7 +931,7 @@ class MainWindow(QMainWindow):
             f"Package: {package}"
         )
         self.status_package.setText(
-            "● APK установлен"
+            "● Пакет установлен"
         )
         self.status_package.setStyleSheet(
             "color: #238636;"
@@ -1141,13 +1141,13 @@ class MainWindow(QMainWindow):
 
         if self.controller.package_name:
             self.status_package.setText(
-                "● APK установлен"
+                "● Пакет установлен"
             )
             self.status_package.setStyleSheet(
                 "color: #238636;"
             )
         else:
-            self.status_package.setText("○ APK")
+            self.status_package.setText("○ APK/XAPK")
             self.status_package.setStyleSheet("")
 
         if state.platform_tools:
