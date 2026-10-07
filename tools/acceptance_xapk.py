@@ -71,15 +71,19 @@ def main() -> int:
     build_tools = _newest_build_tools(sdk)
     aapt2 = build_tools / "aapt2"
     apksigner = build_tools / "apksigner"
+    d8 = build_tools / "d8"
     adb = sdk / "platform-tools" / "adb"
     android_jar = sdk / "platforms" / "android-35" / "android.jar"
     keytool = shutil.which("keytool")
+    javac = shutil.which("javac")
 
-    for path in (aapt2, apksigner, adb, android_jar):
+    for path in (aapt2, apksigner, d8, adb, android_jar):
         if not path.is_file():
             raise RuntimeError(f"Required Android tool is missing: {path}")
     if not keytool:
         raise RuntimeError("keytool is missing")
+    if not javac:
+        raise RuntimeError("javac is missing")
 
     with tempfile.TemporaryDirectory(prefix="apk-research-xapk-acceptance-") as raw:
         root = Path(raw)
@@ -90,9 +94,9 @@ def main() -> int:
     android:versionCode="1"
     android:versionName="1.0">
     <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="35" />
-    <application android:hasCode="false" android:label="XAPK Acceptance">
+    <application android:hasCode="true" android:label="XAPK Acceptance">
         <activity
-            android:name="android.app.Activity"
+            android:name=".MainActivity"
             android:exported="true"
             android:label="XAPK Acceptance">
             <intent-filter>
@@ -110,6 +114,59 @@ def main() -> int:
         base_apk = root / "base.apk"
         keystore = root / "acceptance.jks"
 
+        source_dir = (
+            root
+            / "src"
+            / "org"
+            / "apkresearch"
+            / "xapkacceptance"
+        )
+        source_dir.mkdir(parents=True, exist_ok=True)
+        activity_source = source_dir / "MainActivity.java"
+        activity_source.write_text(
+            """package org.apkresearch.xapkacceptance;
+
+public class MainActivity extends android.app.Activity {
+}
+""",
+            encoding="utf-8",
+        )
+        classes_dir = root / "classes"
+        classes_dir.mkdir(parents=True, exist_ok=True)
+        _run(
+            [
+                str(javac),
+                "-source",
+                "8",
+                "-target",
+                "8",
+                "-classpath",
+                str(android_jar),
+                "-d",
+                str(classes_dir),
+                str(activity_source),
+            ]
+        )
+        dex_dir = root / "dex"
+        dex_dir.mkdir(parents=True, exist_ok=True)
+        class_file = (
+            classes_dir
+            / "org"
+            / "apkresearch"
+            / "xapkacceptance"
+            / "MainActivity.class"
+        )
+        _run(
+            [
+                str(d8),
+                "--lib",
+                str(android_jar),
+                "--output",
+                str(dex_dir),
+                str(class_file),
+            ]
+        )
+
         _run(
             [
                 str(aapt2),
@@ -122,6 +179,15 @@ def main() -> int:
                 str(android_jar),
             ]
         )
+        with zipfile.ZipFile(
+            unsigned,
+            "a",
+            compression=zipfile.ZIP_DEFLATED,
+        ) as apk_archive:
+            apk_archive.write(
+                dex_dir / "classes.dex",
+                "classes.dex",
+            )
         _run(
             [
                 str(keytool),
