@@ -136,6 +136,7 @@ class MainWindow(QMainWindow):
         self._research_active = False
         self._busy = False
         self._last_archive: str | None = None
+        self._selected_package_path: str | None = None
         self._latest_release: ReleaseInfo | None = None
         self._update_check_thread: _UpdateCheckThread | None = None
         self._update_download_thread: _UpdateDownloadThread | None = None
@@ -301,6 +302,28 @@ class MainWindow(QMainWindow):
         apk_layout.addWidget(self.apk_path)
         apk_layout.addWidget(
             self.choose_apk_button
+        )
+        install_buttons = QHBoxLayout()
+        self.install_package_button = QPushButton(
+            "Установить в эмулятор"
+        )
+        self.install_package_button.setEnabled(False)
+        self.launch_package_button = QPushButton(
+            "Запустить приложение"
+        )
+        self.launch_package_button.setEnabled(False)
+        install_buttons.addWidget(
+            self.install_package_button
+        )
+        install_buttons.addWidget(
+            self.launch_package_button
+        )
+        apk_layout.addLayout(install_buttons)
+        self.android_home_button = QPushButton(
+            "Открыть главный экран Android"
+        )
+        apk_layout.addWidget(
+            self.android_home_button
         )
         apk_layout.addWidget(
             self.package_label
@@ -741,6 +764,15 @@ class MainWindow(QMainWindow):
         self.choose_apk_button.clicked.connect(
             self._choose_apk
         )
+        self.install_package_button.clicked.connect(
+            self._install_selected_package
+        )
+        self.launch_package_button.clicked.connect(
+            self.controller.launch_installed_package
+        )
+        self.android_home_button.clicked.connect(
+            self.controller.show_android_home
+        )
         self.prepare_button.clicked.connect(
             self._prepare_environment
         )
@@ -1104,14 +1136,41 @@ class MainWindow(QMainWindow):
         )
         if not path:
             return
-        if not self._ensure_android_license_consent():
-            return
+        self._selected_package_path = path
         self.apk_path.setText(path)
         self.package_label.setText(
-            "Package: определение…"
+            "Package: файл выбран, нажмите «Установить в эмулятор»"
         )
         self.start_button.setEnabled(False)
-        self.status_package.setText("◌ APK/XAPK")
+        self.launch_package_button.setEnabled(False)
+        self.install_package_button.setEnabled(
+            not self._busy
+            and not self._research_active
+        )
+        self.status_package.setText(
+            "○ Пакет выбран — не установлен"
+        )
+        self.status_package.setStyleSheet("")
+
+    def _install_selected_package(self) -> None:
+        path = self._selected_package_path
+        if not path:
+            QMessageBox.information(
+                self,
+                "Установка приложения",
+                "Сначала выберите APK или XAPK.",
+            )
+            return
+        if not self._ensure_android_license_consent():
+            return
+        self.package_label.setText(
+            "Package: установка…"
+        )
+        self.start_button.setEnabled(False)
+        self.launch_package_button.setEnabled(False)
+        self.status_package.setText(
+            "◌ Установка APK/XAPK"
+        )
         self.controller.prepare_apk(path)
 
     def _prepare_environment(self) -> None:
@@ -1200,6 +1259,20 @@ class MainWindow(QMainWindow):
             self.progress_bar.setValue(1)
             self.progress_label.setText("Готово")
         self.choose_apk_button.setEnabled(
+            not busy
+            and not self._research_active
+        )
+        self.install_package_button.setEnabled(
+            not busy
+            and not self._research_active
+            and bool(self._selected_package_path)
+        )
+        self.launch_package_button.setEnabled(
+            not busy
+            and not self._research_active
+            and bool(self.controller.package_name)
+        )
+        self.android_home_button.setEnabled(
             not busy
             and not self._research_active
         )
@@ -1312,9 +1385,17 @@ class MainWindow(QMainWindow):
         path: str,
         package: str,
     ) -> None:
+        self._selected_package_path = path
         self.apk_path.setText(path)
         self.package_label.setText(
             f"Package: {package}"
+        )
+        self.install_package_button.setText(
+            "Переустановить в эмулятор"
+        )
+        self.launch_package_button.setEnabled(
+            not self._busy
+            and not self._research_active
         )
         self.status_package.setText(
             "● Пакет установлен"
@@ -1348,6 +1429,9 @@ class MainWindow(QMainWindow):
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
         self.choose_apk_button.setEnabled(False)
+        self.install_package_button.setEnabled(False)
+        self.launch_package_button.setEnabled(False)
+        self.android_home_button.setEnabled(False)
         self.status_network.setText(
             "● PCAP записывается"
         )
@@ -1410,6 +1494,13 @@ class MainWindow(QMainWindow):
             )
         )
         self.choose_apk_button.setEnabled(True)
+        self.install_package_button.setEnabled(
+            bool(self._selected_package_path)
+        )
+        self.launch_package_button.setEnabled(
+            bool(self.controller.package_name)
+        )
+        self.android_home_button.setEnabled(True)
         self.status_network.setText(
             "● PCAP сохранён"
         )

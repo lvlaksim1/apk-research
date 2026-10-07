@@ -112,6 +112,21 @@ class DesktopController(QObject):
             self._prepare_environment_worker
         )
 
+    def launch_installed_package(self) -> None:
+        if not self.package_name:
+            self.error.emit(
+                "Сначала установите APK/XAPK в эмулятор"
+            )
+            return
+        self._thread(
+            self._launch_installed_package_worker
+        )
+
+    def show_android_home(self) -> None:
+        self._thread(
+            self._show_android_home_worker
+        )
+
     def start_research(
         self,
         clean_launch: bool = True,
@@ -524,6 +539,61 @@ class DesktopController(QObject):
             )
             self.log.emit(
                 f"Готово к исследованию: {package}"
+            )
+        except Exception as exc:
+            self.error.emit(
+                str(exc)
+                or exc.__class__.__name__
+            )
+        finally:
+            self._set_busy(False)
+
+    def _launch_installed_package_worker(self) -> None:
+        try:
+            self._set_busy(True)
+            package = self.package_name
+            if not package:
+                raise RuntimeError(
+                    "Сначала установите APK/XAPK в эмулятор"
+                )
+            self.runtime.ensure_ready(
+                self._progress_callback,
+                self._display_ready_callback,
+            )
+            self._start_screen_stream(
+                wait_for_first_frame=True,
+            )
+            client = AdbClient(
+                self.runtime.paths.adb
+            )
+            client.launch_package(
+                self.runtime.SERIAL,
+                package,
+            )
+            self.log.emit(
+                f"Приложение запущено в эмуляторе: {package}"
+            )
+        except Exception as exc:
+            self.error.emit(
+                str(exc)
+                or exc.__class__.__name__
+            )
+        finally:
+            self._set_busy(False)
+
+    def _show_android_home_worker(self) -> None:
+        try:
+            self._set_busy(True)
+            self.runtime.ensure_ready(
+                self._progress_callback,
+                self._display_ready_callback,
+            )
+            self._start_screen_stream(
+                wait_for_first_frame=True,
+            )
+            self.runtime.keyevent(3)
+            self.log.emit(
+                "Открыт главный экран Android"
             )
         except Exception as exc:
             self.error.emit(

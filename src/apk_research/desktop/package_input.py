@@ -11,6 +11,11 @@ from typing import Iterator
 
 _PACKAGE_LINE_RE = re.compile(r"^package:\s+(.*)$", re.MULTILINE)
 _ATTRIBUTE_RE = re.compile(r"([A-Za-z0-9_]+)='([^']*)'")
+_NATIVE_CODE_LINE_RE = re.compile(
+    r"^native-code:\s+(.*)$",
+    re.MULTILINE,
+)
+_QUOTED_VALUE_RE = re.compile(r"'([^']+)'")
 
 MAX_XAPK_APKS = 64
 MAX_XAPK_OBBS = 64
@@ -27,6 +32,7 @@ class ApkBadging:
     package_name: str
     version_code: str
     split_name: str | None
+    native_codes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -51,16 +57,39 @@ def parse_apk_badging(output: str, path: Path) -> ApkBadging:
         )
     version_code = attributes.get("versionCode", "").strip()
     split_name = attributes.get("split", "").strip() or None
+
+    native_codes: list[str] = []
+    native_match = _NATIVE_CODE_LINE_RE.search(output)
+    if native_match:
+        for value in _QUOTED_VALUE_RE.findall(
+            native_match.group(1)
+        ):
+            normalized = value.strip()
+            if normalized and normalized not in native_codes:
+                native_codes.append(normalized)
+
     return ApkBadging(
         path=path,
         package_name=package_name,
         version_code=version_code,
         split_name=split_name,
+        native_codes=tuple(native_codes),
     )
+
+
+def _format_abis(values: tuple[str, ...] | list[str] | set[str]) -> str:
+    normalized = [
+        str(value).strip()
+        for value in values
+        if str(value).strip()
+    ]
+    return ", ".join(normalized) if normalized else "не указаны"
 
 
 def validate_apk_set(
     badgings: list[ApkBadging],
+    *,
+    device_abis: tuple[str, ...] | list[str] | None = None,
 ) -> tuple[str, tuple[ApkBadging, ...]]:
     if not badgings:
         raise PackageInputError("В пакете не найдено ни одного APK")
@@ -107,7 +136,57 @@ def validate_apk_set(
             item.path.name.lower(),
         ),
     )
-    return base.package_name, (base, *splits)
+
+    normalized_device_abis = tuple(
+        dict.fromkeys(
+            str(value).strip()
+            for value in (device_abis or ())
+            if str(value).strip()
+        )
+    )
+    if not normalized_device_abis:
+        return base.package_name, (base, *splits)
+
+    device_set = set(normalized_device_abis)
+    package_native_abis = {
+        abi
+        for item in badgings
+        for abi in item.native_codes
+        if abi
+    }
+
+    if base.native_codes and not (
+        device_set & set(base.native_codes)
+    ):
+        raise PackageInputError(
+            "Базовый APK содержит нативные библиотеки только для "
+            f"{_format_abis(base.native_codes)}, а текущий эмулятор "
+            f"поддерживает {_format_abis(normalized_device_abis)}. "
+            "Установка невозможна."
+        )
+
+    if package_native_abis and not (
+        device_set & package_native_abis
+    ):
+        raise PackageInputError(
+            "XAPK содержит нативные библиотеки только для "
+            f"{_format_abis(sorted(package_native_abis))}, а текущий "
+            f"эмулятор поддерживает {_format_abis(normalized_device_abis)}. "
+            "Установка невозможна."
+        )
+
+    selected_splits: list[ApkBadging] = []
+    for split in splits:
+        if not split.native_codes:
+            selected_splits.append(split)
+            continue
+        if device_set & set(split.native_codes):
+            selected_splits.append(split)
+
+    return base.package_name, (
+        base,
+        *selected_splits,
+    )
 
 
 def _safe_member_path(name: str) -> PurePosixPath:

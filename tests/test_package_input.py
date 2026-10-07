@@ -146,3 +146,108 @@ def test_materialize_rejects_unknown_extension(tmp_path: Path) -> None:
     with pytest.raises(PackageInputError, match="только APK и XAPK"):
         with materialize_android_package(path):
             pass
+
+
+def test_parse_apk_badging_reads_native_code(tmp_path: Path) -> None:
+    item = parse_apk_badging(
+        "package: name='com.example.app' versionCode='42' "
+        "split='config.arm64_v8a'\n"
+        "native-code: 'arm64-v8a' 'armeabi-v7a'\n",
+        tmp_path / "config.arm64_v8a.apk",
+    )
+
+    assert item.native_codes == (
+        "arm64-v8a",
+        "armeabi-v7a",
+    )
+
+
+def test_validate_apk_set_selects_only_matching_abi_split(
+    tmp_path: Path,
+) -> None:
+    package, ordered = validate_apk_set(
+        [
+            ApkBadging(
+                tmp_path / "base.apk",
+                "com.example.app",
+                "42",
+                None,
+            ),
+            ApkBadging(
+                tmp_path / "arm64.apk",
+                "com.example.app",
+                "42",
+                "config.arm64_v8a",
+                ("arm64-v8a",),
+            ),
+            ApkBadging(
+                tmp_path / "x86_64.apk",
+                "com.example.app",
+                "42",
+                "config.x86_64",
+                ("x86_64",),
+            ),
+            ApkBadging(
+                tmp_path / "ru.apk",
+                "com.example.app",
+                "42",
+                "config.ru",
+            ),
+        ],
+        device_abis=("x86_64", "x86"),
+    )
+
+    assert package == "com.example.app"
+    assert [item.path.name for item in ordered] == [
+        "base.apk",
+        "ru.apk",
+        "x86_64.apk",
+    ]
+
+
+def test_validate_apk_set_rejects_package_without_matching_abi(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        PackageInputError,
+        match="arm64-v8a.*x86_64",
+    ):
+        validate_apk_set(
+            [
+                ApkBadging(
+                    tmp_path / "base.apk",
+                    "com.example.app",
+                    "42",
+                    None,
+                ),
+                ApkBadging(
+                    tmp_path / "arm64.apk",
+                    "com.example.app",
+                    "42",
+                    "config.arm64_v8a",
+                    ("arm64-v8a",),
+                ),
+            ],
+            device_abis=("x86_64",),
+        )
+
+
+def test_validate_apk_set_rejects_incompatible_native_base(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        PackageInputError,
+        match="Базовый APK.*arm64-v8a.*x86_64",
+    ):
+        validate_apk_set(
+            [
+                ApkBadging(
+                    tmp_path / "base.apk",
+                    "com.example.app",
+                    "42",
+                    None,
+                    ("arm64-v8a",),
+                ),
+            ],
+            device_abis=("x86_64",),
+        )

@@ -657,6 +657,29 @@ class AndroidRuntime:
     ) -> str:
         return self._apk_badging(apk_path).package_name
 
+    def device_abis(self) -> tuple[str, ...]:
+        result = self._adb_shell(
+            "getprop",
+            "ro.product.cpu.abilist",
+            timeout=10.0,
+            check=False,
+        )
+        values = [
+            value.strip()
+            for value in result.stdout.strip().split(",")
+            if value.strip()
+        ]
+        if not values:
+            fallback = self._adb_shell(
+                "getprop",
+                "ro.product.cpu.abi",
+                timeout=10.0,
+                check=False,
+            ).stdout.strip()
+            if fallback:
+                values = [fallback]
+        return tuple(dict.fromkeys(values))
+
     def install_package(
         self,
         package_path: str | os.PathLike[str],
@@ -670,8 +693,23 @@ class AndroidRuntime:
                     self._apk_badging(path)
                     for path in materialized.apk_files
                 ]
+                device_abis = self.device_abis()
+                self._emit(
+                    progress,
+                    "Архитектуры эмулятора: "
+                    + (
+                        ", ".join(device_abis)
+                        if device_abis
+                        else "не определены"
+                    ),
+                    None,
+                    None,
+                )
                 try:
-                    package, ordered = validate_apk_set(badgings)
+                    package, ordered = validate_apk_set(
+                        badgings,
+                        device_abis=device_abis,
+                    )
                 except PackageInputError as exc:
                     raise AndroidRuntimeError(str(exc)) from exc
 
@@ -679,6 +717,7 @@ class AndroidRuntime:
                     item.path
                     for item in ordered
                 ]
+                skipped = len(badgings) - len(ordered)
                 self._emit(
                     progress,
                     (
@@ -686,7 +725,12 @@ class AndroidRuntime:
                         if materialized.source_format == "apk"
                         else (
                             f"Установка XAPK {source.name}: "
-                            f"{len(apk_files)} APK-частей"
+                            f"{len(apk_files)} совместимых APK-частей"
+                            + (
+                                f", исключено несовместимых ABI: {skipped}"
+                                if skipped
+                                else ""
+                            )
                         )
                     ),
                     None,
@@ -722,15 +766,42 @@ class AndroidRuntime:
                 result = self._run(
                     command,
                     timeout=300.0,
+                    check=False,
                 )
                 combined = (
                     result.stdout + "\n" + result.stderr
-                ).lower()
-                if "success" not in combined:
+                ).strip()
+                lowered = combined.lower()
+                if result.returncode != 0 or "success" not in lowered:
+                    if "install_failed_no_matching_abis" in lowered:
+                        package_abis = sorted(
+                            {
+                                abi
+                                for item in badgings
+                                for abi in item.native_codes
+                                if abi
+                            }
+                        )
+                        raise AndroidRuntimeError(
+                            "Приложение нельзя установить: "
+                            "Android сообщает INSTALL_FAILED_NO_MATCHING_ABIS. "
+                            "Архитектуры пакета: "
+                            + (
+                                ", ".join(package_abis)
+                                if package_abis
+                                else "не удалось определить"
+                            )
+                            + "; архитектуры эмулятора: "
+                            + (
+                                ", ".join(device_abis)
+                                if device_abis
+                                else "не удалось определить"
+                            )
+                            + "."
+                        )
                     raise AndroidRuntimeError(
                         "Android не подтвердил установку пакета: "
-                        f"{result.stdout.strip()} "
-                        f"{result.stderr.strip()}"
+                        + (combined or "нет диагностики")
                     )
 
                 if materialized.obb_files:

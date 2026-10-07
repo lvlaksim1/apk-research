@@ -22,6 +22,13 @@ WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
+SetupIconFile=..\build\app-icon\apk-research.ico
+UsePreviousAppDir=yes
+UsePreviousGroup=yes
+UsePreviousTasks=yes
+CloseApplications=yes
+RestartApplications=no
+DisableDirPage=auto
 
 [Files]
 Source: "..\dist\apk-research\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -35,3 +42,15 @@ Name: "desktopicon"; Description: "Создать ярлык на рабочем
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Запустить {#MyAppName}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function IsUpdateMode: Boolean;
+begin
+  Result := CompareText(ExpandConstant('{param:UPDATE|0}'), '1') = 0;
+end;
+
+procedure InitializeWizard;
+begin
+  if IsUpdateMode then
+    WizardForm.Caption := 'Обновление apk-research';
+end;

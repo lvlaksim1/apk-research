@@ -227,5 +227,6 @@ def test_windows_update_script_waits_installs_and_restarts(
     assert "Wait-Process -Id 4321" in script
     assert "/VERYSILENT" in script
     assert "/SUPPRESSMSGBOXES" in script
+    assert "/UPDATE=1" in script
     assert f'/DIR="{install_dir}"' in script
     assert "Start-Process -FilePath $restart" in script
