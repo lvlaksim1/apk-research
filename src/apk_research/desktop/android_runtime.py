@@ -890,7 +890,14 @@ class AndroidRuntime:
         ):
             raise AndroidRuntimeError(
                 "Launcher3 не подтвердил создание ярлыка "
-                f"для {package_name}. Ответ: "
+                f"для {package_name}. "
+                "Ответ insert: "
+                + (
+                    inserted.stderr.strip()
+                    or inserted.stdout.strip()
+                    or "пустой"
+                )
+                + ". Ответ query: "
                 + (
                     verify.stderr.strip()
                     or verify.stdout.strip()
