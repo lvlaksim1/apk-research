@@ -23,9 +23,9 @@ The update package does not invoke the old uninstaller. Start-menu and optional 
 
 The redundant «Открыть главный экран Android» button is removed and must not be reintroduced.
 
-The owner has an outstanding product requirement: after a successful APK/XAPK installation, the installed Android application should have a launch shortcut visible on the managed Android home screen.
+The previously open owner requirement to create an Android home-screen shortcut after APK/XAPK installation was explicitly cancelled by the owner on 2026-10-08. It is not an active product requirement and must not be resumed unless the owner explicitly reopens it.
 
-Experimental attempts to force that Launcher3 workspace shortcut through provider/database manipulation were not merged into the verified product. They established useful constraints but did not produce a sufficiently verified product mechanism. This Android-home requirement remains open and is separate from the already completed Windows Inno shortcut/update work.
+Prior Launcher3 provider/database experiments remain research history only and were never merged into the verified product.
 
 ## Protected product semantics
 
