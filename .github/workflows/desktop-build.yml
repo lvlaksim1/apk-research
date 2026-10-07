@@ -101,6 +101,69 @@ jobs:
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" packaging\apk-research.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Upgrade previous release in place
+        shell: pwsh
+        run: |
+          $upgradeDir = Join-Path $env:RUNNER_TEMP "apk-research-upgrade"
+          New-Item -ItemType Directory -Force $upgradeDir | Out-Null
+
+          $previousVersion = "0.29.0"
+          $previousInstaller = Join-Path $env:RUNNER_TEMP "apk-research-setup_v$previousVersion.exe"
+          $previousUrl = "https://github.com/lvlaksim1/apk-research/releases/download/v$previousVersion/apk-research-setup_v$previousVersion.exe"
+          Invoke-WebRequest -Uri $previousUrl -OutFile $previousInstaller
+
+          $beforeInstall = Start-Process -FilePath $previousInstaller -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/SP-",
+            "/DIR=$upgradeDir"
+          ) -Wait -PassThru
+          if ($beforeInstall.ExitCode -ne 0) {
+            throw "Previous release install failed: $($beforeInstall.ExitCode)"
+          }
+
+          $installedExe = Join-Path $upgradeDir "apk-research.exe"
+          $before = & $installedExe --self-test | Out-String
+          if ($before -notmatch "apk-research $([regex]::Escape($previousVersion))") {
+            throw "Previous release verification failed: $before"
+          }
+
+          $text = Get-Content pyproject.toml -Raw
+          if ($text -notmatch '(?m)^version\s*=\s*"([^"]+)"') { throw "Version not found" }
+          $version = $Matches[1]
+          $candidate = (Resolve-Path "installer\apk-research-setup_v$version.exe").Path
+          $env:APK_UPDATE_INSTALLER = $candidate
+          $env:APK_UPDATE_DIR = $upgradeDir
+          $env:APK_UPDATE_VERSION = $version
+          $env:APK_UPDATE_EXE = $installedExe
+
+          python -c "import os; from pathlib import Path; from apk_research.desktop.updater import DownloadedUpdate, ReleaseInfo, launch_update_after_exit; installer=Path(os.environ['APK_UPDATE_INSTALLER']); release=ReleaseInfo(version=os.environ['APK_UPDATE_VERSION'], tag='v'+os.environ['APK_UPDATE_VERSION'], installer_name=installer.name, installer_url='', installer_size=installer.stat().st_size, checksums_url='', release_url=''); downloaded=DownloadedUpdate(release=release, installer_path=installer, sha256='acceptance'); launch_update_after_exit(downloaded, current_pid=os.getpid(), install_dir=Path(os.environ['APK_UPDATE_DIR']), restart_exe=Path(os.environ['APK_UPDATE_EXE']), relaunch=False)"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Updater handoff process failed: $LASTEXITCODE"
+          }
+
+          $updated = $false
+          $after = ""
+          for ($i = 0; $i -lt 12; $i++) {
+            Start-Sleep -Seconds 5
+            if (Test-Path $installedExe) {
+              $after = & $installedExe --self-test | Out-String
+              if ($after -match "apk-research $([regex]::Escape($version))") {
+                $updated = $true
+                break
+              }
+            }
+          }
+
+          if (-not $updated) {
+            $upgradeLog = Join-Path $env:LOCALAPPDATA "apk-research\updates\installer.log"
+            $handoffLog = Join-Path $env:LOCALAPPDATA "apk-research\updates\handoff.log"
+            if (Test-Path $handoffLog) { Get-Content $handoffLog }
+            if (Test-Path $upgradeLog) { Get-Content $upgradeLog }
+            throw "Direct updater handoff did not produce version $version. Last output: $after"
+          }
+
       - name: Install built package and smoke-test installed app
         shell: pwsh
         run: |

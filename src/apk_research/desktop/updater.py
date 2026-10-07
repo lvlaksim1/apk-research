@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import hashlib
 import json
 import os
@@ -293,45 +292,36 @@ def download_release(
     )
 
 
-def _ps_quote(value: str | os.PathLike[str]) -> str:
-    return "'" + str(value).replace("'", "''") + "'"
+def update_log_path() -> Path:
+    root = Path(
+        os.environ.get(
+            "LOCALAPPDATA",
+            tempfile.gettempdir(),
+        )
+    ) / "apk-research" / "updates"
+    root.mkdir(parents=True, exist_ok=True)
+    return root / "installer.log"
 
 
-def build_windows_update_script(
+def build_installer_arguments(
     *,
-    current_pid: int,
-    installer_path: Path,
     install_dir: Path,
-    restart_exe: Path,
-) -> str:
-    installer = _ps_quote(installer_path)
-    directory = _ps_quote(str(install_dir))
-    restart = _ps_quote(restart_exe)
+    log_path: Path,
+    relaunch: bool = True,
+) -> list[str]:
     arguments = [
         "/VERYSILENT",
         "/SUPPRESSMSGBOXES",
         "/NORESTART",
+        "/CLOSEAPPLICATIONS",
         "/SP-",
         "/UPDATE=1",
-        f'/DIR="{install_dir}"',
+        f"/DIR={install_dir}",
+        f"/LOG={log_path}",
     ]
-    ps_args = ",".join(_ps_quote(value) for value in arguments)
-    return (
-        "$ErrorActionPreference='Stop';"
-        f"Wait-Process -Id {int(current_pid)} "
-        "-ErrorAction SilentlyContinue;"
-        f"$installer={installer};"
-        f"$target={directory};"
-        f"$restart={restart};"
-        f"$args=@({ps_args});"
-        "$p=Start-Process -FilePath $installer "
-        "-ArgumentList $args -Wait -PassThru;"
-        "if($p.ExitCode -ne 0){exit $p.ExitCode};"
-        "if(Test-Path -LiteralPath $restart){"
-        "Start-Process -FilePath $restart;"
-        "};"
-        "exit 0"
-    )
+    if not relaunch:
+        arguments.append("/NORELAUNCH=1")
+    return arguments
 
 
 def launch_update_after_exit(
@@ -340,7 +330,11 @@ def launch_update_after_exit(
     current_pid: int,
     install_dir: Path,
     restart_exe: Path,
+    relaunch: bool = True,
 ) -> None:
+    del current_pid
+    del restart_exe
+
     if os.name != "nt":
         raise UpdateError(
             "Автоматическая установка обновления "
@@ -351,34 +345,46 @@ def launch_update_after_exit(
             "Скачанный установщик обновления не найден"
         )
 
-    script = build_windows_update_script(
-        current_pid=current_pid,
-        installer_path=downloaded.installer_path,
-        install_dir=install_dir,
-        restart_exe=restart_exe,
+    target_dir = Path(install_dir).resolve()
+    log_path = update_log_path()
+    arguments = build_installer_arguments(
+        install_dir=target_dir,
+        log_path=log_path,
+        relaunch=relaunch,
     )
-    encoded = base64.b64encode(
-        script.encode("utf-16-le")
-    ).decode("ascii")
-    creation_flags = (
-        getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        | getattr(
-            subprocess,
-            "DETACHED_PROCESS",
-            0,
+
+    handoff_log = log_path.with_name(
+        "handoff.log"
+    )
+    try:
+        handoff_log.write_text(
+            "\n".join(
+                [
+                    "apk-research updater handoff",
+                    f"installer={downloaded.installer_path}",
+                    f"target={target_dir}",
+                    f"release={downloaded.release.version}",
+                    "mode=direct-inno",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
         )
+    except OSError:
+        pass
+
+    creation_flags = getattr(
+        subprocess,
+        "CREATE_NEW_PROCESS_GROUP",
+        0,
     )
     try:
         subprocess.Popen(
             [
-                "powershell.exe",
-                "-NoProfile",
-                "-NonInteractive",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-EncodedCommand",
-                encoded,
+                str(downloaded.installer_path),
+                *arguments,
             ],
+            cwd=str(downloaded.installer_path.parent),
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

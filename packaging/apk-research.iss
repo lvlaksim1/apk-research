@@ -41,12 +41,19 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Name: "desktopicon"; Description: "Создать ярлык на рабочем столе"; GroupDescription: "Дополнительно:"; Flags: unchecked
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Запустить {#MyAppName}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "Запустить {#MyAppName}"; Flags: nowait postinstall skipifsilent; Check: not IsUpdateMode
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait skipifdoesntexist; Check: ShouldRelaunchAfterUpdate
 
 [Code]
 function IsUpdateMode: Boolean;
 begin
   Result := CompareText(ExpandConstant('{param:UPDATE|0}'), '1') = 0;
+end;
+
+function ShouldRelaunchAfterUpdate: Boolean;
+begin
+  Result := IsUpdateMode and
+    (CompareText(ExpandConstant('{param:NORELAUNCH|0}'), '1') <> 0);
 end;
 
 procedure InitializeWizard;
