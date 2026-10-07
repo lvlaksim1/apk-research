@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import zipfile
 from pathlib import Path
 
 from PySide6.QtCore import (
     QSettings,
+    QThread,
     Qt,
     QTimer,
     QUrl,
+    Signal,
 )
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QFileDialog,
     QGridLayout,
@@ -33,15 +37,89 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from apk_research import __version__
 from apk_research.desktop.android_view import (
     AndroidView,
 )
 from apk_research.desktop.controller import (
     DesktopController,
 )
+from apk_research.desktop.updater import (
+    DownloadedUpdate,
+    ReleaseInfo,
+    check_latest_release,
+    download_release,
+    is_newer_version,
+    launch_update_after_exit,
+)
 from apk_research.session import (
     default_runtime_root,
 )
+
+
+class _UpdateCheckThread(QThread):
+    ready = Signal(object)
+    failed = Signal(str)
+
+    def __init__(
+        self,
+        current_version: str,
+        parent=None,
+    ) -> None:
+        super().__init__(parent)
+        self.current_version = current_version
+
+    def run(self) -> None:
+        try:
+            release = check_latest_release(
+                self.current_version
+            )
+        except Exception as exc:
+            self.failed.emit(
+                str(exc) or exc.__class__.__name__
+            )
+            return
+        self.ready.emit(release)
+
+
+class _UpdateDownloadThread(QThread):
+    ready = Signal(object)
+    failed = Signal(str)
+    progress = Signal(int, int)
+
+    def __init__(
+        self,
+        release: ReleaseInfo,
+        current_version: str,
+        parent=None,
+    ) -> None:
+        super().__init__(parent)
+        self.release = release
+        self.current_version = current_version
+
+    def run(self) -> None:
+        try:
+            downloaded = download_release(
+                self.release,
+                current_version=self.current_version,
+                progress=self._emit_progress,
+            )
+        except Exception as exc:
+            self.failed.emit(
+                str(exc) or exc.__class__.__name__
+            )
+            return
+        self.ready.emit(downloaded)
+
+    def _emit_progress(
+        self,
+        current: int,
+        total: int,
+    ) -> None:
+        self.progress.emit(
+            int(current),
+            int(total),
+        )
 
 
 class MainWindow(QMainWindow):
@@ -58,6 +136,11 @@ class MainWindow(QMainWindow):
         self._research_active = False
         self._busy = False
         self._last_archive: str | None = None
+        self._latest_release: ReleaseInfo | None = None
+        self._update_check_thread: _UpdateCheckThread | None = None
+        self._update_download_thread: _UpdateDownloadThread | None = None
+        self._update_busy = False
+        self._applying_update = False
         self._build_ui()
         self._connect_signals()
         self._refresh_component_state()
@@ -69,6 +152,27 @@ class MainWindow(QMainWindow):
         )
 
     def closeEvent(self, event) -> None:  # noqa: N802
+        if self._applying_update:
+            self.controller.close()
+            event.accept()
+            return
+        if (
+            (
+                self._update_check_thread is not None
+                and self._update_check_thread.isRunning()
+            )
+            or (
+                self._update_download_thread is not None
+                and self._update_download_thread.isRunning()
+            )
+        ):
+            QMessageBox.information(
+                self,
+                "Обновление",
+                "Дождитесь завершения текущей операции обновления.",
+            )
+            event.ignore()
+            return
         if self._research_active:
             response = QMessageBox.question(
                 self,
@@ -574,6 +678,50 @@ class MainWindow(QMainWindow):
         )
         layout.addWidget(session_group)
 
+        update_group = QGroupBox(
+            "Обновление программы"
+        )
+        update_layout = QVBoxLayout(
+            update_group
+        )
+        self.update_version_label = QLabel(
+            f"Текущая версия: {__version__}"
+        )
+        self.update_status_label = QLabel(
+            "Обновления ещё не проверялись."
+        )
+        self.update_status_label.setWordWrap(True)
+        update_buttons = QHBoxLayout()
+        self.check_updates_button = QPushButton(
+            "Проверить обновления"
+        )
+        self.install_update_button = QPushButton(
+            "Обновить"
+        )
+        self.install_update_button.setVisible(False)
+        update_buttons.addWidget(
+            self.check_updates_button
+        )
+        update_buttons.addWidget(
+            self.install_update_button
+        )
+        update_buttons.addStretch(1)
+        self.update_progress = QProgressBar()
+        self.update_progress.setRange(0, 1000)
+        self.update_progress.setValue(0)
+        self.update_progress.setVisible(False)
+        update_layout.addWidget(
+            self.update_version_label
+        )
+        update_layout.addWidget(
+            self.update_status_label
+        )
+        update_layout.addLayout(update_buttons)
+        update_layout.addWidget(
+            self.update_progress
+        )
+        layout.addWidget(update_group)
+
         note = QLabel(
             "Python, Android Studio и отдельный ADB "
             "пользователю не требуются. При первом "
@@ -693,6 +841,243 @@ class MainWindow(QMainWindow):
         )
         self.repair_components_button.clicked.connect(
             self._repair_components
+        )
+        self.check_updates_button.clicked.connect(
+            self._check_for_updates
+        )
+        self.install_update_button.clicked.connect(
+            self._install_latest_update
+        )
+
+    def _check_for_updates(self) -> None:
+        if self._update_busy:
+            return
+        self._latest_release = None
+        self._update_busy = True
+        self.install_update_button.setVisible(False)
+        self.update_progress.setVisible(False)
+        self.update_status_label.setText(
+            "Проверка последнего стабильного релиза GitHub…"
+        )
+        self._refresh_update_controls()
+
+        thread = _UpdateCheckThread(
+            __version__,
+            self,
+        )
+        self._update_check_thread = thread
+        thread.ready.connect(
+            self._on_update_check_ready
+        )
+        thread.failed.connect(
+            self._on_update_check_failed
+        )
+        thread.finished.connect(
+            self._on_update_check_finished
+        )
+        thread.start()
+
+    def _on_update_check_ready(
+        self,
+        release: ReleaseInfo,
+    ) -> None:
+        if is_newer_version(
+            release.version,
+            __version__,
+        ):
+            self._latest_release = release
+            self.update_status_label.setText(
+                "Доступна новая версия: "
+                f"{release.version}. "
+                "Установщик будет скачан напрямую "
+                "из последнего релиза GitHub."
+            )
+            self.install_update_button.setText(
+                f"Обновить до {release.version}"
+            )
+            self.install_update_button.setVisible(
+                True
+            )
+        else:
+            self._latest_release = None
+            self.update_status_label.setText(
+                "Установлена последняя версия: "
+                f"{__version__}."
+            )
+            self.install_update_button.setVisible(
+                False
+            )
+
+    def _on_update_check_failed(
+        self,
+        message: str,
+    ) -> None:
+        self._latest_release = None
+        self.update_status_label.setText(
+            "Не удалось проверить обновления: "
+            + message
+        )
+        self.install_update_button.setVisible(
+            False
+        )
+
+    def _on_update_check_finished(
+        self,
+    ) -> None:
+        thread = self._update_check_thread
+        self._update_check_thread = None
+        self._update_busy = False
+        if thread is not None:
+            thread.deleteLater()
+        self._refresh_update_controls()
+
+    def _install_latest_update(self) -> None:
+        release = self._latest_release
+        if release is None or self._update_busy:
+            return
+        if self._research_active or self._busy:
+            QMessageBox.warning(
+                self,
+                "Обновление",
+                "Завершите текущую операцию или исследование "
+                "перед обновлением программы.",
+            )
+            return
+        if os.name != "nt" or not getattr(
+            sys,
+            "frozen",
+            False,
+        ):
+            QMessageBox.information(
+                self,
+                "Обновление",
+                "Автоматическая установка доступна "
+                "в установленной Windows-версии apk-research.",
+            )
+            return
+
+        response = QMessageBox.question(
+            self,
+            "Обновление apk-research",
+            "Скачать, проверить и установить "
+            f"apk-research {release.version}?\n\n"
+            "После проверки установщика программа закроется, "
+            "обновится и запустится снова.",
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.Cancel,
+        )
+        if response != QMessageBox.StandardButton.Yes:
+            return
+
+        self._update_busy = True
+        self.update_status_label.setText(
+            f"Скачивание apk-research {release.version}…"
+        )
+        self.update_progress.setRange(0, 0)
+        self.update_progress.setVisible(True)
+        self._refresh_update_controls()
+
+        thread = _UpdateDownloadThread(
+            release,
+            __version__,
+            self,
+        )
+        self._update_download_thread = thread
+        thread.progress.connect(
+            self._on_update_download_progress
+        )
+        thread.ready.connect(
+            self._on_update_download_ready
+        )
+        thread.failed.connect(
+            self._on_update_download_failed
+        )
+        thread.finished.connect(
+            self._on_update_download_finished
+        )
+        thread.start()
+
+    def _on_update_download_progress(
+        self,
+        current: int,
+        total: int,
+    ) -> None:
+        if total <= 0:
+            self.update_progress.setRange(0, 0)
+            return
+        ratio = min(
+            1.0,
+            max(0.0, current / total),
+        )
+        self.update_progress.setRange(0, 1000)
+        self.update_progress.setValue(
+            int(ratio * 1000)
+        )
+        self.update_status_label.setText(
+            "Скачивание обновления — "
+            f"{current / (1024 * 1024):.1f} / "
+            f"{total / (1024 * 1024):.1f} МБ "
+            f"({ratio * 100:.0f}%)"
+        )
+
+    def _on_update_download_ready(
+        self,
+        downloaded: DownloadedUpdate,
+    ) -> None:
+        executable = Path(
+            sys.executable
+        ).resolve()
+        try:
+            launch_update_after_exit(
+                downloaded,
+                current_pid=os.getpid(),
+                install_dir=executable.parent,
+                restart_exe=executable,
+            )
+        except Exception as exc:
+            self._on_update_download_failed(
+                str(exc) or exc.__class__.__name__
+            )
+            return
+
+        self._applying_update = True
+        self.update_progress.setRange(0, 1000)
+        self.update_progress.setValue(1000)
+        self.update_status_label.setText(
+            "Установщик проверен. "
+            "Программа закрывается для обновления…"
+        )
+        QApplication.quit()
+
+    def _on_update_download_failed(
+        self,
+        message: str,
+    ) -> None:
+        self.update_status_label.setText(
+            "Обновление не установлено: "
+            + message
+        )
+        self.update_progress.setVisible(False)
+
+    def _on_update_download_finished(
+        self,
+    ) -> None:
+        thread = self._update_download_thread
+        self._update_download_thread = None
+        self._update_busy = False
+        if thread is not None:
+            thread.deleteLater()
+        self._refresh_update_controls()
+
+    def _refresh_update_controls(self) -> None:
+        self.check_updates_button.setEnabled(
+            not self._update_busy
+        )
+        self.install_update_button.setEnabled(
+            not self._update_busy
+            and not self._research_active
+            and not self._busy
+            and self._latest_release is not None
         )
 
     def _start_research(self) -> None:
@@ -842,6 +1227,7 @@ class MainWindow(QMainWindow):
         self.repair_components_button.setEnabled(
             settings_enabled
         )
+        self._refresh_update_controls()
 
     def _on_environment_ready(
         self,
