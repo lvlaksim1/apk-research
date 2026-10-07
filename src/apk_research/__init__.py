@@ -1,7 +1,7 @@
 """apk-research core package."""
 
-__version__ = "0.29.0"
+__version__ = "0.29.1"
 
-# v0.29.0 adds ABI-aware XAPK intake, explicit emulator app controls,
-# a project-owned Windows icon, and explicit in-place update mode.
+# v0.29.1 replaces the hidden PowerShell updater relay with
+# a direct verified-installer handoff and installer-owned relaunch.
 __all__ = ["__version__"]

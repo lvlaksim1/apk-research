@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.29.1] - 2026-10-07
+
+### Fixed
+- Removed the hidden PowerShell relay from the self-update handoff.
+- The verified Inno Setup installer is now launched directly before apk-research exits.
+- Inno Setup now owns successful post-update relaunch of apk-research.
+- Added persistent update handoff and installer logs under the user's local application data.
+
+### Verification
+- Windows CI now installs published v0.29.0, invokes the candidate updater through the same Python handoff used by the GUI, lets that parent process exit, then checks at five-second intervals that the installed application reaches the candidate version.
+- Existing in-place update, checksum verification, GUI, AVD and clean-Windows gates remain required.
+
 ## [0.29.0] - 2026-10-07
 
 ### Fixed

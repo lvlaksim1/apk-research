@@ -1,5 +1,27 @@
 # Refactoring and Architecture Log
 
+## v0.29.1 — Reliable update process handoff
+
+### Direct-installer invariant
+
+The application no longer creates a detached PowerShell script/process to wait, install and restart. After release integrity verification, apk-research starts the verified Inno Setup executable directly as an independent Windows child process and then exits.
+
+### Relaunch ownership
+
+Inno Setup owns the successful relaunch. In update mode, a dedicated `[Run]` entry starts the installed `apk-research.exe` after files have been updated successfully. `/NORELAUNCH=1` exists only for automated acceptance where the launched GUI would interfere with verification.
+
+### Diagnostic invariant
+
+The updater writes a handoff record and passes a persistent `/LOG` path to Inno Setup under the user's local application-data directory. A failed update therefore leaves post-mortem evidence even after the GUI has closed.
+
+### Parent-exit acceptance
+
+Windows CI verifies the exact failure mode reported by the owner: previous release installed, updater launched through production Python code, initiating Python process exits, then the installed executable is polled no faster than every five seconds until the candidate version is observed or the check fails with installer/handoff logs.
+
+### Compatibility boundary
+
+Release discovery, SHA-256 verification, same-AppId in-place installation, APK/XAPK runtime, evidence collection and forensic semantics are unchanged.
+
 ## v0.29.0 — Corrective package/runtime UX
 
 ### ABI-selection invariant
