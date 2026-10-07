@@ -4,38 +4,47 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+APP_ID = "{{5C5EE2B7-78FB-47E1-95C7-85AA2540195A}"
 
 
-def test_installer_updates_existing_installation_in_place() -> None:
-    text = (
-        ROOT / "packaging" / "apk-research.iss"
+def test_full_and_update_installers_share_identity() -> None:
+    full = (
+        ROOT / "packaging" / "full.iss"
+    ).read_text(encoding="utf-8")
+    update = (
+        ROOT / "packaging" / "update.iss"
     ).read_text(encoding="utf-8")
 
+    assert APP_ID in full
+    assert APP_ID in update
+    assert "apk-research-setup_v{#MyAppVersion}" in full
+    assert "apk-research-update_v{#MyAppVersion}" in update
+    assert "UsePreviousAppDir=no" in full
+    assert "UsePreviousAppDir=no" in update
+    assert "InitializeSetup(): Boolean" in update
     assert (
-        "AppId={{5C5EE2B7-78FB-47E1-95C7-85AA2540195A}"
-        in text
+        "{localappdata}\\Programs\\apk-research\\{#MyAppExeName}"
+        in update
     )
-    assert "UsePreviousAppDir=yes" in text
-    assert "UsePreviousGroup=yes" in text
-    assert "UsePreviousTasks=yes" in text
-    assert "CloseApplications=yes" in text
-    assert "RestartApplications=no" in text
-    assert "{param:UPDATE|0}" in text
-    assert "ShouldRelaunchAfterUpdate" in text
-    assert "{param:NORELAUNCH|0}" in text
-    assert (
-        "SetupIconFile=..\\build\\app-icon\\apk-research.ico"
-        in text
-    )
+    assert "Для первой установки используйте полный установщик" in update
 
 
-def test_updater_does_not_request_uninstall_before_update() -> None:
+def test_shortcuts_are_owned_by_inno_setup() -> None:
+    for name in ("full.iss", "update.iss"):
+        text = (
+            ROOT / "packaging" / name
+        ).read_text(encoding="utf-8")
+        assert '[Tasks]' in text
+        assert 'Name: "desktopicon"' in text
+        assert '{autoprograms}\\apk-research' in text
+        assert '{userdesktop}\\apk-research' in text
+        assert 'SetupIconFile=..\\build\\app-icon\\apk-research.ico' in text
+
+
+def test_update_installer_does_not_uninstall_first() -> None:
     text = (
-        ROOT / "src" / "apk_research" / "desktop" / "updater.py"
-    ).read_text(encoding="utf-8")
+        ROOT / "packaging" / "update.iss"
+    ).read_text(encoding="utf-8").lower()
 
-    assert '"/UPDATE=1"' in text
-    assert '"powershell.exe"' not in text.lower()
-    assert "build_installer_arguments" in text
     assert "unins000.exe" not in text
-    assert "uninstall" not in text.lower()
+    assert "exec(" not in text or "unins" not in text

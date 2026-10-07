@@ -91,39 +91,43 @@ jobs:
         shell: pwsh
         run: choco install innosetup -y --no-progress
 
-      - name: Build installer
+      - name: Build full and update installers
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force installer | Out-Null
           $text = Get-Content pyproject.toml -Raw
           if ($text -notmatch '(?m)^version\s*=\s*"([^"]+)"') { throw "Version not found" }
           $version = $Matches[1]
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" packaging\apk-research.iss
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc "/DMyAppVersion=$version" packaging\full.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $iscc "/DMyAppVersion=$version" packaging\update.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Upgrade previous release in place
+      - name: Upgrade previous release with dedicated update installer
         shell: pwsh
         run: |
-          $upgradeDir = Join-Path $env:RUNNER_TEMP "apk-research-upgrade"
-          New-Item -ItemType Directory -Force $upgradeDir | Out-Null
-
-          $previousVersion = "0.29.0"
+          $previousVersion = "0.29.1"
           $previousInstaller = Join-Path $env:RUNNER_TEMP "apk-research-setup_v$previousVersion.exe"
           $previousUrl = "https://github.com/lvlaksim1/apk-research/releases/download/v$previousVersion/apk-research-setup_v$previousVersion.exe"
           Invoke-WebRequest -Uri $previousUrl -OutFile $previousInstaller
+
+          $defaultDir = Join-Path $env:LOCALAPPDATA "Programs\apk-research"
+          if (Test-Path $defaultDir) {
+            Remove-Item -Recurse -Force $defaultDir
+          }
 
           $beforeInstall = Start-Process -FilePath $previousInstaller -ArgumentList @(
             "/VERYSILENT",
             "/SUPPRESSMSGBOXES",
             "/NORESTART",
-            "/SP-",
-            "/DIR=$upgradeDir"
+            "/SP-"
           ) -Wait -PassThru
           if ($beforeInstall.ExitCode -ne 0) {
             throw "Previous release install failed: $($beforeInstall.ExitCode)"
           }
 
-          $installedExe = Join-Path $upgradeDir "apk-research.exe"
+          $installedExe = Join-Path $defaultDir "apk-research.exe"
           $before = & $installedExe --self-test | Out-String
           if ($before -notmatch "apk-research $([regex]::Escape($previousVersion))") {
             throw "Previous release verification failed: $before"
@@ -132,36 +136,20 @@ jobs:
           $text = Get-Content pyproject.toml -Raw
           if ($text -notmatch '(?m)^version\s*=\s*"([^"]+)"') { throw "Version not found" }
           $version = $Matches[1]
-          $candidate = (Resolve-Path "installer\apk-research-setup_v$version.exe").Path
-          $env:APK_UPDATE_INSTALLER = $candidate
-          $env:APK_UPDATE_DIR = $upgradeDir
-          $env:APK_UPDATE_VERSION = $version
-          $env:APK_UPDATE_EXE = $installedExe
-
-          python -c "import os; from pathlib import Path; from apk_research.desktop.updater import DownloadedUpdate, ReleaseInfo, launch_update_after_exit; installer=Path(os.environ['APK_UPDATE_INSTALLER']); release=ReleaseInfo(version=os.environ['APK_UPDATE_VERSION'], tag='v'+os.environ['APK_UPDATE_VERSION'], installer_name=installer.name, installer_url='', installer_size=installer.stat().st_size, checksums_url='', release_url=''); downloaded=DownloadedUpdate(release=release, installer_path=installer, sha256='acceptance'); launch_update_after_exit(downloaded, current_pid=os.getpid(), install_dir=Path(os.environ['APK_UPDATE_DIR']), restart_exe=Path(os.environ['APK_UPDATE_EXE']), relaunch=False)"
-          if ($LASTEXITCODE -ne 0) {
-            throw "Updater handoff process failed: $LASTEXITCODE"
+          $candidate = (Resolve-Path "installer\apk-research-update_v$version.exe").Path
+          $update = Start-Process -FilePath $candidate -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/SP-"
+          ) -Wait -PassThru
+          if ($update.ExitCode -ne 0) {
+            throw "Dedicated update installer failed: $($update.ExitCode)"
           }
 
-          $updated = $false
-          $after = ""
-          for ($i = 0; $i -lt 12; $i++) {
-            Start-Sleep -Seconds 5
-            if (Test-Path $installedExe) {
-              $after = & $installedExe --self-test | Out-String
-              if ($after -match "apk-research $([regex]::Escape($version))") {
-                $updated = $true
-                break
-              }
-            }
-          }
-
-          if (-not $updated) {
-            $upgradeLog = Join-Path $env:LOCALAPPDATA "apk-research\updates\installer.log"
-            $handoffLog = Join-Path $env:LOCALAPPDATA "apk-research\updates\handoff.log"
-            if (Test-Path $handoffLog) { Get-Content $handoffLog }
-            if (Test-Path $upgradeLog) { Get-Content $upgradeLog }
-            throw "Direct updater handoff did not produce version $version. Last output: $after"
+          $after = & $installedExe --self-test | Out-String
+          if ($after -notmatch "apk-research $([regex]::Escape($version))") {
+            throw "Updated release verification failed: $after"
           }
 
       - name: Install built package and smoke-test installed app
@@ -191,16 +179,22 @@ jobs:
           $process = Start-Process -FilePath $installedExe -ArgumentList "--gui-smoke-test" -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Installed GUI smoke-test failed: $($process.ExitCode)" }
 
-      - name: Hash installer
+      - name: Hash installers
         shell: pwsh
         run: |
           $text = Get-Content pyproject.toml -Raw
           if ($text -notmatch '(?m)^version\s*=\s*"([^"]+)"') { throw "Version not found" }
           $version = $Matches[1]
-          $installerName = "apk-research-setup_v$version.exe"
-          $installer = Join-Path "installer" $installerName
-          $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
-          "$hash  $installerName" | Set-Content installer\SHA256SUMS.txt -Encoding ascii
+          $setupName = "apk-research-setup_v$version.exe"
+          $updateName = "apk-research-update_v$version.exe"
+          $setup = Join-Path "installer" $setupName
+          $update = Join-Path "installer" $updateName
+          $setupHash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
+          $updateHash = (Get-FileHash $update -Algorithm SHA256).Hash.ToLower()
+          @(
+            "$setupHash  $setupName",
+            "$updateHash  $updateName"
+          ) | Set-Content installer\SHA256SUMS.txt -Encoding ascii
           Get-Content installer\SHA256SUMS.txt
 
       - name: Upload temporary release installer
@@ -211,6 +205,7 @@ jobs:
           retention-days: 1
           path: |
             installer/apk-research-setup_v*.exe
+            installer/apk-research-update_v*.exe
             installer/SHA256SUMS.txt
 
   windows-provisioning-acceptance:

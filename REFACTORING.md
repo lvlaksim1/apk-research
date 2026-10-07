@@ -1,5 +1,24 @@
 # Refactoring and Architecture Log
 
+## v0.29.2 — MailRu-style installer/update split
+
+The previous single-installer design mixed first-install and update responsibilities. v0.29.2 adopts the already operating MailRu Desktop separation.
+
+### Full installer
+`packaging/full.iss` performs the first installation into the fixed per-user application directory and owns normal Start-menu/optional desktop shortcuts.
+
+### Update installer
+`packaging/update.iss` shares the same AppId and file set, refuses to start when the existing apk-research executable is absent, updates files in place, and recreates shortcuts. It never invokes the previous uninstaller.
+
+### Application handoff
+The application downloads only the dedicated Update asset, keeps SHA-256 verification, calls the Windows shell directly to launch the installer, and exits. There is no PowerShell relay, detached waiter, custom installer argument protocol or application-owned relaunch orchestration.
+
+### Release contract
+Every stable GitHub Release must contain the full installer, update installer and one SHA256SUMS file that validates both binaries.
+
+### UI boundary
+The explicit Android Home button is removed; it is not part of the supported desktop workflow.
+
 ## v0.29.1 — Reliable update process handoff
 
 ### Direct-installer invariant

@@ -10,7 +10,7 @@ from apk_research.desktop.updater import (
     DownloadedUpdate,
     ReleaseInfo,
     UpdateError,
-    build_installer_arguments,
+    launch_update_installer,
     check_latest_release,
     download_release,
     is_newer_version,
@@ -68,12 +68,12 @@ def test_check_latest_release_resolves_exact_assets() -> None:
         ),
         "assets": [
             {
-                "name": "apk-research-setup_v0.28.0.exe",
+                "name": "apk-research-update_v0.28.0.exe",
                 "size": 12345,
                 "browser_download_url": (
                     "https://github.com/lvlaksim1/apk-research/"
                     "releases/download/v0.28.0/"
-                    "apk-research-setup_v0.28.0.exe"
+                    "apk-research-update_v0.28.0.exe"
                 ),
             },
             {
@@ -102,7 +102,7 @@ def test_check_latest_release_resolves_exact_assets() -> None:
     assert release.version == "0.28.0"
     assert (
         release.installer_name
-        == "apk-research-setup_v0.28.0.exe"
+        == "apk-research-update_v0.28.0.exe"
     )
     assert release.installer_size == 12345
 
@@ -116,11 +116,11 @@ def test_download_release_verifies_published_sha256(
     release = ReleaseInfo(
         version="0.28.0",
         tag="v0.28.0",
-        installer_name="apk-research-setup_v0.28.0.exe",
+        installer_name="apk-research-update_v0.28.0.exe",
         installer_url=(
             "https://github.com/lvlaksim1/apk-research/"
             "releases/download/v0.28.0/"
-            "apk-research-setup_v0.28.0.exe"
+            "apk-research-update_v0.28.0.exe"
         ),
         installer_size=len(installer),
         checksums_url=(
@@ -174,11 +174,11 @@ def test_download_release_rejects_bad_checksum(
     release = ReleaseInfo(
         version="0.28.0",
         tag="v0.28.0",
-        installer_name="apk-research-setup_v0.28.0.exe",
+        installer_name="apk-research-update_v0.28.0.exe",
         installer_url=(
             "https://github.com/lvlaksim1/apk-research/"
             "releases/download/v0.28.0/"
-            "apk-research-setup_v0.28.0.exe"
+            "apk-research-update_v0.28.0.exe"
         ),
         installer_size=len(installer),
         checksums_url=(
@@ -210,27 +210,30 @@ def test_download_release_rejects_bad_checksum(
         )
 
 
-def test_installer_arguments_use_direct_update_mode(
+def test_update_installer_uses_shell_launcher(
     tmp_path: Path,
 ) -> None:
-    install_dir = (
-        tmp_path / "Program Files" / "apk-research"
+    installer = tmp_path / "apk-research-update_v0.28.0.exe"
+    installer.write_bytes(b"installer")
+    release = ReleaseInfo(
+        version="0.28.0",
+        tag="v0.28.0",
+        installer_name=installer.name,
+        installer_url="",
+        installer_size=installer.stat().st_size,
+        checksums_url="",
+        release_url="",
     )
-    log_path = tmp_path / "installer.log"
+    downloaded = DownloadedUpdate(
+        release=release,
+        installer_path=installer,
+        sha256="verified",
+    )
+    launched: list[str] = []
 
-    arguments = build_installer_arguments(
-        install_dir=install_dir,
-        log_path=log_path,
+    launch_update_installer(
+        downloaded,
+        launcher=launched.append,
     )
 
-    assert "/VERYSILENT" in arguments
-    assert "/SUPPRESSMSGBOXES" in arguments
-    assert "/NORESTART" in arguments
-    assert "/CLOSEAPPLICATIONS" in arguments
-    assert "/UPDATE=1" in arguments
-    assert f"/DIR={install_dir}" in arguments
-    assert f"/LOG={log_path}" in arguments
-    assert not any(
-        "powershell" in value.lower()
-        for value in arguments
-    )
+    assert launched == [str(installer)]

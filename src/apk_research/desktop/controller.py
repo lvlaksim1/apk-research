@@ -122,11 +122,6 @@ class DesktopController(QObject):
             self._launch_installed_package_worker
         )
 
-    def show_android_home(self) -> None:
-        self._thread(
-            self._show_android_home_worker
-        )
-
     def start_research(
         self,
         clean_launch: bool = True,
@@ -572,28 +567,6 @@ class DesktopController(QObject):
             )
             self.log.emit(
                 f"Приложение запущено в эмуляторе: {package}"
-            )
-        except Exception as exc:
-            self.error.emit(
-                str(exc)
-                or exc.__class__.__name__
-            )
-        finally:
-            self._set_busy(False)
-
-    def _show_android_home_worker(self) -> None:
-        try:
-            self._set_busy(True)
-            self.runtime.ensure_ready(
-                self._progress_callback,
-                self._display_ready_callback,
-            )
-            self._start_screen_stream(
-                wait_for_first_frame=True,
-            )
-            self.runtime.keyevent(3)
-            self.log.emit(
-                "Открыт главный экран Android"
             )
         except Exception as exc:
             self.error.emit(

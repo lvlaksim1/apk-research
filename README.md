@@ -1,5 +1,17 @@
 # apk-research
 
+## v0.29.2 — Separate Setup/Update Installers
+
+v0.29.2 adopts the installer model already proven in `lvlaksim1/mailru-desktop`.
+
+Each stable release contains two distinct Windows installers:
+- `apk-research-setup_v<version>.exe` for the first installation;
+- `apk-research-update_v<version>.exe` for an existing installation.
+
+The application update checker resolves only the dedicated Update asset, downloads it into the user's local apk-research Updates directory, verifies its published SHA-256, launches it through the Windows shell and then closes the running application. The Update installer refuses to run when apk-research is not already installed.
+
+Windows Start-menu and optional desktop shortcuts are owned and recreated by Inno Setup, matching the MailRu Desktop pattern. The redundant «Открыть главный экран Android» button is removed.
+
 ## v0.29.1 — Reliable Self-Update Handoff
 
 v0.29.1 исправляет сбой автоматического обновления, при котором apk-research успешно находил и скачивал новый релиз, сообщал о перезапуске, закрывался, но установщик больше не запускался.

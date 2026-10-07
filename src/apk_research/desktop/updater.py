@@ -4,7 +4,6 @@ import hashlib
 import json
 import os
 import re
-import subprocess
 import tempfile
 import urllib.error
 import urllib.request
@@ -126,12 +125,11 @@ def check_latest_release(
     tag = str(payload.get("tag_name") or "").strip()
     latest_tuple = parse_release_version(tag)
     version = ".".join(str(part) for part in latest_tuple)
-
     assets = payload.get("assets") or []
     if not isinstance(assets, list):
         raise UpdateError("У релиза GitHub нет списка файлов")
 
-    installer_name = f"apk-research-setup_v{version}.exe"
+    installer_name = f"apk-research-update_v{version}.exe"
     installer = next(
         (
             item
@@ -152,7 +150,7 @@ def check_latest_release(
     )
     if installer is None or checksums is None:
         raise UpdateError(
-            "В последнем релизе отсутствует установщик "
+            "В последнем релизе отсутствует установщик обновления "
             "или SHA256SUMS.txt"
         )
 
@@ -162,15 +160,14 @@ def check_latest_release(
     checksums_url = str(
         checksums.get("browser_download_url") or ""
     )
-    if not installer_url.startswith(
+    expected_prefix = (
         "https://github.com/lvlaksim1/apk-research/"
-    ):
+    )
+    if not installer_url.startswith(expected_prefix):
         raise UpdateError(
-            "GitHub вернул неожиданный адрес установщика"
+            "GitHub вернул неожиданный адрес установщика обновления"
         )
-    if not checksums_url.startswith(
-        "https://github.com/lvlaksim1/apk-research/"
-    ):
+    if not checksums_url.startswith(expected_prefix):
         raise UpdateError(
             "GitHub вернул неожиданный адрес контрольной суммы"
         )
@@ -198,8 +195,20 @@ def _expected_checksum(
         if filename.strip() == installer_name:
             return digest.lower()
     raise UpdateError(
-        "SHA256SUMS.txt не содержит контрольную сумму установщика"
+        "SHA256SUMS.txt не содержит контрольную сумму "
+        "установщика обновления"
     )
+
+
+def update_download_root() -> Path:
+    root = Path(
+        os.environ.get(
+            "LOCALAPPDATA",
+            tempfile.gettempdir(),
+        )
+    ) / "apk-research" / "Updates"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
 
 
 def download_release(
@@ -227,12 +236,16 @@ def download_release(
         release.installer_name,
     )
 
-    root = Path(
-        tempfile.mkdtemp(prefix="apk-research-update-")
-    )
-    root.mkdir(parents=True, exist_ok=True)
-    partial = root / (release.installer_name + ".part")
+    root = update_download_root()
+    for old_file in root.glob("apk-research-update_v*.exe"):
+        try:
+            old_file.unlink()
+        except OSError:
+            pass
+
     final = root / release.installer_name
+    partial = root / (release.installer_name + ".part")
+    partial.unlink(missing_ok=True)
     hasher = hashlib.sha256()
     downloaded = 0
     total = max(0, int(release.installer_size))
@@ -247,9 +260,7 @@ def download_release(
             installer_request,
             timeout,
         ) as response, partial.open("wb") as handle:
-            header_length = response.headers.get(
-                "Content-Length"
-            )
+            header_length = response.headers.get("Content-Length")
             if header_length:
                 try:
                     total = max(total, int(header_length))
@@ -292,105 +303,30 @@ def download_release(
     )
 
 
-def update_log_path() -> Path:
-    root = Path(
-        os.environ.get(
-            "LOCALAPPDATA",
-            tempfile.gettempdir(),
-        )
-    ) / "apk-research" / "updates"
-    root.mkdir(parents=True, exist_ok=True)
-    return root / "installer.log"
-
-
-def build_installer_arguments(
-    *,
-    install_dir: Path,
-    log_path: Path,
-    relaunch: bool = True,
-) -> list[str]:
-    arguments = [
-        "/VERYSILENT",
-        "/SUPPRESSMSGBOXES",
-        "/NORESTART",
-        "/CLOSEAPPLICATIONS",
-        "/SP-",
-        "/UPDATE=1",
-        f"/DIR={install_dir}",
-        f"/LOG={log_path}",
-    ]
-    if not relaunch:
-        arguments.append("/NORELAUNCH=1")
-    return arguments
-
-
-def launch_update_after_exit(
+def launch_update_installer(
     downloaded: DownloadedUpdate,
     *,
-    current_pid: int,
-    install_dir: Path,
-    restart_exe: Path,
-    relaunch: bool = True,
+    launcher: Callable[[str], None] | None = None,
 ) -> None:
-    del current_pid
-    del restart_exe
-
-    if os.name != "nt":
-        raise UpdateError(
-            "Автоматическая установка обновления "
-            "поддерживается только в Windows"
-        )
     if not downloaded.installer_path.is_file():
         raise UpdateError(
             "Скачанный установщик обновления не найден"
         )
 
-    target_dir = Path(install_dir).resolve()
-    log_path = update_log_path()
-    arguments = build_installer_arguments(
-        install_dir=target_dir,
-        log_path=log_path,
-        relaunch=relaunch,
-    )
-
-    handoff_log = log_path.with_name(
-        "handoff.log"
-    )
-    try:
-        handoff_log.write_text(
-            "\n".join(
-                [
-                    "apk-research updater handoff",
-                    f"installer={downloaded.installer_path}",
-                    f"target={target_dir}",
-                    f"release={downloaded.release.version}",
-                    "mode=direct-inno",
-                ]
+    if launcher is None:
+        if os.name != "nt":
+            raise UpdateError(
+                "Автоматический запуск обновления "
+                "поддерживается только в Windows"
             )
-            + "\n",
-            encoding="utf-8",
-        )
-    except OSError:
-        pass
+        launcher = getattr(os, "startfile", None)
+        if launcher is None:
+            raise UpdateError(
+                "Windows ShellExecute недоступен"
+            )
 
-    creation_flags = getattr(
-        subprocess,
-        "CREATE_NEW_PROCESS_GROUP",
-        0,
-    )
     try:
-        subprocess.Popen(
-            [
-                str(downloaded.installer_path),
-                *arguments,
-            ],
-            cwd=str(downloaded.installer_path.parent),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=creation_flags,
-            close_fds=True,
-        )
+        launcher(str(downloaded.installer_path))
     except OSError as exc:
         raise UpdateError(
             "Не удалось запустить установщик обновления: "
