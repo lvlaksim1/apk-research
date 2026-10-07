@@ -251,3 +251,15 @@ def test_validate_apk_set_rejects_incompatible_native_base(
             ],
             device_abis=("x86_64",),
         )
+
+
+def test_parse_apk_badging_reads_application_label(
+    tmp_path: Path,
+) -> None:
+    item = parse_apk_badging(
+        "package: name='com.example.app' versionCode='1'\n"
+        "application-label:'Example App'\n",
+        tmp_path / "base.apk",
+    )
+
+    assert item.app_label == "Example App"

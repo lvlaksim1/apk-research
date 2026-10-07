@@ -4,6 +4,7 @@ import base64
 import json
 import os
 import re
+import shlex
 import shutil
 import socket
 import subprocess
@@ -19,6 +20,14 @@ from apk_research.desktop.components import (
 )
 from apk_research.desktop.emulator_grpc import (
     EmulatorGrpcClient,
+)
+from apk_research.desktop.home_shortcut import (
+    build_launch_intent,
+    choose_home_cell,
+    has_package_shortcut,
+    launcher_grid_from_listing,
+    next_favorite_id,
+    parse_launcher_favorites,
 )
 from apk_research.desktop.package_input import (
     ApkBadging,
@@ -680,6 +689,207 @@ class AndroidRuntime:
                 values = [fallback]
         return tuple(dict.fromkeys(values))
 
+    def _resolve_main_component(
+        self,
+        category: str,
+        package_name: str | None = None,
+    ) -> str:
+        command = [
+            "cmd",
+            "package",
+            "resolve-activity",
+            "--brief",
+            "-a",
+            "android.intent.action.MAIN",
+            "-c",
+            category,
+        ]
+        if package_name:
+            command.append(package_name)
+        result = self._adb_shell(
+            *command,
+            timeout=15.0,
+            check=False,
+        )
+        candidates = [
+            line.strip()
+            for line in result.stdout.splitlines()
+            if "/" in line and " " not in line.strip()
+        ]
+        if not candidates:
+            if package_name:
+                raise AndroidRuntimeError(
+                    "У приложения нет запускаемой Activity: "
+                    f"{package_name}"
+                )
+            raise AndroidRuntimeError(
+                "Не удалось определить системный Launcher Android"
+            )
+        return candidates[-1]
+
+    def ensure_home_shortcut(
+        self,
+        package_name: str,
+        label: str,
+    ) -> str:
+        component = self._resolve_main_component(
+            "android.intent.category.LAUNCHER",
+            package_name,
+        )
+        launcher_component = self._resolve_main_component(
+            "android.intent.category.HOME",
+        )
+        launcher_package = launcher_component.split("/", 1)[0]
+        if launcher_package != "com.android.launcher3":
+            raise AndroidRuntimeError(
+                "Автоматическое добавление ярлыка поддерживается "
+                "только управляемым Launcher3; найден: "
+                f"{launcher_package}"
+            )
+
+        uri = (
+            "content://com.android.launcher3.settings/favorites"
+        )
+        query = self._adb_shell(
+            "content",
+            "query",
+            "--uri",
+            uri,
+            timeout=15.0,
+            check=False,
+        )
+        if query.returncode != 0:
+            raise AndroidRuntimeError(
+                "Не удалось прочитать рабочий стол Launcher3: "
+                + (
+                    query.stderr.strip()
+                    or query.stdout.strip()
+                    or "нет диагностики"
+                )
+            )
+
+        favorites = parse_launcher_favorites(query.stdout)
+        if has_package_shortcut(favorites, package_name):
+            self._adb_shell(
+                "input",
+                "keyevent",
+                "KEYCODE_HOME",
+                timeout=10.0,
+                check=False,
+            )
+            return "existing"
+
+        listing = self._adb_shell(
+            "ls",
+            f"/data/user/0/{launcher_package}/databases",
+            timeout=10.0,
+            check=False,
+        )
+        columns, rows = launcher_grid_from_listing(
+            listing.stdout
+        )
+        screen, cell_x, cell_y = choose_home_cell(
+            favorites,
+            columns=columns,
+            rows=rows,
+        )
+        item_id = next_favorite_id(favorites)
+        intent = build_launch_intent(
+            package_name,
+            component,
+        )
+        shortcut_label = (
+            label.strip()
+            if label.strip()
+            else package_name
+        )
+        modified = int(time.time() * 1000)
+
+        binds = [
+            f"_id:i:{item_id}",
+            f"title:s:{shortcut_label}",
+            f"intent:s:{intent}",
+            "container:i:-100",
+            f"screen:i:{screen}",
+            f"cellX:i:{cell_x}",
+            f"cellY:i:{cell_y}",
+            "spanX:i:1",
+            "spanY:i:1",
+            "itemType:i:0",
+            "appWidgetId:i:-1",
+            f"modified:l:{modified}",
+            "restored:i:0",
+            "profileId:i:0",
+            "rank:i:0",
+            "options:i:0",
+            "appWidgetSource:i:-1",
+        ]
+        parts = [
+            "content",
+            "insert",
+            "--uri",
+            uri,
+        ]
+        for value in binds:
+            parts.extend(["--bind", value])
+        shell_command = " ".join(
+            shlex.quote(value)
+            for value in parts
+        )
+        inserted = self._adb_shell(
+            "sh",
+            "-c",
+            shell_command,
+            timeout=15.0,
+            check=False,
+        )
+        if inserted.returncode != 0:
+            raise AndroidRuntimeError(
+                "Не удалось добавить ярлык приложения на рабочий стол: "
+                + (
+                    inserted.stderr.strip()
+                    or inserted.stdout.strip()
+                    or "нет диагностики"
+                )
+            )
+
+        verify = self._adb_shell(
+            "content",
+            "query",
+            "--uri",
+            uri,
+            timeout=15.0,
+            check=False,
+        )
+        verified = parse_launcher_favorites(
+            verify.stdout
+        )
+        if not has_package_shortcut(
+            verified,
+            package_name,
+        ):
+            raise AndroidRuntimeError(
+                "Launcher3 не подтвердил создание ярлыка "
+                f"для {package_name}"
+            )
+
+        self._adb_shell(
+            "am",
+            "force-stop",
+            launcher_package,
+            timeout=10.0,
+            check=False,
+        )
+        self._adb_shell(
+            "input",
+            "keyevent",
+            "KEYCODE_HOME",
+            timeout=10.0,
+            check=False,
+        )
+        time.sleep(1.0)
+        return "created"
+
     def install_package(
         self,
         package_path: str | os.PathLike[str],
@@ -846,6 +1056,23 @@ class AndroidRuntime:
                             ],
                             timeout=300.0,
                         )
+
+                base_badging = ordered[0]
+                shortcut_state = self.ensure_home_shortcut(
+                    package,
+                    base_badging.app_label or package,
+                )
+                self._emit(
+                    progress,
+                    (
+                        "Ярлык на рабочем столе уже существует: "
+                        if shortcut_state == "existing"
+                        else "Ярлык добавлен на рабочий стол: "
+                    )
+                    + (base_badging.app_label or package),
+                    None,
+                    None,
+                )
 
                 self._emit(
                     progress,

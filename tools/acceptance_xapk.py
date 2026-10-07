@@ -90,7 +90,17 @@ def main() -> int:
     android:versionCode="1"
     android:versionName="1.0">
     <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="35" />
-    <application android:hasCode="false" android:label="XAPK Acceptance" />
+    <application android:hasCode="false" android:label="XAPK Acceptance">
+        <activity
+            android:name="android.app.Activity"
+            android:exported="true"
+            android:label="XAPK Acceptance">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
 </manifest>
 """,
             encoding="utf-8",
@@ -196,30 +206,6 @@ def main() -> int:
             )
 
         try:
-            launcher_probe = _run(
-                [
-                    str(adb),
-                    "-s",
-                    SERIAL,
-                    "shell",
-                    "sh",
-                    "-c",
-                    "echo HOME=$(cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME 2>/dev/null); "
-                    "echo SHORTCUT_HELP_BEGIN; cmd shortcut help 2>&1 | head -80; echo SHORTCUT_HELP_END; "
-                    "echo LAUNCHER_DBS_BEGIN; ls -la /data/user/0/com.android.launcher3/databases 2>&1; echo LAUNCHER_DBS_END; "
-                    "echo FAVORITES_BEGIN; content query --uri content://com.android.launcher3.settings/favorites 2>&1 | head -40; echo FAVORITES_END",
-                ]
-            )
-            print(
-                json.dumps(
-                    {
-                        "event": "launcher_shortcut_probe",
-                        "output": launcher_probe.stdout,
-                    },
-                    ensure_ascii=False,
-                )
-            )
-
             installed = runtime.install_package(xapk, progress)
             if installed != PACKAGE:
                 raise RuntimeError(
@@ -258,6 +244,42 @@ def main() -> int:
                     "Synthetic XAPK OBB payload does not match"
                 )
 
+            favorites = _run(
+                [
+                    str(adb),
+                    "-s",
+                    SERIAL,
+                    "shell",
+                    "content",
+                    "query",
+                    "--uri",
+                    "content://com.android.launcher3.settings/favorites",
+                ]
+            )
+            if (
+                f"package={PACKAGE};" not in favorites.stdout
+                and f"component={PACKAGE}/" not in favorites.stdout
+            ):
+                raise RuntimeError(
+                    "Synthetic XAPK home shortcut was not created"
+                )
+
+            home = _run(
+                [
+                    str(adb),
+                    "-s",
+                    SERIAL,
+                    "shell",
+                    "dumpsys",
+                    "activity",
+                    "activities",
+                ]
+            )
+            if "com.android.launcher3" not in home.stdout:
+                raise RuntimeError(
+                    "Launcher3 is not visible after XAPK installation"
+                )
+
             if not any("Установка XAPK" in item for item in events):
                 raise RuntimeError(
                     "Runtime did not report XAPK installation path"
@@ -270,6 +292,7 @@ def main() -> int:
                         "status": "ok",
                         "package": PACKAGE,
                         "obb": remote_obb,
+                        "home_shortcut": True,
                     },
                     ensure_ascii=False,
                 )

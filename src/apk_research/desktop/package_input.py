@@ -16,6 +16,10 @@ _NATIVE_CODE_LINE_RE = re.compile(
     re.MULTILINE,
 )
 _QUOTED_VALUE_RE = re.compile(r"'([^']+)'")
+_APPLICATION_LABEL_RE = re.compile(
+    r"^application-label(?:-[^:]+)?:'([^']*)'",
+    re.MULTILINE,
+)
 
 MAX_XAPK_APKS = 64
 MAX_XAPK_OBBS = 64
@@ -33,6 +37,7 @@ class ApkBadging:
     version_code: str
     split_name: str | None
     native_codes: tuple[str, ...] = ()
+    app_label: str = ""
 
 
 @dataclass(frozen=True)
@@ -68,12 +73,20 @@ def parse_apk_badging(output: str, path: Path) -> ApkBadging:
             if normalized and normalized not in native_codes:
                 native_codes.append(normalized)
 
+    label_match = _APPLICATION_LABEL_RE.search(output)
+    app_label = (
+        label_match.group(1).strip()
+        if label_match
+        else ""
+    )
+
     return ApkBadging(
         path=path,
         package_name=package_name,
         version_code=version_code,
         split_name=split_name,
         native_codes=tuple(native_codes),
+        app_label=app_label,
     )
 
 
