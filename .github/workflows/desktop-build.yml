@@ -101,6 +101,62 @@ jobs:
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" packaging\apk-research.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Upgrade previous release in place
+        shell: pwsh
+        run: |
+          $upgradeDir = Join-Path $env:RUNNER_TEMP "apk-research-upgrade"
+          New-Item -ItemType Directory -Force $upgradeDir | Out-Null
+
+          $previousVersion = "0.29.0"
+          $previousInstaller = Join-Path $env:RUNNER_TEMP "apk-research-setup_v$previousVersion.exe"
+          $previousUrl = "https://github.com/lvlaksim1/apk-research/releases/download/v$previousVersion/apk-research-setup_v$previousVersion.exe"
+          Invoke-WebRequest -Uri $previousUrl -OutFile $previousInstaller
+
+          $beforeInstall = Start-Process -FilePath $previousInstaller -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/SP-",
+            "/DIR=$upgradeDir"
+          ) -Wait -PassThru
+          if ($beforeInstall.ExitCode -ne 0) {
+            throw "Previous release install failed: $($beforeInstall.ExitCode)"
+          }
+
+          $installedExe = Join-Path $upgradeDir "apk-research.exe"
+          $before = & $installedExe --self-test | Out-String
+          if ($before -notmatch "apk-research $([regex]::Escape($previousVersion))") {
+            throw "Previous release verification failed: $before"
+          }
+
+          $text = Get-Content pyproject.toml -Raw
+          if ($text -notmatch '(?m)^version\s*=\s*"([^"]+)"') { throw "Version not found" }
+          $version = $Matches[1]
+          $candidate = (Resolve-Path "installer\apk-research-setup_v$version.exe").Path
+          $upgradeLog = Join-Path $env:RUNNER_TEMP "apk-research-upgrade.log"
+
+          $update = Start-Process -FilePath $candidate -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/CLOSEAPPLICATIONS",
+            "/SP-",
+            "/UPDATE=1",
+            "/NORELAUNCH=1",
+            "/DIR=$upgradeDir",
+            "/LOG=$upgradeLog"
+          ) -Wait -PassThru
+          if ($update.ExitCode -ne 0) {
+            if (Test-Path $upgradeLog) { Get-Content $upgradeLog }
+            throw "In-place update failed: $($update.ExitCode)"
+          }
+
+          $after = & $installedExe --self-test | Out-String
+          if ($after -notmatch "apk-research $([regex]::Escape($version))") {
+            if (Test-Path $upgradeLog) { Get-Content $upgradeLog }
+            throw "Updated release verification failed: $after"
+          }
+
       - name: Install built package and smoke-test installed app
         shell: pwsh
         run: |
