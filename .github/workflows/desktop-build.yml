@@ -133,28 +133,35 @@ jobs:
           if ($text -notmatch '(?m)^version\s*=\s*"([^"]+)"') { throw "Version not found" }
           $version = $Matches[1]
           $candidate = (Resolve-Path "installer\apk-research-setup_v$version.exe").Path
-          $upgradeLog = Join-Path $env:RUNNER_TEMP "apk-research-upgrade.log"
+          $env:APK_UPDATE_INSTALLER = $candidate
+          $env:APK_UPDATE_DIR = $upgradeDir
+          $env:APK_UPDATE_VERSION = $version
+          $env:APK_UPDATE_EXE = $installedExe
 
-          $update = Start-Process -FilePath $candidate -ArgumentList @(
-            "/VERYSILENT",
-            "/SUPPRESSMSGBOXES",
-            "/NORESTART",
-            "/CLOSEAPPLICATIONS",
-            "/SP-",
-            "/UPDATE=1",
-            "/NORELAUNCH=1",
-            "/DIR=$upgradeDir",
-            "/LOG=$upgradeLog"
-          ) -Wait -PassThru
-          if ($update.ExitCode -ne 0) {
-            if (Test-Path $upgradeLog) { Get-Content $upgradeLog }
-            throw "In-place update failed: $($update.ExitCode)"
+          python -c "import os; from pathlib import Path; from apk_research.desktop.updater import DownloadedUpdate, ReleaseInfo, launch_update_after_exit; installer=Path(os.environ['APK_UPDATE_INSTALLER']); release=ReleaseInfo(version=os.environ['APK_UPDATE_VERSION'], tag='v'+os.environ['APK_UPDATE_VERSION'], installer_name=installer.name, installer_url='', installer_size=installer.stat().st_size, checksums_url='', release_url=''); downloaded=DownloadedUpdate(release=release, installer_path=installer, sha256='acceptance'); launch_update_after_exit(downloaded, current_pid=os.getpid(), install_dir=Path(os.environ['APK_UPDATE_DIR']), restart_exe=Path(os.environ['APK_UPDATE_EXE']), relaunch=False)"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Updater handoff process failed: $LASTEXITCODE"
           }
 
-          $after = & $installedExe --self-test | Out-String
-          if ($after -notmatch "apk-research $([regex]::Escape($version))") {
+          $updated = $false
+          $after = ""
+          for ($i = 0; $i -lt 12; $i++) {
+            Start-Sleep -Seconds 5
+            if (Test-Path $installedExe) {
+              $after = & $installedExe --self-test | Out-String
+              if ($after -match "apk-research $([regex]::Escape($version))") {
+                $updated = $true
+                break
+              }
+            }
+          }
+
+          if (-not $updated) {
+            $upgradeLog = Join-Path $env:LOCALAPPDATA "apk-research\updates\installer.log"
+            $handoffLog = Join-Path $env:LOCALAPPDATA "apk-research\updates\handoff.log"
+            if (Test-Path $handoffLog) { Get-Content $handoffLog }
             if (Test-Path $upgradeLog) { Get-Content $upgradeLog }
-            throw "Updated release verification failed: $after"
+            throw "Direct updater handoff did not produce version $version. Last output: $after"
           }
 
       - name: Install built package and smoke-test installed app
