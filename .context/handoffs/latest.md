@@ -1,8 +1,8 @@
 # Latest Handoff
 
-Generation: 22
+Generation: 23
 Date: 2026-10-08
-Checkpoint: user requested durable save before moving to a new chat.
+Checkpoint: owner cancelled the Android home-screen shortcut task and requested the current update installer.
 
 Persistent manager: `apk-research-project-manager`.
 
@@ -18,20 +18,11 @@ Release assets:
 - Update: `apk-research-update_v0.29.2.exe`, SHA-256 `812382bbf61613f296e011c4fead9d5ede00bab9fb44679c76a6b27a542d4821`, 36,477,534 bytes.
 - `SHA256SUMS.txt` covers both.
 
-v0.29.2 adopts the proven MailRu Desktop Windows installer pattern:
-- separate first-install Setup and existing-install Update packages;
-- Update is the only asset used by the in-app updater;
-- downloaded Update retains SHA-256 verification;
-- Update is launched directly via the Windows shell;
-- apk-research exits after launch;
-- Inno Setup updates files and recreates Start-menu/optional desktop shortcuts;
-- no uninstall-first flow.
+v0.29.2 uses the MailRu Desktop Windows installer pattern: separate Setup and Update packages, Update-only in-app discovery, SHA-256 verification, direct Windows-shell launch of Update, application exit, and Inno-owned shortcut recreation.
 
 The redundant Android Home button is removed.
 
-OPEN OWNER REQUIREMENT FOR NEXT CHAT:
-After APK/XAPK installation, the installed Android application should appear as a launch shortcut on the managed Android home screen. There should be no separate Home button.
-
-Do not confuse this with MailRu Desktop's Windows shortcut. The prior experimental Launcher3 provider/database branch was not merged because stable real-AVD shortcut persistence was not proven. Continue this feature from clean v0.29.2, using only proven findings from those experiments.
+OWNER CANCELLATION:
+The prior requirement to create an Android home-screen shortcut after APK/XAPK installation was explicitly cancelled on 2026-10-08. It is not an active commitment or blocker and must not be resumed unless explicitly reopened.
 
 No broader v0.30 stage is active.
