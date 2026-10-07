@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.28.0] - 2026-10-07
+
+### Added
+- Manual «Проверить обновления» control in Settings using the latest stable GitHub Release.
+- «Обновить до <version>» button shown only after a strictly newer stable version is confirmed.
+- Direct download of the versioned Windows installer and `SHA256SUMS.txt` from `lvlaksim1/apk-research`.
+- Local SHA-256 verification before any downloaded installer can run.
+- Detached Windows update handoff: wait for the current process to exit, silently install into the same directory, then restart apk-research.
+- Unit coverage for version comparison, release parsing, checksum validation and updater handoff plus GUI smoke coverage for the new controls.
+
+### Unchanged
+- Android runtime, APK/XAPK intake, collectors, Research ZIP schemas and forensic evidence semantics.
+
 ## [0.27.0] - 2026-10-07
 
 ### APK/XAPK Package Intake

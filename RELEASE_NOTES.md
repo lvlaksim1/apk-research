@@ -1,38 +1,32 @@
-# apk-research v0.27.0 — APK/XAPK Package Intake
+# apk-research v0.28.0 — Direct GitHub Self-Update
 
-v0.27.0 adds first-class XAPK input while preserving the verified Android runtime, research capture path and evidence semantics.
+v0.28.0 adds user-controlled application updates directly from the latest stable GitHub Release.
 
-## APK/XAPK selection
+## Settings
 
-- The desktop file picker accepts both `.apk` and `.xapk`.
-- Single APK files keep the established `adb install -r -t -g` installation path.
-- XAPK files are treated as ZIP containers and only APK/OBB payloads are materialized.
+- Adds «Проверить обновления».
+- Shows «Обновить до <version>» only when GitHub reports a strictly newer stable release.
+- Displays current version, discovery status and download progress.
+- Does not poll for updates in the background.
 
-## XAPK validation and split installation
+## Direct GitHub release verification
 
-- Every APK part is inspected independently with `aapt2 dump badging`.
-- All APK parts must have the same package name and compatible versionCode.
-- Exactly one base APK without a split name is required.
-- Duplicate split names and mixed-package containers are rejected.
-- Multi-APK XAPK packages are installed atomically with `adb install-multiple -r -t -g`, with the base APK first.
+- Queries `https://api.github.com/repos/lvlaksim1/apk-research/releases/latest`.
+- Requires the exact `apk-research-setup_v<version>.exe` asset.
+- Requires the release `SHA256SUMS.txt`.
+- Downloads both directly from the project GitHub Release.
+- Computes SHA-256 locally and refuses installation on digest or size mismatch.
 
-## OBB payloads
+## Safe application handoff
 
-- OBB files are copied only after successful APK installation.
-- The destination is derived from the verified package name: `/sdcard/Android/obb/<package>/`.
-- OBB transfer failures stop package preparation rather than silently starting research with incomplete assets.
-
-## Container safety
-
-- Rejects absolute paths and path traversal entries.
-- Rejects encrypted ZIP members.
-- Applies bounded APK/OBB counts and extracted-size limits.
-- Rejects damaged/non-ZIP XAPK input.
-- Temporary extraction is removed after installation or failure.
+- The running apk-research process never overwrites itself.
+- After verification, a detached Windows helper waits for the current process to exit.
+- The verified Inno Setup package updates the same installation directory silently.
+- apk-research is started again after a successful installer exit.
 
 ## Compatibility
 
-- Hidden Emulator → gRPC/MMAP → AndroidView is unchanged.
-- v0.10.5 startup/clean-launch sequencing is unchanged.
-- Research ZIP schemas, RAW PCAP authority, evidence attribution and non-causality boundaries are unchanged.
-- The accepted dual-source screen model is unchanged.
+- APK/XAPK package intake is unchanged.
+- Android runtime and research collectors are unchanged.
+- Research ZIP schemas and evidence semantics are unchanged.
+- Hidden Emulator → gRPC/MMAP → AndroidView and v0.10.5 startup/clean-launch sequencing remain protected.

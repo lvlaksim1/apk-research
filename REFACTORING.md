@@ -1,5 +1,35 @@
 # Refactoring and Architecture Log
 
+## v0.28.0 — Direct GitHub Self-Update
+
+### Scope boundary
+
+v0.28 changes only application maintenance outside a research session. It does not modify Android runtime, capture, APK/XAPK installation, Research ZIP generation or evidence interpretation.
+
+### Explicit-check invariant
+
+The application does not poll GitHub in the background. Release discovery occurs only when the user presses «Проверить обновления». The request targets the public `releases/latest` endpoint for `lvlaksim1/apk-research`.
+
+### Release-identity invariant
+
+An update is offered only when the returned stable tag parses as a strict three-component version and is newer than the running version. The release must contain the exact `apk-research-setup_v<version>.exe` asset and `SHA256SUMS.txt`, both hosted under the project GitHub release path.
+
+### Integrity invariant
+
+The installer is staged in a temporary local directory. apk-research downloads `SHA256SUMS.txt`, hashes the installer itself with SHA-256 and refuses installation if file size or digest disagrees with the published release metadata/checksum file.
+
+### Process-handoff invariant
+
+The running executable never attempts to overwrite itself. After verification it starts a detached PowerShell handoff which waits for the current apk-research PID to exit, runs the verified Inno Setup package silently into the same installation directory, then restarts the installed executable.
+
+### Failure boundary
+
+Any network, release-shape, download, size, checksum or installer-launch failure leaves the current installation running/unchanged and is surfaced in Settings. An update cannot start while research or another managed operation is active.
+
+### Compatibility boundary
+
+v0.27 APK/XAPK intake, hidden Emulator → gRPC/MMAP → AndroidView, v0.10.5 clean-launch sequencing, dual-source screen evidence, RAW PCAP authority and all non-causality boundaries are unchanged.
+
 ## v0.27.0 — APK/XAPK Package Intake
 
 ### Scope boundary
