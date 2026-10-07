@@ -1,5 +1,27 @@
 # Refactoring and Architecture Log
 
+## v0.29.0 — Corrective package/runtime UX
+
+### ABI-selection invariant
+
+Before an XAPK install, apk-research reads the emulator ABI list from Android properties and inspects `native-code` from every APK through `aapt2 dump badging`. APK parts whose native libraries do not intersect the emulator ABI set are excluded from the install transaction. A base APK with incompatible native code, or an XAPK whose native ABI set has no emulator match, is rejected before installation with explicit diagnostics.
+
+### Explicit install invariant
+
+Selecting a file does not imply installation. The desktop UI exposes installation, launch and Android-home actions separately. Research cannot start until the selected package has been successfully installed.
+
+### Icon invariant
+
+A single project-owned icon design (phone + Android + magnifier) is generated during Windows packaging and is used by the Qt application, PyInstaller executable, Inno Setup package and resulting shortcuts.
+
+### In-place update invariant
+
+The updater does not invoke the old uninstaller. It launches the verified release installer with `/UPDATE=1`. Inno Setup reuses the previous application directory/group/tasks under the same AppId. Research data and QSettings live outside the program file set and are not removed by this update path.
+
+### Compatibility boundary
+
+Research capture, gRPC/MMAP display/input, v0.10.5 startup sequencing, Research ZIP schemas, RAW PCAP and all evidence semantics are unchanged.
+
 ## v0.28.0 — Direct GitHub Self-Update
 
 ### Scope boundary

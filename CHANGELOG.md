@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.29.0] - 2026-10-07
+
+### Fixed
+- Added ABI-aware XAPK split selection based on the running emulator's `ro.product.cpu.abilist`.
+- Replaced raw `INSTALL_FAILED_NO_MATCHING_ABIS` failures with explicit package/emulator ABI diagnostics.
+- Split application selection from explicit installation so the installation action is visible in the UI.
+
+### Added
+- New apk-research application icon for the Qt window, EXE, installer and Windows shortcuts.
+- Explicit «Установить в эмулятор», «Запустить приложение» and «Открыть главный экран Android» controls.
+
+### Changed
+- Self-update invokes the installer in explicit `/UPDATE=1` mode.
+- Inno Setup is configured to retain the previous installation directory, program group and tasks and update in place without uninstalling first.
+
 ## [0.28.0] - 2026-10-07
 
 ### Added

@@ -1,32 +1,37 @@
-# apk-research v0.28.0 — Direct GitHub Self-Update
+# apk-research v0.29.0 — Icon, ABI-aware XAPK and Emulator Controls
 
-v0.28.0 adds user-controlled application updates directly from the latest stable GitHub Release.
+v0.29.0 is a corrective usability/runtime release.
 
-## Settings
+## Application icon
 
-- Adds «Проверить обновления».
-- Shows «Обновить до <version>» only when GitHub reports a strictly newer stable release.
-- Displays current version, discovery status and download progress.
-- Does not poll for updates in the background.
+- Adds a dedicated apk-research icon based on Android research: phone + Android + magnifier.
+- The same icon is used by the Qt window, Windows executable, installer and shortcuts.
 
-## Direct GitHub release verification
+## XAPK ABI compatibility
 
-- Queries `https://api.github.com/repos/lvlaksim1/apk-research/releases/latest`.
-- Requires the exact `apk-research-setup_v<version>.exe` asset.
-- Requires the release `SHA256SUMS.txt`.
-- Downloads both directly from the project GitHub Release.
-- Computes SHA-256 locally and refuses installation on digest or size mismatch.
+- Reads the running emulator ABI list before installation.
+- Parses `native-code` from every APK member.
+- Excludes incompatible native ABI split APKs before `adb install-multiple`.
+- Rejects a genuinely incompatible package before installation with a clear package/emulator ABI explanation.
+- Preserves non-ABI splits and the existing one-base/package/version safety checks.
 
-## Safe application handoff
+## Emulator application controls
 
-- The running apk-research process never overwrites itself.
-- After verification, a detached Windows helper waits for the current process to exit.
-- The verified Inno Setup package updates the same installation directory silently.
-- apk-research is started again after a successful installer exit.
+- File selection is now separate from installation.
+- Adds «Установить в эмулятор».
+- Adds «Запустить приложение».
+- Adds «Открыть главный экран Android».
+
+## In-place updates
+
+- The updater passes `/UPDATE=1` to the verified release installer.
+- The installer reuses the existing application directory, program group and tasks.
+- The existing installation is not uninstalled before update.
+- User settings and Research ZIP data are preserved.
 
 ## Compatibility
 
-- APK/XAPK package intake is unchanged.
-- Android runtime and research collectors are unchanged.
-- Research ZIP schemas and evidence semantics are unchanged.
-- Hidden Emulator → gRPC/MMAP → AndroidView and v0.10.5 startup/clean-launch sequencing remain protected.
+- Research collectors and evidence schemas are unchanged.
+- Hidden Emulator → gRPC/MMAP → AndroidView remains unchanged.
+- v0.10.5 clean-launch sequencing remains protected.
+- v0.24–v0.28 forensic semantics remain unchanged.

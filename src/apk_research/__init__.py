@@ -1,7 +1,7 @@
 """apk-research core package."""
 
-__version__ = "0.28.0"
+__version__ = "0.29.0"
 
-# v0.28.0 adds verified direct GitHub self-update controls.
-# Release contract includes the v0.28 architecture log.
+# v0.29.0 adds ABI-aware XAPK intake, explicit emulator app controls,
+# a project-owned Windows icon, and explicit in-place update mode.
 __all__ = ["__version__"]
