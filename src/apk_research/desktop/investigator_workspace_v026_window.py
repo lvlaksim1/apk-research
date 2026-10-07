@@ -316,8 +316,15 @@ class InvestigatorWorkspaceV026MainWindow(UnifiedEvidenceV024MainWindow):
     def _on_workspace_unified_ready(self, data: dict) -> None:
         archive = str(data.get("archive") or "")
         model = data.get("model")
-        if not archive or not isinstance(model, dict):
+        requested = str(getattr(self, "_workspace_requested_archive", "") or "")
+        if (
+            not archive
+            or not isinstance(model, dict)
+            or not requested
+            or archive != requested
+        ):
             return
+        self._workspace_requested_archive = ""
         self._activate_workspace(archive, model)
 
     def _activate_workspace(self, archive: str, unified_model: dict[str, Any]) -> None:
