@@ -14,9 +14,13 @@ on:
       - "src/apk_research/desktop/package_input.py"
       - "src/apk_research/desktop/sidecar.py"
       - "src/apk_research/collectors/continuous_screen.py"
+      - "src/apk_research/collectors/https_intercept.py"
+      - "src/apk_research/https_capture.py"
       - "src/apk_research/orchestrator.py"
       - "src/apk_research/targets/adb.py"
+      - "pyproject.toml"
       - "tools/acceptance_avd.py"
+      - "tools/acceptance_https.py"
       - "tools/build_android_sidecar.py"
       - "tools/acceptance_sidecar.py"
       - "tools/acceptance_xapk.py"
@@ -162,6 +166,9 @@ jobs:
 
       - name: Verify generated Research ZIP again
         run: python -m apk_research research-zip-verify acceptance-output/apk-research-acceptance.research.zip --json
+
+      - name: Validate real HTTPS interception
+        run: python tools/acceptance_https.py
 
       - name: Stop emulator
         if: always()
