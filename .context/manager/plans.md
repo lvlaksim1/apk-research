@@ -19,21 +19,20 @@
 - v0.23 — Transport Session Evidence — COMPLETE.
 - v0.23.1 — Sidecar evidence isolation + idle stability — COMPLETE.
 - v0.24 — Unified Session Evidence — COMPLETE and RELEASED.
+- v0.25 — Transport and Protocol Analysis — COMPLETE and RELEASED.
 
-## v0.24 delivered model
+## Active roadmap stage — v0.26 Investigator Workspace
 
-The release unifies navigation across screen, user actions, normalized flows, raw packets and process/socket attribution while preserving source authority. Continuous Screen target-time links are derived from archived clock conversion and remain time-aligned navigation only. Process/socket reverse indexes retain original confidence.
+The owner directed execution. Build the investigation workflow on top of existing evidence, rather than changing capture/runtime foundations:
+- a coherent behavior/session overview assembled from already observed actions, process/socket attribution, network/protocol evidence and screen timing;
+- global search across investigation evidence;
+- filters by time, process, remote endpoint, protocol and action;
+- bookmarks and saved evidence sets with stable references back to existing evidence identifiers;
+- report generation from selected evidence;
+- reverse navigation from each report/evidence-set item back to the exact source view/item where possible;
+- explicit labels for observed fact, established technical relationship, temporal relationship and analyst selection; no causal upgrade.
 
-## Next agreed roadmap stage — v0.25
-
-Do not start implementation until the next owner-directed execution step. When activated, v0.25 should combine transport-session and protocol-analysis work:
-- capture-bounded TCP session/lifecycle structure;
-- sequence/acknowledgment/retransmission/window evidence;
-- explicit missing-start/missing-end/gap semantics;
-- DNS, TLS metadata, QUIC, HTTP/3 and observable HTTP;
-- transaction/grouping only when supported by observed packets/protocol evidence.
-
-Any new inference must expose provenance/confidence and must not synthesize missing traffic, plaintext or causality.
+Implementation should reuse v0.24 Session Evidence/Evidence Explorer and v0.25 Packet Inspector analysis rather than duplicating parsers or capture logic.
 
 ## Explicit exclusions
 

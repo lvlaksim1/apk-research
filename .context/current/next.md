@@ -1,8 +1,10 @@
 # Next Actions
 
-1. Treat v0.24.0 / `176dc1f1302c729456fc0d5711d0e5879e36837e` as the verified release baseline.
-2. Preserve Unified Session Evidence relation boundaries: RAW authority, temporal-only action/network links, time-aligned screen navigation and unchanged attribution confidence.
-3. Preserve the accepted dual-source screen model: Continuous Screen for uninterrupted timeline evidence and Android screenrecord for high-resolution evidence.
-4. Preserve hidden Emulator → gRPC/MMAP → AndroidView and v0.10.5 startup/clean-launch sequencing.
-5. When the owner directs the next roadmap step, begin v0.25 Transport and Protocol Analysis from current `main` on a dedicated branch.
-6. Keep Audio Evidence and user-facing Virtual Display out of scope.
+1. Treat v0.25.0 / `3717210a9db3074569602afc336380fd26598dd7` as the verified release baseline.
+2. Create a dedicated v0.26 Investigator Workspace feature branch from current `main`.
+3. Reuse Session Evidence, Evidence Explorer and Packet Inspector as the authoritative derived views; do not duplicate capture or protocol parsers.
+4. Implement behavior/session overview, global search/filters, bookmarks/evidence sets, report generation and reverse evidence navigation.
+5. Keep relation labels explicit and preserve RAW authority, temporal-only action/network semantics and unchanged attribution confidence.
+6. Run focused tests plus full CI, real AVD Research ZIP acceptance and Windows installer/smoke gates before release.
+7. Preserve hidden Emulator → gRPC/MMAP → AndroidView and v0.10.5 startup/clean-launch sequencing.
+8. Keep Audio Evidence and user-facing Virtual Display out of scope.

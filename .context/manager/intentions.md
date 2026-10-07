@@ -10,21 +10,28 @@ Owner-side v0.23.1 archives proved idle survival, long-session rollover continui
 
 Status: completed and released as v0.24.0.
 
-The manager accepted and completed the owner-directed v0.24 work:
-- Session Evidence chronological investigation view;
-- screen/action/flow/packet/process-socket/raw cross-navigation;
-- reverse process/socket attribution index;
-- bounded Continuous Screen target-time navigation;
-- explicit relation strength and no causal upgrade;
-- release packaging and exact-SHA verification.
+Unified Session Evidence provides chronological cross-navigation across screen, actions, flows, packets, process/socket attribution and RAW evidence while preserving temporal-only and confidence boundaries.
 
-Completion evidence: PR #15 gates passed; main pipeline #133 (`37558075676`) completed SUCCESS; GitHub Release v0.24.0 is published for exact SHA `176dc1f1302c729456fc0d5711d0e5879e36837e`.
+## Completed — v0.25 Transport and Protocol Analysis
 
-## Proposed — v0.25 Transport and Protocol Analysis
+Status: completed and released as v0.25.0.
 
-Status: proposed as the next agreed roadmap stage; no v0.25 implementation is active at this checkpoint.
+Delivered:
+- capture-bounded TCP lifecycle/sequence/ACK/window observations;
+- explicit missing-start/missing-end/gap semantics without loss/retransmission overclaim;
+- structured DNS messages and conservative ordered transaction pairing;
+- observed TLS ClientHello/ServerHello metadata;
+- QUIC Initial/SNI/ALPN aggregation and HTTP/3 only when observed;
+- cleartext HTTP/1.x and h2c recognition only from directly captured bytes;
+- Packet Inspector integration and end-to-end PCAP → analysis verification.
 
-Planned scope includes deeper capture-bounded TCP session analysis and protocol intelligence (DNS/TLS/QUIC/HTTP3 and observable HTTP) without inventing missing packets, plaintext or causality.
+Completion evidence: PR #16 gates passed and GitHub Release v0.25.0 is published for exact SHA `3717210a9db3074569602afc336380fd26598dd7`.
+
+## Active — v0.26 Investigator Workspace
+
+Status: owner-directed execution active.
+
+Build the agreed investigation workspace on top of the verified v0.24/v0.25 evidence model: coherent behavior/session overview, global search and filters, bookmarks/evidence sets, report generation and reverse navigation from report items to evidence. Do not introduce new causal semantics or alter RAW authority.
 
 ## Active — continuity and release integrity
 

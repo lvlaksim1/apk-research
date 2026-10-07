@@ -2,14 +2,14 @@
 
 ## Product baseline and latest release
 
-The product authority is `main`. The current verified product baseline and latest published release are `apk-research v0.24.0` at commit `176dc1f1302c729456fc0d5711d0e5879e36837e`.
+The product authority is `main`. The current verified product baseline and latest published release are `apk-research v0.25.0` at commit `3717210a9db3074569602afc336380fd26598dd7`.
 
-Release asset `apk-research-setup_v0.24.0.exe` has SHA-256 `f1ee0ec8e60345b17a21d00c8a5f4b4f616c8ed6c1aca24714f92eb912cb2c3c` and size 36,355,696 bytes. Main pipeline #133 (`37558075676`) completed SUCCESS for the exact release SHA, including CI, real AVD Research ZIP acceptance, Windows standalone/self-test/GUI/installer smoke, clean-Windows managed Android provisioning, documentation validation, checksum verification, release publication and temporary-artifact cleanup.
+Release asset `apk-research-setup_v0.25.0.exe` has SHA-256 `f9a2a92e02b5a1da9f6b8be39d3967a54292d8c04ad20926cba2361f3d560bb7` and size 36,384,738 bytes. The exact-SHA release pipeline published GitHub Release v0.25.0 after CI, real AVD Research ZIP acceptance, Windows standalone/self-test/GUI/installer checks, clean-Windows managed Android provisioning, documentation/checksum validation and release packaging.
 
-- source: GitHub repository main, pipeline #133 and GitHub Release v0.24.0, reconciled 2026-10-07
+- source: GitHub repository main and GitHub Release v0.25.0, reconciled 2026-10-07
 - authority: verified-repository + verified-ci
 
-## Completed product roadmap through v0.24
+## Completed product roadmap through v0.25
 
 - v0.18.0: Raw / Packet Inspector.
 - v0.19.0: project-owned Android app_process sidecar foundation.
@@ -19,21 +19,15 @@ Release asset `apk-research-setup_v0.24.0.exe` has SHA-256 `f1ee0ec8e60345b17a21
 - v0.23.0: Transport Session Evidence.
 - v0.23.1: Sidecar infrastructure isolation + idle stability correction.
 - v0.24.0: Unified Session Evidence and cross-navigation.
+- v0.25.0: capture-bounded Transport and Protocol Analysis.
 
-- source: verified release lineage
-- authority: verified-repository + verified-ci
+## v0.25 Transport and Protocol Analysis
 
-## v0.24 Unified Session Evidence
+v0.25 extends Packet Inspector without changing RAW authority. It adds capture-bounded TCP sequence/ACK/window observations, explicit missing-start/missing-end semantics, DNS message/transaction analysis, TLS ClientHello/ServerHello metadata, QUIC Initial/SNI/ALPN aggregation, HTTP/3 reporting only when `h3` is observed, and cleartext HTTP parsing only where captured bytes directly support it.
 
-v0.24 adds one cross-navigable investigation model over existing archived evidence. The intended chain is `screen ↔ action ↔ normalized flow ↔ packet ↔ process/socket ↔ raw evidence`.
+Sequence gaps are observations in the capture and are not automatically packet-loss claims. Repeated sequence ranges are not automatically network retransmission claims. DNS and HTTP transactions are paired only when the selected flow contains an unambiguous request/query followed by the matching response in capture order. Encrypted application payload is never synthesized as plaintext.
 
-The new Session Evidence view is chronological and presentation-only. It can navigate to Timeline, Evidence Explorer and Packet Inspector. Evidence Explorer also provides reverse Process/Socket → related flows navigation.
-
-Continuous Screen device MediaCodec PTS is mapped to target UTC for navigation using the realtime↔elapsed transform already archived by high-resolution Android screenrecord timing. Screen links are explicitly `time-aligned-navigation`; they do not assert causality. A high-resolution screenrecord chunk gap is represented as a gap rather than silently interpolated.
-
-Process/socket reverse navigation preserves the attribution confidence already present in normalized flow evidence and never upgrades it.
-
-- source: v0.24.0 implementation, tests and exact-release pipeline #133
+- source: v0.25.0 implementation, PR #16 gates and exact-release publication
 - authority: verified-repository + verified-ci
 
 ## Screen evidence role
@@ -45,15 +39,9 @@ The owner-approved dual-source model remains active:
 
 The proven live UI transport remains hidden Emulator → gRPC/MMAP → AndroidView and is not replaced by encoded Continuous Screen video.
 
-- source: explicit owner directive 2026-10-07 + owner-side v0.23.1 validation
-- authority: owner-directive + owner-evidence
-
 ## Evidence semantics
 
 Raw PCAP remains the primary network source of truth. Researcher-induced infrastructure traffic remains preserved in RAW evidence but may be excluded from ordinary derived app-analysis. Action↔Flow and Packet↔Action remain temporal-only with `causal_claim=false`. Screen links are target-time navigation only. Missing packets/events/frames are not synthesized, and encrypted traffic is not represented as plaintext.
-
-- source: verified repository implementation and owner directives
-- authority: verified-repository + owner-directive
 
 ## Protected runtime baseline
 
