@@ -601,9 +601,20 @@ def main() -> int:
             raise RuntimeError(
                 "Continuous screen evidence must remain non-canonical"
             )
-        if continuous_metadata.get("experimental") is not True:
+        if continuous_metadata.get("experimental") is not False:
             raise RuntimeError(
-                "Continuous screen evidence is not marked experimental"
+                "Continuous screen evidence must be marked stable/non-experimental"
+            )
+        if (
+            continuous_metadata.get("evidence_role")
+            != "stable-continuous-timeline"
+        ):
+            raise RuntimeError(
+                "Continuous screen evidence role is not stable-continuous-timeline"
+            )
+        if continuous_metadata.get("schema_version") != "0.2":
+            raise RuntimeError(
+                "Continuous screen evidence metadata is not schema 0.2"
             )
         if continuous_metadata.get("status") != "completed":
             raise RuntimeError(

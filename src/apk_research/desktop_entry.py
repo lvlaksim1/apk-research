@@ -9,16 +9,18 @@ def _gui_smoke_test() -> int:
 
     from PySide6.QtWidgets import QApplication
 
-    from apk_research.desktop.packet_window import (
-        PacketInspectorMainWindow,
+    from apk_research.desktop.unified_evidence_v024 import (
+        UnifiedEvidenceV024MainWindow,
     )
 
     app = QApplication.instance() or QApplication([])
-    window = PacketInspectorMainWindow()
+    window = UnifiedEvidenceV024MainWindow()
     window.show()
     app.processEvents()
     assert hasattr(window, "evidence_tab_index")
     assert hasattr(window, "packet_tab_index")
+    assert hasattr(window, "unified_tab_index")
+    assert hasattr(window, "unified_table")
     window.close()
     app.processEvents()
     return 0

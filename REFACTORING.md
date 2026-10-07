@@ -1,5 +1,27 @@
 # Refactoring and Architecture Log
 
+## v0.24.0 — Unified Session Evidence
+
+### Scope
+
+v0.24 is a presentation/navigation layer over existing evidence. It does not replace RAW artifacts or introduce a stronger causal model. The new session graph joins target-time screen locators, archived user actions, canonical normalized flows, raw-PCAP packet locators and existing process/socket attribution.
+
+### Screen-time invariant
+
+Continuous Screen MediaCodec PTS remains device elapsed-time evidence. UTC navigation is derived only when an archived realtime↔elapsed transform exists in canonical `screenrecord` timing; otherwise a legacy boundary anchor is explicitly marked estimated. Screen links are `time-aligned-navigation` with `causal_claim=false`.
+
+### Reverse attribution invariant
+
+The new Process/Socket reverse index groups flows only by the attribution already present in `network-flows.json`; it preserves UID/PID/inode/confidence/evidence and never upgrades attribution strength.
+
+### Dual-source screen role
+
+Owner-side v0.23.1 idle and rollover tests proved Continuous Screen continuity, including coverage inside a canonical screenrecord rollover gap. v0.24 records it as stable continuous/timeline evidence (`experimental=false`) while retaining Android `screenrecord` as the high-resolution source. Sole-source replacement remains a future quality/revalidation decision.
+
+### Runtime boundary
+
+Raw PCAP remains authoritative; Action ↔ Flow stays `temporal-only`; hidden Emulator → gRPC/MMAP → AndroidView and v0.10.5 startup sequencing remain unchanged.
+
 ## v0.23.1 — Sidecar evidence isolation and idle stability
 
 ### Trigger

@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.24.0] - 2026-10-07
+
+### Unified Session Evidence
+
+- Adds the `Session Evidence` chronological cross-navigation view.
+- Connects screen ↔ action ↔ normalized flow ↔ packet ↔ process/socket ↔ raw evidence.
+- Adds Packet → Evidence, Packet → screen, Timeline → screen and Evidence → Session Evidence/screen navigation.
+- Adds a reverse Process/Socket index that exposes all flows carrying the existing attribution without increasing its confidence.
+- Maps Continuous Screen device PTS to target UTC using archived screenrecord realtime↔elapsed timing and labels the result as time-aligned navigation, never causality.
+- Explicitly reports high-resolution screenrecord coverage gaps while retaining Continuous Screen navigation through those gaps.
+- Promotes Continuous Screen metadata to stable continuous/timeline evidence after owner-side idle and rollover validation; Android screenrecord remains the 1080×1920 high-resolution companion source.
+- Preserves RAW PCAP authority, Action ↔ Flow `temporal-only` / `causal_claim=false`, v0.10.5 launch sequencing and the hidden Emulator → gRPC/MMAP runtime.
+
 ## [0.23.1] - 2026-10-06
 
 ### Sidecar evidence isolation and idle stability

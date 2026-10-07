@@ -1,6 +1,6 @@
 """apk-research core package."""
 
-__version__ = "0.23.1"
+__version__ = "0.24.0"
 
-# v0.23.1 corrects experimental sidecar evidence isolation and media idle handling.
+# v0.24.0 unifies screen, action, flow, packet and process/socket evidence navigation.
 __all__ = ["__version__"]

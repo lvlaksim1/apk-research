@@ -204,8 +204,11 @@ def test_continuous_screen_writes_lossless_packet_payloads_and_pts(
             / ContinuousScreenCollector.METADATA_ARTIFACT
         ).read_text(encoding="utf-8")
     )
+    assert metadata["schema_version"] == "0.2"
     assert metadata["canonical"] is False
-    assert metadata["experimental"] is True
+    assert metadata["experimental"] is False
+    assert metadata["evidence_role"] == "stable-continuous-timeline"
+    assert metadata["high_resolution_companion"] == "adb-screenrecord"
     assert metadata["status"] == "completed"
     assert metadata["media_frame_count"] == 2
 

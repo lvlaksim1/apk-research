@@ -1,5 +1,13 @@
 # apk-research
 
+## v0.24.0 — Unified Session Evidence
+
+v0.24.0 объединяет существующие Timeline, Evidence Explorer, Packet Inspector, socket/process attribution и экранные источники в одну сквозную систему навигации. Новый раздел `Session Evidence` связывает `screen ↔ action ↔ flow ↔ packet ↔ process/socket ↔ raw` и показывает тип/силу каждой связи.
+
+Continuous Screen после двух реальных owner-side проверок больше не считается экспериментальным по надёжности: он является штатным непрерывным/timeline источником, а Android `screenrecord` остаётся высокодетальным 1080×1920 источником. Привязка Continuous Screen к target UTC выводится из архивируемого device realtime↔elapsed преобразования; это `time-aligned-navigation`, а не доказательство причинности.
+
+Raw PCAP остаётся авторитетным. Action ↔ Flow и Packet ↔ Action остаются `temporal-only` / `causal_claim=false`. Hidden Emulator → gRPC/MMAP → AndroidView и v0.10.5 startup/clean-launch sequencing не меняются. Подробный контракт: `docs/V0.24_UNIFIED_EVIDENCE.md`.
+
 ## v0.23.1 — Sidecar Evidence Isolation & Idle Stability
 
 v0.23.1 is a corrective release based on the first owner-side real Research ZIP produced by v0.23.0.
