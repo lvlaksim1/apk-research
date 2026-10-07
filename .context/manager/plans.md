@@ -19,14 +19,17 @@ Stable releases publish:
 
 The application updater uses only the dedicated Update asset.
 
-## Current product work
+## Current product plan — HTTPS traffic inspection
 
-No additional product feature stage is currently authorized.
+The next product stage is focused on decrypted HTTPS traffic display.
 
-The Android home-screen shortcut requirement was cancelled by the owner on 2026-10-08 and must not be resumed without a new explicit directive.
+1. Add an application-managed intercepting HTTP(S) proxy bundled with the Windows package; no external Python installation or manual proxy setup for normal use.
+2. Configure the managed Android emulator to route research traffic through it and provision a trusted research CA in the managed system environment.
+3. Capture complete HTTP transactions where decryption succeeds: request URL/method/headers/body and response status/headers/body, with timing and protocol metadata.
+4. Add a dedicated HTTPS/HTTP transactions view with search, filtering, human-readable body rendering and raw representation.
+5. Archive interception evidence separately from passive RAW PCAP and preserve exact provenance so active interception is never confused with passive observation.
+6. Validate on the real managed AVD with representative HTTP/1.1 and HTTP/2 applications before release.
+7. Treat certificate pinning/custom trust stores as the next bounded tier. First detect and report interception failure correctly; then implement an explicit enhanced research mode rather than silently modifying applications.
+8. Evaluate HTTP/3/QUIC interception separately and never downgrade or block QUIC without recording that the research environment altered transport behavior.
 
-Until a new owner task arrives:
-- treat v0.29.2 as the verified baseline;
-- preserve the separate Setup/Update installer contract;
-- keep «Открыть главный экран Android» removed;
-- preserve ABI-aware XAPK handling and all evidence/runtime invariants.
+The Android home-screen shortcut requirement remains cancelled.
