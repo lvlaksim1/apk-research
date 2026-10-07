@@ -95,7 +95,7 @@ def _dns_name(
         if length > 63 or cursor + length > len(data):
             raise ProtocolParseError("truncated DNS label")
         label = data[cursor : cursor + length].decode(
-            "idna",
+            "ascii",
             errors="replace",
         )
         labels.append(label)
