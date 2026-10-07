@@ -97,6 +97,11 @@ def test_install_xapk_uses_install_multiple_and_pushes_obb(
         "device_abis",
         lambda: ("arm64-v8a",),
     )
+    monkeypatch.setattr(
+        runtime,
+        "ensure_home_shortcut",
+        lambda package, label: "created",
+    )
 
     package = runtime.install_package(archive_path)
 
@@ -181,6 +186,11 @@ def test_install_xapk_rejects_mixed_packages_before_install(
         "device_abis",
         lambda: ("x86_64",),
     )
+    monkeypatch.setattr(
+        runtime,
+        "ensure_home_shortcut",
+        lambda package, label: "created",
+    )
 
     with pytest.raises(
         AndroidRuntimeError,
@@ -227,6 +237,11 @@ def test_single_apk_keeps_single_install_path(
         runtime,
         "device_abis",
         lambda: ("x86_64",),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "ensure_home_shortcut",
+        lambda package, label: "created",
     )
 
     assert runtime.install_package(apk) == "com.example.app"
@@ -283,6 +298,11 @@ def test_install_xapk_filters_incompatible_abi_split(
         runtime,
         "device_abis",
         lambda: ("x86_64", "x86"),
+    )
+    monkeypatch.setattr(
+        runtime,
+        "ensure_home_shortcut",
+        lambda package, label: "created",
     )
 
     assert runtime.install_package(archive_path) == "com.example.app"
