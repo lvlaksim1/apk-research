@@ -14,9 +14,13 @@ on:
       - "src/apk_research/desktop/package_input.py"
       - "src/apk_research/desktop/sidecar.py"
       - "src/apk_research/collectors/continuous_screen.py"
+      - "src/apk_research/collectors/https_intercept.py"
+      - "src/apk_research/https_capture.py"
       - "src/apk_research/orchestrator.py"
       - "src/apk_research/targets/adb.py"
+      - "pyproject.toml"
       - "tools/acceptance_avd.py"
+      - "tools/acceptance_https.py"
       - "tools/build_android_sidecar.py"
       - "tools/acceptance_sidecar.py"
       - "tools/acceptance_xapk.py"
@@ -88,7 +92,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          nohup "$ANDROID_HOME/emulator/emulator"             @apk_research_api35             -port 5554             -no-window             -gpu auto             -grpc 8554             -no-snapshot             -noaudio             -no-boot-anim             -wipe-data             > emulator.log 2>&1 &
+          nohup "$ANDROID_HOME/emulator/emulator" @apk_research_api35 -port 5554 -no-window -gpu auto -grpc 8554 -no-snapshot -noaudio -no-boot-anim -wipe-data > emulator.log 2>&1 &
           echo $! > emulator.pid
 
           sleep 5
@@ -153,6 +157,9 @@ jobs:
 
       - name: Validate live Emulator gRPC transport after sidecar
         run: python tools/check_emulator_grpc.py --port 8554
+
+      - name: Validate real HTTPS interception
+        run: python tools/acceptance_https.py
 
       - name: Run real XAPK install acceptance
         run: python tools/acceptance_xapk.py

@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_all
+
 project_root = Path(SPECPATH).parent
 source_root = project_root / "src"
 entry_script = source_root / "apk_research" / "desktop_entry.py"
@@ -34,10 +36,16 @@ if not app_icon_ico.is_file() or not app_icon_png.is_file():
         + str(app_icon_ico)
     )
 
+mitm_datas, mitm_binaries, mitm_hiddenimports = collect_all(
+    "mitmproxy"
+)
+
 a = Analysis(
     [str(entry_script)],
     pathex=[str(source_root)],
-    binaries=[],
+    binaries=[
+        *mitm_binaries,
+    ],
     datas=[
         (
             str(agent_jar),
@@ -47,6 +55,7 @@ a = Analysis(
             str(app_icon_png),
             "apk_research/resources",
         ),
+        *mitm_datas,
     ],
     hiddenimports=[
         "grpc",
@@ -54,6 +63,7 @@ a = Analysis(
         "google.protobuf",
         "google.protobuf.descriptor_pb2",
         "google.protobuf.message_factory",
+        *mitm_hiddenimports,
     ],
     hookspath=[],
     hooksconfig={},
