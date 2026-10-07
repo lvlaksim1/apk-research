@@ -1,9 +1,9 @@
 # Next Actions
 
-1. Treat v0.29.1 / `ae4450ba662299c30199742ba4b1d2bbcdb27601` as the verified release baseline.
-2. For any future updater change, retain direct installer launch, installer-owned relaunch, persistent logs and parent-exit Windows acceptance.
-3. Preserve ABI-aware XAPK validation and explicit emulator application controls.
-4. Preserve all v0.24-v0.26 evidence semantics and RAW authority.
-5. Preserve the accepted dual-source screen model.
-6. Preserve hidden Emulator → gRPC/MMAP → AndroidView and v0.10.5 startup/clean-launch sequencing.
-7. Do not start a new feature stage until the owner defines the next development goal.
+1. Treat v0.29.2 / `0f9d949e5158860a51d4e83624fa1cbf3db121cc` as the verified baseline.
+2. Preserve the separate Setup/Update installer contract.
+3. Preserve SHA-256 verification and GitHub Release publication of both installers.
+4. Preserve Inno-owned Windows shortcut recreation.
+5. Preserve ABI-aware XAPK handling and evidence/runtime invariants.
+6. Do not restart the experimental Launcher3 database/provider approach without an explicit owner decision to continue that separate Android-home feature.
+7. Await the owner's next product direction.

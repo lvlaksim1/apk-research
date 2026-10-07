@@ -1,30 +1,27 @@
 # Latest Handoff
 
-Generation: 20
+Generation: 21
 Date: 2026-10-07
 
 Persistent manager: `apk-research-project-manager`.
 
-Authority:
-- manager state: `context`;
-- product: `main`.
+Verified product baseline: **apk-research v0.29.2** at `0f9d949e5158860a51d4e83624fa1cbf3db121cc`.
 
-Verified product baseline is **apk-research v0.29.1** at `ae4450ba662299c30199742ba4b1d2bbcdb27601`.
+Release assets:
+- Setup: `apk-research-setup_v0.29.2.exe`, SHA-256 `6acc5b72337faa92cfd930ed88151445fb218eb580b54eb4e5f65112b457c1f0`, 36,477,159 bytes.
+- Update: `apk-research-update_v0.29.2.exe`, SHA-256 `812382bbf61613f296e011c4fead9d5ede00bab9fb44679c76a6b27a542d4821`, 36,477,534 bytes.
 
-Installer: `apk-research-setup_v0.29.1.exe`.
-SHA-256: `f853d8672dd4f0c5e80ed39c4b538d38d25b52ea6be8a1cbee3ba03f3e194e49`.
-Size: 36,474,197 bytes.
-Release published: 2026-10-07T14:37:24Z.
+v0.29.2 adopts the proven MailRu Desktop Windows installer pattern:
+- separate first-install Setup and existing-install Update packages;
+- Update is the only asset used by the in-app updater;
+- downloaded Update retains SHA-256 verification;
+- Update is launched directly via the Windows shell;
+- apk-research exits after launch;
+- Inno Setup updates files and recreates Start-menu/optional desktop shortcuts;
+- no uninstall-first flow.
 
-v0.29.1 fixes the owner-reported updater failure after GUI exit:
-- hidden PowerShell relay removed;
-- verified installer launched directly;
-- Inno Setup owns successful relaunch;
-- persistent handoff/installer logs added;
-- Windows acceptance proves v0.29.0 → v0.29.1 update survives initiating-process exit.
+The redundant Android Home button is removed.
 
-Main pipeline #140 passed all mandatory gates after one exact AVD rerun. The first AVD attempt had a non-reproduced Continuous Screen failure while the session/ZIP and other layers passed; the rerun passed.
+PR #24 and main pipeline #141 passed all mandatory release gates.
 
-Important: installed v0.28.0/v0.29.0 contains the old broken relay, so an affected user must manually install v0.29.1 once. Future updates can then use the corrected mechanism.
-
-No later feature stage is active. Await owner direction.
+The prior experimental forced Android Launcher3 workspace shortcut work was not merged; MailRu Desktop provides no Android analogue. Continue that only as a separate feature if explicitly requested.

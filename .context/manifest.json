@@ -52,7 +52,8 @@
     ".context/decisions/DEC-20261006-v022-release-baseline.md",
     ".context/decisions/DEC-20261007-continuous-screen-dual-source-role.md",
     ".context/decisions/DEC-20261007-v024-release-baseline.md",
-    ".context/decisions/DEC-20261007-direct-github-self-update.md"
+    ".context/decisions/DEC-20261007-direct-github-self-update.md",
+    ".context/decisions/DEC-20261007-mailru-installer-model.md"
   ],
   "dialogues": [
     ".context/dialogues/20261006-scrcpy-v5-applicability.md",

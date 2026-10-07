@@ -4,37 +4,32 @@ Last reconciled: 2026-10-07.
 
 ## Product
 
-- Product: `apk-research`.
-- Product authority: `main`.
-- Current release/main commit: `ae4450ba662299c30199742ba4b1d2bbcdb27601`.
-- Latest published release: `v0.29.1`.
-- Installer: `apk-research-setup_v0.29.1.exe`.
-- Installer SHA-256: `f853d8672dd4f0c5e80ed39c4b538d38d25b52ea6be8a1cbee3ba03f3e194e49`.
-- Installer size: 36,474,197 bytes.
-- Release published: 2026-10-07T14:37:24Z.
+- Current release/main commit: `0f9d949e5158860a51d4e83624fa1cbf3db121cc`.
+- Latest release: `v0.29.2`.
+- Full installer: `apk-research-setup_v0.29.2.exe`.
+- Update installer: `apk-research-update_v0.29.2.exe`.
+- Setup SHA-256: `6acc5b72337faa92cfd930ed88151445fb218eb580b54eb4e5f65112b457c1f0`.
+- Update SHA-256: `812382bbf61613f296e011c4fead9d5ede00bab9fb44679c76a6b27a542d4821`.
 
-## v0.29.1
+## v0.29.2
 
-Complete and published.
+The Windows packaging/update path now matches MailRu Desktop structurally: distinct Setup and Update installers, direct Windows-shell launch of Update, same AppId, fixed per-user install directory, and Inno-owned shortcut recreation.
 
-Fixes the owner-reported automatic-update handoff failure. The updater no longer depends on a hidden PowerShell process after GUI exit. It starts the already verified Inno Setup package directly, then exits; Inno Setup updates the existing installation and relaunches apk-research itself.
+SHA-256 verification remains mandatory and validates both published installers.
 
-Persistent logs:
-- `%LOCALAPPDATA%\apk-research\updates\handoff.log`;
-- `%LOCALAPPDATA%\apk-research\updates\installer.log`.
+The explicit Android Home button is removed.
 
-## Verified release state
+## Verification
 
-PR #21 passed CI, updater unit/contract tests, real Windows upgrade acceptance and clean-Windows provisioning.
-
-Main pipeline #140 passed for exact SHA `ae4450ba662299c30199742ba4b1d2bbcdb27601` after one AVD job rerun. The first AVD attempt had an unrelated/non-reproduced Continuous Screen `failed-experimental` status; the session itself completed and validated. The exact AVD rerun passed.
-
-The release includes checksum verification and GitHub Release publication.
-
-## Protected baseline
-
-v0.29 icon/XAPK/emulator-control behavior and all evidence/runtime semantics remain unchanged.
+PR #24 and main pipeline #141 passed:
+- full CI;
+- real AVD acceptance;
+- Windows standalone and GUI smoke;
+- full + update installer build;
+- real v0.29.1 → v0.29.2 dedicated update acceptance;
+- clean-Windows Android provisioning;
+- GitHub Release publication.
 
 ## Development status
 
-v0.29.1 is the current verified baseline. No subsequent feature stage is active.
+v0.29.2 is the verified baseline. No later feature stage is active.
