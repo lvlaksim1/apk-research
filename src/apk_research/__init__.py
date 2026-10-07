@@ -1,6 +1,6 @@
 """apk-research core package."""
 
-__version__ = "0.25.0"
+__version__ = "0.26.0"
 
-# v0.25.0 adds capture-bounded transport and protocol analysis to Packet Inspector.
+# v0.26.0 adds the Investigator Workspace over the verified evidence model.
 __all__ = ["__version__"]
