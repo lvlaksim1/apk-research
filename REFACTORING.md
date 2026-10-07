@@ -1,5 +1,31 @@
 # Refactoring and Architecture Log
 
+## v0.26.0 — Investigator Workspace
+
+### Scope boundary
+
+v0.26 is a workflow/presentation layer over the verified v0.24 Unified Session Evidence and v0.25 Transport/Protocol Analysis. It introduces no new capture path, no replacement RAW artifact and no stronger causal model.
+
+### Stable navigation references
+
+Each workspace row receives a deterministic `EV-...` key derived from the row's existing time/event/action/flow identity. The key is used only for navigation, bookmarks, evidence sets and reports. It does not become source evidence and does not upgrade attribution or temporal correlation.
+
+### Analyst-state boundary
+
+Bookmarks and named evidence sets are persisted beside the archive as `<research.zip>.investigator.json`. The immutable Research ZIP is never opened for write. Stale references are pruned against the current workspace model.
+
+### Search/filter boundary
+
+Global search and filters are intersections over already observed/modelled fields. A filtered-out or absent row is not evidence that an event did not occur.
+
+### Report boundary
+
+Markdown/JSON reports contain selected evidence references plus source navigation IDs. Report membership is explicit analyst selection. Every record retains its original relation type/strength and `causal_claim`; the report cannot strengthen the source relation.
+
+### Compatibility boundary
+
+RAW PCAP remains authoritative; Action ↔ Flow/Packet stays temporal-only; screen links remain time-aligned navigation; v0.25 protocol interpretation remains captured-packets-only. Hidden Emulator → gRPC/MMAP → AndroidView, v0.10.5 startup/clean-launch sequencing and the accepted Continuous Screen + high-resolution screenrecord roles are unchanged. Audio Evidence and user-facing Virtual Display remain out of scope.
+
 ## v0.25.0 — Transport and Protocol Analysis
 
 ### Evidence model

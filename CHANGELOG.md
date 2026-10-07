@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.26.0] - 2026-10-07
+
+### Investigator Workspace
+
+- Adds a dedicated Investigator workspace over the existing v0.24/v0.25 evidence model.
+- Adds global search and intersecting filters by time, event kind, protocol, process/PID/inode, endpoint, action and evidence class.
+- Adds reproducible `EV-...` navigation references derived from existing evidence identity without creating a new forensic fact.
+- Adds bookmarks and named evidence sets stored outside the immutable Research ZIP in `<research.zip>.investigator.json`.
+- Adds reverse navigation from workspace/evidence-set items to Session Evidence, Timeline, Evidence Explorer, Packet Inspector and screen context.
+- Adds Markdown/JSON report generation from the active evidence set; every report item retains EV/action/flow/time source-navigation identifiers.
+- Treats report membership as analyst selection rather than evidence and preserves original relation type/strength and `causal_claim`.
+- Preserves RAW PCAP authority, temporal-only action/network links, time-aligned screen navigation and capture-bounded protocol semantics.
+- Leaves hidden Emulator → gRPC/MMAP → AndroidView, v0.10.5 startup sequencing and the dual-source screen model unchanged.
+
 ## [0.25.0] - 2026-10-07
 
 ### Transport and Protocol Analysis
