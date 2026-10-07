@@ -1,5 +1,13 @@
 # apk-research
 
+## v0.27.0 — APK/XAPK Package Intake
+
+v0.27.0 добавляет XAPK как штатный входной формат. В одном диалоге можно выбрать `.apk` или `.xapk`; одиночный APK продолжает устанавливаться прежним путём, а XAPK безопасно распаковывается во временный каталог.
+
+Каждая APK-часть проверяется через `aapt2`: программа требует один базовый APK, одинаковый package name и совместимый versionCode, после чего устанавливает base + split одной командой `adb install-multiple`. OBB-файлы переносятся только после успешной установки в `/sdcard/Android/obb/<package>/`.
+
+Неоднозначный, смешанный или небезопасный XAPK отклоняется. Исследовательский runtime, gRPC/MMAP, clean-launch, Research ZIP, RAW PCAP и доказательные границы не меняются. Подробный контракт: `docs/V0.27_XAPK_PACKAGE_INTAKE.md`.
+
 ## v0.26.0 — Investigator Workspace
 
 v0.26.0 превращает существующие Session Evidence, Evidence Explorer и Packet Inspector в единое рабочее место исследователя. Новый раздел `Investigator` даёт глобальный поиск и пересекающиеся фильтры по времени, типу события, протоколу, процессу/PID/inode, endpoint, action и классу связи.
