@@ -67,6 +67,7 @@ def test_database_shortcut_insert_and_duplicate_prevention(
     database = tmp_path / "launcher_4_by_4.db"
     connection = sqlite3.connect(database)
     try:
+        connection.execute("PRAGMA journal_mode=WAL")
         connection.execute(
             """
             CREATE TABLE favorites (
@@ -158,3 +159,16 @@ def test_database_shortcut_insert_and_duplicate_prevention(
             0,
         )
     ]
+
+    copied_database = tmp_path / "copied-main-only.db"
+    copied_database.write_bytes(database.read_bytes())
+    copied = sqlite3.connect(copied_database)
+    try:
+        copied_rows = copied.execute(
+            "SELECT title FROM favorites "
+            "WHERE intent LIKE '%package=com.example.app;%'"
+        ).fetchall()
+    finally:
+        copied.close()
+
+    assert copied_rows == [("Example App",)]
