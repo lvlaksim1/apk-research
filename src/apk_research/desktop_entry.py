@@ -21,6 +21,9 @@ def _gui_smoke_test() -> int:
     assert hasattr(window, "packet_tab_index")
     assert hasattr(window, "unified_tab_index")
     assert hasattr(window, "unified_table")
+    assert hasattr(window, "check_updates_button")
+    assert hasattr(window, "install_update_button")
+    assert hasattr(window, "update_status_label")
     window.close()
     app.processEvents()
     return 0
