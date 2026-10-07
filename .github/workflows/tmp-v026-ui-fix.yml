@@ -1,0 +1,49 @@
+name: Temporary v0.26 UI fix
+
+on:
+  push:
+    branches:
+      - feature/v0.26-investigator-workspace
+    paths:
+      - .github/workflows/tmp-v026-ui-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Patch workspace activation guard
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/apk_research/desktop/investigator_workspace_v026_window.py")
+          text = path.read_text(encoding="utf-8")
+          old = '''    def _on_workspace_unified_ready(self, data: dict) -> None:\n        archive = str(data.get("archive") or "")\n        model = data.get("model")\n        if not archive or not isinstance(model, dict):\n            return\n        self._activate_workspace(archive, model)\n'''
+          new = '''    def _on_workspace_unified_ready(self, data: dict) -> None:\n        archive = str(data.get("archive") or "")\n        model = data.get("model")\n        requested = str(getattr(self, "_workspace_requested_archive", "") or "")\n        if (\n            not archive\n            or not isinstance(model, dict)\n            or not requested\n            or archive != requested\n        ):\n            return\n        self._workspace_requested_archive = ""\n        self._activate_workspace(archive, model)\n'''
+          if old not in text:
+              raise SystemExit("expected activation block not found")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+      - name: Focused verification
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest
+          python -m compileall -q src
+          pytest -q tests/test_investigator_workspace_v026.py
+      - name: Commit patch and remove helper
+        run: |
+          rm .github/workflows/tmp-v026-ui-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/apk_research/desktop/investigator_workspace_v026_window.py .github/workflows/tmp-v026-ui-fix.yml
+          git commit -m "v0.26: keep Session Evidence navigation independent"
+          git push origin HEAD:feature/v0.26-investigator-workspace
