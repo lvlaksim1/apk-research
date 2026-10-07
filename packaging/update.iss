@@ -18,7 +18,7 @@ DefaultGroupName=apk-research
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 DirExistsWarning=no
-UsePreviousAppDir=yes
+UsePreviousAppDir=no
 UsePreviousGroup=yes
 UsePreviousTasks=yes
 OutputDir=..\installer
@@ -56,7 +56,7 @@ function InitializeSetup(): Boolean;
 var
   InstalledExe: String;
 begin
-  InstalledExe := ExpandConstant('{app}\{#MyAppExeName}');
+  InstalledExe := ExpandConstant('{localappdata}\Programs\apk-research\{#MyAppExeName}');
   if not FileExists(InstalledExe) then
   begin
     MsgBox('apk-research не найден.' + #13#10 +
