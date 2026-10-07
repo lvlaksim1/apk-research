@@ -1,0 +1,19 @@
+name: TEMP v0.29.2 Validation
+
+on:
+  push:
+    branches:
+      - fix/v0.29.2-home-shortcut
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  avd:
+    uses: ./.github/workflows/avd-research-acceptance.yml
+
+  desktop:
+    uses: ./.github/workflows/desktop-build.yml
