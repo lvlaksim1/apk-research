@@ -6,48 +6,43 @@ Last reconciled: 2026-10-07.
 
 - Product: `apk-research`.
 - Product authority: `main`.
-- Current release/main commit: `cbf6d177e67cd56e980319ab654da2f27a73176a`.
-- Latest published release: `v0.26.0`.
-- Installer: `apk-research-setup_v0.26.0.exe`.
-- Installer SHA-256: `f5ce59d8c51263fd61d425422ee4e3f5a471592c35d1a19f9a1317161e8affb6`.
-- Installer size: 36,409,960 bytes.
-- Release published: 2026-10-07T03:32:51Z.
+- Current release/main commit: `f6a39f21583273f91b192d14fa258bc1e7613a93`.
+- Latest published release: `v0.27.0`.
+- Installer: `apk-research-setup_v0.27.0.exe`.
+- Installer SHA-256: `19d5ca4fe75ed24bd65d1f89e70c56c0e89e91b9ee9894b44722ea0535834e34`.
+- Installer size: 36,414,204 bytes.
+- Release published: 2026-10-07T04:27:24Z.
 
-## v0.26.0 — Investigator Workspace
+## v0.27.0 — APK/XAPK Package Intake
 
-v0.26.0 is complete and published.
+v0.27.0 is complete and published.
 
 Delivered:
-- dedicated Investigator workspace over v0.24/v0.25 evidence;
-- global search and intersecting filters by time/event/protocol/process/endpoint/action/evidence class;
-- stable `EV-...` navigation references;
-- bookmarks and named evidence sets stored outside Research ZIP;
-- reverse navigation to Session Evidence, Timeline, Evidence Explorer, Packet Inspector and screen context;
-- Markdown/JSON report export retaining EV/source navigation identifiers;
-- explicit preservation of relation type/strength and `causal_claim`.
+- APK/XAPK selection in the desktop UI;
+- safe XAPK extraction;
+- exact package/version/split validation through aapt2;
+- one-base requirement and duplicate/mixed-package rejection;
+- split installation through `adb install-multiple`;
+- OBB deployment to the installed package directory;
+- regression-preserved single-APK installation.
 
 ## Verified release state
 
-Main pipeline #135 executed for exact SHA `cbf6d177e67cd56e980319ab654da2f27a73176a`:
-- CI/compile/tests passed;
-- real AVD Research ZIP acceptance passed;
-- Windows standalone build, self-test and GUI smoke passed;
-- v0.26.0 installer build/install/smoke passed;
-- clean-Windows managed Android provisioning passed;
-- release publication produced GitHub Release v0.26.0.
+PR #18 final SHA `72b713496e46fb3f5b1c1c30fafa46eee9fb5051` passed CI, repository storage policy, real AVD acceptance and Windows desktop checks.
+
+The first main publication attempt at `a89a11db586ae2254e2dfffdd5744fca3ce5d912` failed only at `Verify release documentation`. The corrective commit `f6a39f21583273f91b192d14fa258bc1e7613a93` updated the missing release contract. Main pipeline #137 then passed:
+- CI/compile/tests;
+- real XAPK installation on AVD;
+- real Research ZIP AVD acceptance;
+- Windows standalone/self-test/GUI;
+- installer build/install/smoke;
+- clean-Windows Android provisioning;
+- checksum verification and GitHub Release publication.
 
 ## Protected evidence/runtime baseline
 
-- Raw PCAP remains authoritative network evidence.
-- Action ↔ Flow and Packet ↔ Action remain temporal-only, `causal_claim=false`.
-- Screen navigation remains time-aligned, not causal.
-- v0.25 protocol analysis remains captured-packets-only.
-- Investigator EV references and reports are navigation/analyst-organization metadata, not new evidence.
-- Hidden Emulator → gRPC/MMAP → AndroidView remains the live display/input path.
-- v0.10.5 clean-launch/startup sequencing remains protected.
-- Continuous Screen is stable continuous/timeline evidence; Android screenrecord remains high-resolution evidence.
-- Audio Evidence and user-facing Virtual Display remain out of scope.
+All v0.24-v0.26 evidence semantics remain unchanged. Hidden Emulator → gRPC/MMAP → AndroidView, v0.10.5 clean-launch sequencing and the accepted dual-source screen model remain protected.
 
 ## Development status
 
-The agreed `v0.24 → v0.25 → v0.26` roadmap is complete. No v0.27 implementation or other new roadmap stage is active.
+v0.27.0 is the current verified baseline. No subsequent feature stage is active.

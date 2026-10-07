@@ -1,6 +1,6 @@
 # Latest Handoff
 
-Generation: 16
+Generation: 17
 Date: 2026-10-07
 
 Persistent manager: `apk-research-project-manager`.
@@ -9,34 +9,31 @@ Authority:
 - manager state: `context`;
 - product: `main`.
 
-Verified product baseline is **apk-research v0.26.0** at `cbf6d177e67cd56e980319ab654da2f27a73176a`.
+Verified product baseline is **apk-research v0.27.0** at `f6a39f21583273f91b192d14fa258bc1e7613a93`.
 
-Installer: `apk-research-setup_v0.26.0.exe`.
-SHA-256: `f5ce59d8c51263fd61d425422ee4e3f5a471592c35d1a19f9a1317161e8affb6`.
-Size: 36,409,960 bytes.
-Release published: 2026-10-07T03:32:51Z.
+Installer: `apk-research-setup_v0.27.0.exe`.
+SHA-256: `19d5ca4fe75ed24bd65d1f89e70c56c0e89e91b9ee9894b44722ea0535834e34`.
+Size: 36,414,204 bytes.
+Release published: 2026-10-07T04:27:24Z.
 
-Main pipeline #135 executed on the exact release SHA. CI, real AVD Research ZIP acceptance, Windows standalone/self-test/GUI smoke, installer build/install/smoke and clean-Windows Android provisioning passed before publication.
+v0.27.0 adds first-class APK/XAPK intake:
+- unified file selection;
+- safe XAPK extraction;
+- one base APK + compatible split validation through aapt2;
+- `adb install-multiple` for split packages;
+- optional OBB deployment after successful APK installation;
+- preserved single-APK path;
+- rejection of unsafe/ambiguous bundles.
 
-v0.26.0 delivers Investigator Workspace:
-- global investigation search and intersecting filters;
-- stable EV navigation references;
-- bookmarks and named evidence sets outside immutable Research ZIP;
-- reverse navigation to Session Evidence / Timeline / Evidence / Packets / screen;
-- Markdown/JSON report export retaining source-navigation identifiers;
-- no evidence-strength or causal upgrade.
+PR #18 final gates passed. The first post-merge release attempt failed only at release-documentation verification. Corrective commit `f6a39f21583273f91b192d14fa258bc1e7613a93` fixed the release contract. Main pipeline #137 then passed CI, explicit real XAPK installation on AVD, normal Research ZIP AVD acceptance, Windows desktop/installer checks, clean-Windows provisioning, checksum verification and publication.
 
-The owner-agreed three-stage roadmap `v0.24 → v0.25 → v0.26` is complete.
+Protected semantics/runtime remain unchanged:
+- raw PCAP authority;
+- temporal-only/non-causal action/network links;
+- captured-packets-only protocol analysis;
+- analyst-only EV/report organization;
+- hidden Emulator → gRPC/MMAP → AndroidView;
+- v0.10.5 startup sequencing;
+- dual-source screen model.
 
-Protected semantics:
-- raw PCAP is authoritative;
-- Action ↔ Flow and Packet ↔ Action remain `temporal-only`, `causal_claim=false`;
-- screen links are time-aligned navigation, not causality;
-- protocol analysis remains `captured-packets-only`;
-- EV references/bookmarks/sets/reports are analyst navigation/organization metadata, not new evidence;
-- hidden Emulator → gRPC/MMAP → AndroidView remains live display/input;
-- v0.10.5 startup/clean-launch sequencing remains protected;
-- Continuous Screen is stable continuous/timeline evidence; Android screenrecord remains high-resolution evidence;
-- Audio Evidence and user-facing Virtual Display remain out of scope.
-
-No v0.27 implementation or other new roadmap stage is active. Await the owner's next development direction.
+No v0.28 or later feature stage is active. Await owner direction.
