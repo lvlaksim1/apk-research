@@ -1,6 +1,6 @@
 # Latest Handoff
 
-Generation: 13
+Generation: 14
 Date: 2026-10-07
 
 Persistent manager: `apk-research-project-manager`.
@@ -9,46 +9,30 @@ Authority:
 - manager state: `context`;
 - product: `main`.
 
-Verified product baseline is **apk-research v0.23.1** at `39e483ee03d5337e4e928b4b85cce85c40f4fe35`.
+Verified product baseline is **apk-research v0.24.0** at `176dc1f1302c729456fc0d5711d0e5879e36837e`.
 
-Installer: `apk-research-setup_v0.23.1.exe`.
-SHA-256: `b5bf2d31da1c47ef59d351988a09f5c0dad72a8117aab0c4849ae30bb54eb540`.
-Size: 36,323,501 bytes.
+Installer: `apk-research-setup_v0.24.0.exe`.
+SHA-256: `f1ee0ec8e60345b17a21d00c8a5f4b4f616c8ed6c1aca24714f92eb912cb2c3c`.
+Size: 36,355,696 bytes.
+Release published: 2026-10-07T01:43:15Z.
 
-Main pipeline #127 completed SUCCESS and GitHub Release v0.23.1 is published.
+Main pipeline #133 (`37558075676`) completed SUCCESS for the exact release SHA. CI, real AVD Research ZIP acceptance, Windows standalone/self-test/GUI smoke, installer install/smoke, clean-Windows Android provisioning, documentation/checksum gates, GitHub Release publication and artifact cleanup all passed.
 
-Two owner-side v0.23.1 archives now close Continuous Screen technical validation.
+v0.24.0 delivers Unified Session Evidence:
+- chronological `Session Evidence` view;
+- screen ↔ action ↔ normalized flow ↔ packet ↔ process/socket ↔ raw navigation;
+- reverse Process/Socket → related flows index;
+- device-PTS → target-UTC screen locator using archived realtime↔elapsed conversion;
+- explicit evidence relation type/strength without causal upgrade.
 
-Short/idle archive `20261006T230500.602195Z-1206ec46.research.zip` proves:
-- 59.005490 s no-frame interval survives and resumes;
-- old inherited 8 s media timeout is gone;
-- Sidecar traffic remains RAW/infrastructure-only in derived network views.
-
-Long/rollover archive `20261006T231833.446176Z-710dfbe4.research.zip` proves:
-- 33/33 checksums, complete/non-degraded;
-- canonical screenrecord rotates across two chunks with a 1.965848 s frame gap;
-- Continuous Screen remains one clean stream with 6,970 frames / 256.466399 s;
-- 66 continuous frames exist inside the canonical rollover gap, maximum adjacent gap 0.100000 s;
-- owner action 166 occurs entirely inside the canonical gap and is captured by Continuous Screen;
-- H.264 decodes end-to-end with no error;
-- 93,556 Sidecar infrastructure packets / 65,433,681 bytes are preserved in RAW PCAP, while zero exact Sidecar-port flows leak into 82 ordinary normalized flows.
-
-Therefore Continuous Screen stability/continuity validation is complete.
-
-Remaining product-role boundary:
-- Continuous Screen current profile: 540×960 / 2 Mbit/s;
-- canonical screenrecord: 1080×1920.
-
-Owner decision accepted on 2026-10-07:
-- Continuous Screen is the stable continuous/timeline screen-evidence source;
-- canonical Android screenrecord remains the high-resolution source;
-- future sole-source replacement is deferred until Sidecar capture quality is raised and revalidated.
-
-Protected baselines:
+Protected semantics:
 - raw PCAP is authoritative;
-- Packet ↔ Action remains `temporal-only`, `causal_claim=false`;
+- Action ↔ Flow and Packet ↔ Action remain `temporal-only`, `causal_claim=false`;
+- screen links are `time-aligned-navigation`, not causality;
+- reverse process/socket navigation retains existing attribution confidence;
 - hidden Emulator → gRPC/MMAP → AndroidView remains live display;
 - v0.10.5 startup/clean-launch sequencing remains protected;
+- Continuous Screen is stable continuous/timeline evidence; Android screenrecord remains high-resolution evidence;
 - Audio Evidence and user-facing Virtual Display remain out of scope.
 
-No v0.24 implementation is active. The screen-evidence question is closed for the current roadmap; next work returns to Stage E.
+No v0.25 implementation is active. The next agreed roadmap stage is v0.25 Transport and Protocol Analysis, to start when the owner directs execution.

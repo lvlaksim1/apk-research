@@ -11,35 +11,32 @@
 
 ## Completed roadmap
 
-- Stage A / v0.18 — Raw / Packet Inspector — COMPLETE.
-- Stage B / v0.19 — Android sidecar foundation — COMPLETE.
-- Stage C / v0.20 — continuous screen evidence — COMPLETE AS EXPERIMENTAL; canonical screenrecord retained.
-- Stage D / v0.21 — interaction completeness — COMPLETE.
-- Stage E increment 1 / v0.22 — Packet ↔ Action temporal evidence — COMPLETE.
-- Stage E increment 2 / v0.23 — Transport Session Evidence — COMPLETE.
-- v0.23.1 corrective release — Sidecar evidence isolation + idle media stability — COMPLETE.
+- v0.18 — Raw / Packet Inspector — COMPLETE.
+- v0.19 — Android sidecar foundation — COMPLETE.
+- v0.20 — Continuous Screen foundation — COMPLETE.
+- v0.21 — interaction completeness — COMPLETE.
+- v0.22 — Packet ↔ Action temporal evidence — COMPLETE.
+- v0.23 — Transport Session Evidence — COMPLETE.
+- v0.23.1 — Sidecar evidence isolation + idle stability — COMPLETE.
+- v0.24 — Unified Session Evidence — COMPLETE and RELEASED.
 
-## Continuous Screen closure result
+## v0.24 delivered model
 
-The technical validation plan is complete. Idle survival, long-session operation and canonical chunk-rollover continuity all passed on owner evidence.
+The release unifies navigation across screen, user actions, normalized flows, raw packets and process/socket attribution while preserving source authority. Continuous Screen target-time links are derived from archived clock conversion and remain time-aligned navigation only. Process/socket reverse indexes retain original confidence.
 
-The owner accepted the dual-source product role:
-- Continuous Screen is now the stable continuous/timeline screen source;
-- canonical 1080×1920 screenrecord remains the high-resolution source.
+## Next agreed roadmap stage — v0.25
 
-No further screen-validation work is required before resuming the Stage E roadmap. Any future attempt to make Continuous Screen the sole canonical source must first raise its capture quality and revalidate resource/storage behavior and forensic detail.
+Do not start implementation until the next owner-directed execution step. When activated, v0.25 should combine transport-session and protocol-analysis work:
+- capture-bounded TCP session/lifecycle structure;
+- sequence/acknowledgment/retransmission/window evidence;
+- explicit missing-start/missing-end/gap semantics;
+- DNS, TLS metadata, QUIC, HTTP/3 and observable HTTP;
+- transaction/grouping only when supported by observed packets/protocol evidence.
 
-## Stage E continuation
-
-Choose the next increment by the remaining investigative gap, not by feature novelty. Strong candidates are:
-- additional provenance-preserving cross-navigation between packet, process/socket and Timeline evidence;
-- bounded TCP stream/transaction grouping only where packet continuity and protocol evidence support it, without inventing missing data;
-- screen/network cross-links only after clock-domain provenance is sufficient.
-
-Any new derived inference must expose source/provenance and confidence. No feature may silently reinterpret encrypted traffic, manufacture causality, synthesize absent packets or weaken RAW authority.
+Any new inference must expose provenance/confidence and must not synthesize missing traffic, plaintext or causality.
 
 ## Explicit exclusions
 
 - Audio Evidence: out of scope.
-- Virtual Display: out of scope.
-- encoded scrcpy-style live mirroring: not a replacement for gRPC/MMAP.
+- User-facing Virtual Display: out of scope.
+- encoded Continuous Screen does not replace the proven gRPC/MMAP live display path.

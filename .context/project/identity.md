@@ -7,6 +7,6 @@
 - Manager-state authority branch: `context`
 - Product type: standalone Windows desktop GUI for controlled Android application research.
 - Primary user workflow: choose an Android application, start a managed research session, interact with the embedded Android view, finish the session, and inspect/export a `.research.zip` evidence bundle.
-- Current release baseline: `v0.23.1` at `39e483ee03d5337e4e928b4b85cce85c40f4fe35`.
+- Current release baseline: `v0.24.0` at `176dc1f1302c729456fc0d5711d0e5879e36837e`.
 
-The project is evidence-oriented: raw capture remains authoritative while normalized Timeline, network attribution, protocol intelligence and Evidence Explorer provide derived navigation and analysis.
+The project is evidence-oriented: raw capture remains authoritative while Timeline, Unified Session Evidence, network attribution, protocol intelligence and Evidence Explorer provide derived navigation and analysis.
