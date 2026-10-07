@@ -1,29 +1,36 @@
-# apk-research v0.29.1 — Reliable Self-Update Handoff
+# apk-research v0.29.2 — Separate Setup and Update Installers
 
-v0.29.1 fixes the automatic-update failure where the application downloaded and verified a new release, announced restart, closed, and then nothing else happened.
+v0.29.2 replaces the custom single-installer update path with the same simple architecture used by MailRu Desktop.
 
-## Update handoff
+## Windows installers
 
-- Removes the hidden PowerShell relay entirely.
-- Launches the already verified Inno Setup package directly.
-- Closes apk-research only after the installer process has been created successfully.
-- Lets Inno Setup relaunch the installed application after a successful update.
-- Keeps the same installation directory and same AppId; no uninstall-first step is introduced.
+Every release now contains:
+- `apk-research-setup_v0.29.2.exe` — first installation;
+- `apk-research-update_v0.29.2.exe` — update of an existing installation;
+- `SHA256SUMS.txt` — SHA-256 for both installers.
 
-## Diagnostics
+The Update package uses the same Inno Setup AppId and updates the existing application files without uninstalling first. It refuses to run when apk-research is not installed.
 
-- Writes a handoff log before closing.
-- Passes a persistent installer log path to Inno Setup.
-- A future installation failure therefore leaves useful evidence even if apk-research is no longer running.
+## In-app update
 
-## Windows acceptance
+The application:
+1. checks the latest stable GitHub Release;
+2. selects only the dedicated Update installer;
+3. downloads it to the local apk-research Updates directory;
+4. verifies its SHA-256;
+5. launches the installer through the Windows shell;
+6. closes apk-research.
 
-The build now performs an end-to-end upgrade test:
-1. install published v0.29.0;
-2. verify the installed version;
-3. invoke the candidate updater through production Python code;
-4. allow that initiating process to exit;
-5. wait in five-second intervals;
-6. verify that the installed application becomes v0.29.1.
+The installer UI then owns the update flow, matching MailRu Desktop.
 
-All previous CI, real AVD, XAPK, Windows GUI/installer and clean-Windows checks remain required.
+## Shortcuts
+
+Inno Setup creates the Start-menu shortcut and the optional desktop shortcut during first install and recreates them during update so icon/metadata changes are refreshed.
+
+## UI cleanup
+
+The redundant «Открыть главный экран Android» button is removed.
+
+## Compatibility
+
+Android runtime, APK/XAPK intake, evidence collection and Research ZIP semantics are unchanged.

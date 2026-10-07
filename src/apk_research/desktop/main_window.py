@@ -50,7 +50,7 @@ from apk_research.desktop.updater import (
     check_latest_release,
     download_release,
     is_newer_version,
-    launch_update_after_exit,
+    launch_update_installer,
 )
 from apk_research.session import (
     default_runtime_root,
@@ -319,12 +319,6 @@ class MainWindow(QMainWindow):
             self.launch_package_button
         )
         apk_layout.addLayout(install_buttons)
-        self.android_home_button = QPushButton(
-            "Открыть главный экран Android"
-        )
-        apk_layout.addWidget(
-            self.android_home_button
-        )
         apk_layout.addWidget(
             self.package_label
         )
@@ -770,9 +764,6 @@ class MainWindow(QMainWindow):
         self.launch_package_button.clicked.connect(
             self.controller.launch_installed_package
         )
-        self.android_home_button.clicked.connect(
-            self.controller.show_android_home
-        )
         self.prepare_button.clicked.connect(
             self._prepare_environment
         )
@@ -993,8 +984,9 @@ class MainWindow(QMainWindow):
             "Обновление apk-research",
             "Скачать, проверить и установить "
             f"apk-research {release.version}?\n\n"
-            "После проверки установщика программа закроется, "
-            "обновится и запустится снова.",
+            "После проверки откроется отдельный установщик "
+            "обновления, а apk-research закроется. "
+            "Завершите обновление в открывшемся окне.",
             QMessageBox.StandardButton.Yes
             | QMessageBox.StandardButton.Cancel,
         )
@@ -1056,16 +1048,8 @@ class MainWindow(QMainWindow):
         self,
         downloaded: DownloadedUpdate,
     ) -> None:
-        executable = Path(
-            sys.executable
-        ).resolve()
         try:
-            launch_update_after_exit(
-                downloaded,
-                current_pid=os.getpid(),
-                install_dir=executable.parent,
-                restart_exe=executable,
-            )
+            launch_update_installer(downloaded)
         except Exception as exc:
             self._on_update_download_failed(
                 str(exc) or exc.__class__.__name__
@@ -1076,8 +1060,8 @@ class MainWindow(QMainWindow):
         self.update_progress.setRange(0, 1000)
         self.update_progress.setValue(1000)
         self.update_status_label.setText(
-            "Установщик проверен. "
-            "Программа закрывается для обновления…"
+            "Установщик обновления запущен. "
+            "apk-research закрывается…"
         )
         QApplication.quit()
 
@@ -1272,10 +1256,6 @@ class MainWindow(QMainWindow):
             and not self._research_active
             and bool(self.controller.package_name)
         )
-        self.android_home_button.setEnabled(
-            not busy
-            and not self._research_active
-        )
         self.prepare_button.setEnabled(
             not busy
             and not self._research_active
@@ -1431,7 +1411,6 @@ class MainWindow(QMainWindow):
         self.choose_apk_button.setEnabled(False)
         self.install_package_button.setEnabled(False)
         self.launch_package_button.setEnabled(False)
-        self.android_home_button.setEnabled(False)
         self.status_network.setText(
             "● PCAP записывается"
         )
@@ -1500,7 +1479,6 @@ class MainWindow(QMainWindow):
         self.launch_package_button.setEnabled(
             bool(self.controller.package_name)
         )
-        self.android_home_button.setEnabled(True)
         self.status_network.setText(
             "● PCAP сохранён"
         )

@@ -1,7 +1,7 @@
 """apk-research core package."""
 
-__version__ = "0.29.1"
+__version__ = "0.29.2"
 
-# v0.29.1 replaces the hidden PowerShell updater relay with
-# a direct verified-installer handoff and installer-owned relaunch.
+# v0.29.2 adopts the proven MailRu Desktop installer model:
+# separate full/update packages and Windows-owned shortcut recreation.
 __all__ = ["__version__"]

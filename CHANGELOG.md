@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.29.2] - 2026-10-07
+
+### Changed
+- Split the Windows package into a full installer and a dedicated update installer, following the proven MailRu Desktop architecture.
+- Update discovery now requires `apk-research-update_v<version>.exe` from the latest stable GitHub Release.
+- The downloaded update installer is launched directly through the Windows shell; apk-research then exits.
+- Inno Setup owns Start-menu/desktop shortcut creation and refresh on both full install and update.
+- Removed the redundant «Открыть главный экран Android» control.
+
+### Preserved
+- SHA-256 verification remains mandatory and now covers both release installers.
+- APK/XAPK handling, Android runtime, Research ZIP and forensic evidence semantics are unchanged.
+
 ## [0.29.1] - 2026-10-07
 
 ### Fixed
