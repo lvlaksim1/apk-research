@@ -976,7 +976,7 @@ def format_packet_details(
             f"Protocol evidence: {metadata}",
             *transport_lines,
             "",
-            "v0.25 protocol observations:",
+            "Наблюдения протоколов v0.25:",
             *(protocol_lines or ["  no additional structured protocol evidence in this packet"]),
             "",
             "Timeline relation:",

@@ -331,6 +331,31 @@ def main() -> int:
             Path(result.archive),
             inspected_flow,
         )
+        protocol_analysis = packet_report.get("protocol_analysis")
+        if not isinstance(protocol_analysis, dict):
+            raise RuntimeError(
+                "Packet Inspector v0.25 protocol analysis is missing"
+            )
+        if protocol_analysis.get("schema_version") != "0.1":
+            raise RuntimeError(
+                "Packet Inspector v0.25 protocol analysis schema is invalid"
+            )
+        if protocol_analysis.get("evidence_basis") != "captured-packets-only":
+            raise RuntimeError(
+                "Packet Inspector v0.25 evidence basis is invalid"
+            )
+        if protocol_analysis.get("causal_claim") is not False:
+            raise RuntimeError(
+                "Packet Inspector v0.25 must not claim causality"
+            )
+        analyzed_transport = protocol_analysis.get("transport") or {}
+        if (
+            str(inspected_flow.get("protocol") or "").lower() == "tcp"
+            and analyzed_transport.get("applicable") is not True
+        ):
+            raise RuntimeError(
+                "Packet Inspector v0.25 TCP analysis is not applicable to a TCP flow"
+            )
         if packet_report.get("artifact") != RAW_PCAP_ARTIFACT:
             raise RuntimeError(
                 "Packet Inspector did not preserve raw PCAP provenance"
