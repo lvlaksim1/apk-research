@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import socket
 import subprocess
 import tempfile
 import time
@@ -429,22 +428,12 @@ def main() -> int:
         prefix="apk-research-https-acceptance-"
     ) as raw:
         root = Path(raw)
-        addresses = sorted(
-            {
-                str(item[4][0])
-                for item in socket.getaddrinfo(
-                    "example.com",
-                    443,
-                    socket.AF_INET,
-                    socket.SOCK_STREAM,
-                )
-            }
-        )
-        if not addresses:
-            raise RuntimeError(
-                "No IPv4 address resolved for example.com"
-            )
-        target_ipv4 = addresses[0]
+        # The Emulator host-gateway address is always locally routable.
+        # The Android helper reads SNI from the TLS ClientHello, so the
+        # local HTTPS analyzer still receives example.com:443 as the
+        # destination. This removes Android DNS/direct-Internet routing
+        # from the acceptance preconditions.
+        target_ipv4 = "10.0.2.2"
         apk = _build_apk(
             root,
             target_ipv4,
