@@ -1,36 +1,40 @@
-# apk-research v0.29.2 — Separate Setup and Update Installers
+# apk-research v0.30.0 — HTTPS Traffic Inspection
 
-v0.29.2 replaces the custom single-installer update path with the same simple architecture used by MailRu Desktop.
+v0.30.0 adds first-class inspection of decrypted HTTPS traffic in the managed Android research environment.
 
-## Windows installers
+## HTTPS interception
 
-Every release now contains:
-- `apk-research-setup_v0.29.2.exe` — first installation;
-- `apk-research-update_v0.29.2.exe` — update of an existing installation;
-- `SHA256SUMS.txt` — SHA-256 for both installers.
+During a research session apk-research now:
+- starts an isolated bundled HTTPS proxy worker;
+- routes the managed Android emulator through it using `adb reverse`;
+- injects the research CA into the rooted Android 15 system trust environment;
+- records decrypted HTTP transactions where interception succeeds;
+- restores Android proxy/routing state during teardown.
 
-The Update package uses the same Inno Setup AppId and updates the existing application files without uninstalling first. It refuses to run when apk-research is not installed.
+The private CA key remains in the proxy runtime configuration and is not exported into the Research ZIP.
 
-## In-app update
+## Research ZIP
 
-The application:
-1. checks the latest stable GitHub Release;
-2. selects only the dedicated Update installer;
-3. downloads it to the local apk-research Updates directory;
-4. verifies its SHA-256;
-5. launches the installer through the Windows shell;
-6. closes apk-research.
+New evidence includes:
+- `02_normalized/http-transactions.jsonl`;
+- `02_normalized/http-bodies/*`;
+- `02_normalized/http-interception.json`;
+- `01_raw/network/https-proxy.stderr.txt`.
 
-The installer UI then owns the update flow, matching MailRu Desktop.
+Transactions retain URL, method, protocol, request/response headers, status, timing and body references.
 
-## Shortcuts
+## Desktop UI
 
-Inno Setup creates the Start-menu shortcut and the optional desktop shortcut during first install and recreates them during update so icon/metadata changes are refreshed.
+The Results tab now has an **HTTP/HTTPS** viewer with search plus separate request/response header and body panes. JSON is formatted for reading; binary payloads are shown as bounded hexadecimal previews.
 
-## UI cleanup
+## Verification
 
-The redundant «Открыть главный экран Android» button is removed.
+The real Android 15 release gate installs a dedicated test APK and requires a genuine `https://example.com/` request to be decrypted and exported with HTTP status 200 and a non-empty response body.
 
-## Compatibility
+## Boundaries
 
-Android runtime, APK/XAPK intake, evidence collection and Research ZIP semantics are unchanged.
+This is active interception, not passive observation. The Research ZIP records that the explicit Android proxy can change transport behavior. RAW PCAP remains the source of truth for traffic actually observed in that research environment.
+
+Applications using certificate pinning or a custom trust store can still reject interception. v0.30.0 detects proxy errors but does not claim a universal pinning bypass.
+
+HTTP/3/QUIC decryption is not claimed by this release.

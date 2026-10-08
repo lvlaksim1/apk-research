@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.30.0] - 2026-10-08
+
+### Added
+- Managed active HTTPS interception for the rooted AVD-RESEARCH environment using a bundled mitmproxy runtime.
+- Automatic Android proxy routing through `adb reverse` and temporary system CA injection for Android 15/Conscrypt.
+- Research ZIP artifacts for decrypted HTTP transactions, request/response headers, bodies and interception provenance.
+- A dedicated HTTP/HTTPS results viewer with search, request/response headers, JSON/text rendering and binary previews.
+- Real Android 15 acceptance that installs a launchable test APK, performs a genuine HTTPS request and requires the decrypted URL, response status and non-empty body in the exported Research ZIP.
+
+### Changed
+- Complete v0.30 sessions require the HTTPS interception collector to complete.
+- Android-sidecar graceful shutdown now waits for the existing protocol timeout before forced termination, improving sequential-session cleanup.
+- Standalone packaging now requires Python 3.12 because the bundled HTTPS proxy runtime requires it.
+
+### Evidence boundaries
+- Active HTTPS interception is explicitly recorded as an intervention. RAW PCAP remains authoritative for the traffic actually observed in the intercepted environment, not an unmodified-network claim.
+- Certificate-pinned applications or custom trust stores may reject interception; v0.30 does not claim universal pinning bypass.
+- HTTP/3/QUIC decryption is not a v0.30 acceptance claim; explicit proxy routing may change transport selection.
+
+
 ## [0.29.2] - 2026-10-07
 
 ### Changed

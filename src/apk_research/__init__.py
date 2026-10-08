@@ -1,7 +1,7 @@
 """apk-research core package."""
 
-__version__ = "0.29.2"
+__version__ = "0.30.0"
 
-# v0.29.2 adopts the proven MailRu Desktop installer model:
-# separate full/update packages and Windows-owned shortcut recreation.
+# v0.30.0 adds managed HTTPS interception and first-class decrypted
+# HTTP request/response evidence while preserving explicit provenance.
 __all__ = ["__version__"]
