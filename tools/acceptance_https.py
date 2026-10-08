@@ -428,12 +428,11 @@ def main() -> int:
         prefix="apk-research-https-acceptance-"
     ) as raw:
         root = Path(raw)
-        # The Emulator host-gateway address is always locally routable.
+        # Loopback is guaranteed to be routable inside Android itself.
         # The Android helper reads SNI from the TLS ClientHello, so the
         # local HTTPS analyzer still receives example.com:443 as the
-        # destination. This removes Android DNS/direct-Internet routing
-        # from the acceptance preconditions.
-        target_ipv4 = "10.0.2.2"
+        # destination. This isolates the routing test from CI networking.
+        target_ipv4 = "127.0.0.1"
         apk = _build_apk(
             root,
             target_ipv4,
