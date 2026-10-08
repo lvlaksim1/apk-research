@@ -79,6 +79,72 @@ jobs:
           $process = Start-Process -FilePath $exe -ArgumentList "--self-test" -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Standalone self-test failed: $($process.ExitCode)" }
 
+      - name: Standalone HTTPS proxy smoke-test
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path "dist\apk-research\apk-research.exe").Path
+          $root = Join-Path $env:RUNNER_TEMP "apk-research-https-proxy-smoke"
+          Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $root | Out-Null
+
+          $confdir = Join-Path $root "conf"
+          $transactions = Join-Path $root "transactions.jsonl"
+          $bodies = Join-Path $root "bodies"
+          $ready = Join-Path $root "ready.json"
+          $errorFile = Join-Path $root "error.txt"
+
+          $listener = [System.Net.Sockets.TcpListener]::new(
+            [System.Net.IPAddress]::Loopback,
+            0
+          )
+          $listener.Start()
+          $port = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+          $listener.Stop()
+
+          $process = $null
+          try {
+            $process = Start-Process -FilePath $exe -ArgumentList @(
+              "--https-proxy-worker",
+              "--listen-port", "$port",
+              "--confdir", $confdir,
+              "--transactions", $transactions,
+              "--bodies", $bodies,
+              "--ready-file", $ready,
+              "--error-file", $errorFile
+            ) -WindowStyle Hidden -PassThru
+
+            $deadline = [DateTime]::UtcNow.AddSeconds(30)
+            while ([DateTime]::UtcNow -lt $deadline) {
+              if (Test-Path $errorFile) {
+                throw "HTTPS proxy worker failed: $(Get-Content $errorFile -Raw)"
+              }
+              if ($process.HasExited) {
+                throw "HTTPS proxy worker exited early: $($process.ExitCode)"
+              }
+              $ca = Join-Path $confdir "mitmproxy-ca-cert.cer"
+              if ((Test-Path $ready) -and (Test-Path $ca) -and ((Get-Item $ca).Length -gt 0)) {
+                $readyValue = Get-Content $ready -Raw | ConvertFrom-Json
+                if ($readyValue.status -ne "ready") {
+                  throw "Unexpected HTTPS proxy ready state: $($readyValue.status)"
+                }
+                Write-Host "HTTPS proxy worker ready; mitmproxy=$($readyValue.mitmproxy_version); port=$port"
+                break
+              }
+              Start-Sleep -Milliseconds 100
+            }
+
+            $ca = Join-Path $confdir "mitmproxy-ca-cert.cer"
+            if (-not (Test-Path $ready)) { throw "HTTPS proxy worker did not become ready" }
+            if (-not (Test-Path $ca)) { throw "HTTPS proxy worker did not generate CA" }
+            if ((Get-Item $ca).Length -le 0) { throw "Generated HTTPS proxy CA is empty" }
+          }
+          finally {
+            if ($process -and -not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force
+              $process.WaitForExit()
+            }
+          }
+
       - name: Standalone GUI smoke-test
         shell: pwsh
         run: |
