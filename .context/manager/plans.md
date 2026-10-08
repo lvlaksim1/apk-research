@@ -19,17 +19,25 @@ Stable releases publish:
 
 The application updater uses only the dedicated Update asset.
 
-## Current product plan — HTTPS traffic inspection
+## HTTPS traffic analysis
 
-The next product stage is focused on decrypted HTTPS traffic display.
+The v0.30 implementation stage is complete and released.
 
-1. Add an application-managed intercepting HTTP(S) proxy bundled with the Windows package; no external Python installation or manual proxy setup for normal use.
-2. Configure the managed Android emulator to route research traffic through it and provision a trusted research CA in the managed system environment.
-3. Capture complete HTTP transactions where decryption succeeds: request URL/method/headers/body and response status/headers/body, with timing and protocol metadata.
-4. Add a dedicated HTTPS/HTTP transactions view with search, filtering, human-readable body rendering and raw representation.
-5. Archive interception evidence separately from passive RAW PCAP and preserve exact provenance so active interception is never confused with passive observation.
-6. Validate on the real managed AVD with representative HTTP/1.1 and HTTP/2 applications before release.
-7. Treat certificate pinning/custom trust stores as the next bounded tier. First detect and report interception failure correctly; then implement an explicit enhanced research mode rather than silently modifying applications.
-8. Evaluate HTTP/3/QUIC interception separately and never downgrade or block QUIC without recording that the research environment altered transport behavior.
+Verified delivered scope:
+- local application-managed HTTPS proxy;
+- Android routing through `adb reverse`;
+- temporary research CA trust in the managed rooted Android 15 environment;
+- HTTP transaction metadata and bodies in Research ZIP;
+- dedicated HTTP/HTTPS desktop viewer;
+- passive RAW PCAP preserved as an independent evidence source;
+- real Android 15 end-to-end acceptance.
+
+Do not claim universal HTTPS decryption. Certificate pinning/custom trust and HTTP/3/QUIC remain separate bounded follow-up areas.
+
+## Current product plan
+
+No additional product feature stage is authorized after v0.30.0.
+
+The next practical step is owner validation on representative real APK/XAPK targets. If a target does not expose readable HTTPS transactions, diagnose the concrete reason first and only then define a bounded follow-up.
 
 The Android home-screen shortcut requirement remains cancelled.
