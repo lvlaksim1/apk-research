@@ -1,13 +1,11 @@
 # Next Actions
 
-1. Treat v0.29.2 / `0f9d949e5158860a51d4e83624fa1cbf3db121cc` as the verified baseline.
-2. Preserve the separate Setup/Update installer contract and Inno-owned Windows shortcuts.
-3. Keep the Android home-screen shortcut task cancelled.
-4. Begin the HTTPS inspection stage from a clean feature branch.
-5. Integrate an application-managed intercepting HTTP(S) proxy into the standalone Windows package.
-6. Automate managed-emulator proxy routing and research CA trust provisioning.
-7. Add a first-class HTTPS transactions model and UI showing request URL/method/headers/body and response status/headers/body where decryption succeeds.
-8. Store interception evidence separately from passive RAW PCAP with explicit provenance and transport/interception state.
-9. Real-AVD acceptance must prove decrypted HTTP/1.1 and HTTP/2 request/response display end to end.
-10. Detect certificate-pinning/custom-trust failures explicitly; do not claim universal HTTPS decryption until an enhanced interception tier is separately implemented and verified.
-11. Evaluate HTTP/3/QUIC interception separately and record any forced fallback/downgrade as an intervention.
+1. Treat v0.30.0 / `1d75ec32d80cdea2af172035d43d12d3284978fa` as the verified baseline.
+2. Deliver/use `apk-research-update_v0.30.0.exe` for an existing installation.
+3. Preserve the separate Setup/Update installer contract and SHA-256 verification.
+4. Preserve the new HTTP/HTTPS transaction evidence and dedicated viewer.
+5. Preserve passive RAW PCAP as an independent evidence source.
+6. Keep the Android home-screen shortcut task cancelled.
+7. Validate v0.30.0 on representative owner-selected real APK/XAPK applications.
+8. If readable HTTPS transactions are missing for a target, diagnose the concrete cause first: certificate pinning, custom trust, QUIC/HTTP3, proxy avoidance, or another target-specific mechanism.
+9. Do not start a broader follow-up feature stage until the owner explicitly defines it.
