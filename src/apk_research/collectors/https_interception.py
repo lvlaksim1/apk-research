@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -16,6 +17,7 @@ from typing import BinaryIO, Callable, Protocol, Sequence
 
 from cryptography import x509
 
+from apk_research.desktop.sidecar import resolve_agent_jar
 from apk_research.session import SessionManager, SessionStatus
 from apk_research.targets import AdbClient, AdbError
 
@@ -130,6 +132,20 @@ def _default_process_factory(
     )
 
 
+def _default_router_process_factory(
+    command: Sequence[str],
+    stderr: BinaryIO,
+) -> ProcessLike:
+    creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return subprocess.Popen(
+        list(command),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=stderr,
+        creationflags=creation_flags,
+    )
+
+
 def _worker_command(arguments: list[str]) -> list[str]:
     if getattr(sys, "frozen", False):
         return [
@@ -155,12 +171,31 @@ class HttpsInterceptionCollector:
     """
 
     NAME = "https_interception"
-    BACKEND = "mitmproxy-regular-adb-reverse"
+    BACKEND = "mitmproxy-regular-adb-reverse+tproxy-connect-router"
     TRANSACTIONS_ARTIFACT = "02_normalized/http-transactions.jsonl"
     BODIES_DIR = "02_normalized/http-bodies"
     METADATA_ARTIFACT = "02_normalized/http-interception.json"
     STDERR_ARTIFACT = "01_raw/network/https-proxy.stderr.txt"
+    ROUTER_STDERR_ARTIFACT = (
+        "01_raw/network/https-direct-router.stderr.txt"
+    )
     DEVICE_PROXY_PORT = 38887
+    DIRECT_ROUTER_PORT = 38888
+    DIRECT_ROUTER_REMOTE_DIR = (
+        "/data/local/tmp/apk-research/https-router"
+    )
+    DIRECT_ROUTER_REMOTE_JAR = (
+        DIRECT_ROUTER_REMOTE_DIR + "/apk-research-agent.jar"
+    )
+    DIRECT_ROUTER_MAIN_CLASS = (
+        "com.lvlaksim1.apkresearch.sidecar.DirectHttpsRouter"
+    )
+    DIRECT_ROUTE_MARK = "0x2301"
+    DIRECT_ROUTE_MASK = "0xffffffff"
+    DIRECT_ROUTE_TABLE = 230
+    DIRECT_ROUTE_PREF = 23000
+    DIRECT_OUT_CHAIN = "APKR30_OUT"
+    DIRECT_PRE_CHAIN = "APKR30_PRE"
 
     def __init__(
         self,
@@ -170,16 +205,22 @@ class HttpsInterceptionCollector:
         package_name: str,
         clock: Clock = _utc_now,
         process_factory: ProcessFactory = _default_process_factory,
+        router_process_factory: ProcessFactory = (
+            _default_router_process_factory
+        ),
     ) -> None:
         self.adb = adb
         self.session = session
         self.package_name = package_name
         self.clock = clock
         self.process_factory = process_factory
+        self.router_process_factory = router_process_factory
 
         self._preflight: HttpsInterceptionPreflight | None = None
         self._process: ProcessLike | None = None
+        self._router_process: ProcessLike | None = None
         self._stderr: BinaryIO | None = None
+        self._router_stderr: BinaryIO | None = None
         self._temp_dir: Path | None = None
         self._host_port: int | None = None
         self._serial = ""
@@ -193,13 +234,18 @@ class HttpsInterceptionCollector:
         self._reverse_configured = False
         self._ca_injected = False
         self._ca_injection_succeeded = False
+        self._package_uid: int | None = None
+        self._router_pid: int | None = None
+        self._direct_routing_configured = False
 
     @property
     def running(self) -> bool:
         return (
             self._process is not None
+            and self._router_process is not None
             and not self._finished
             and self._process.poll() is None
+            and self._router_process.poll() is None
         )
 
     def preflight(self) -> HttpsInterceptionPreflight:
@@ -229,6 +275,17 @@ class HttpsInterceptionCollector:
                     "command -v nsenter || true"
                 )
             )
+            self._package_uid = self.adb.get_package_uid(
+                serial,
+                self.package_name,
+            )
+            routing_probe = self._shell_script(
+                "command -v ip >/dev/null 2>&1 "
+                "&& command -v iptables >/dev/null 2>&1 "
+                "&& iptables -t mangle -j TPROXY -h "
+                ">/dev/null 2>&1 "
+                "&& echo ready || echo unavailable"
+            ).strip()
         except AdbError as exc:
             raise HttpsInterceptionCollectorError(str(exc)) from exc
         if uid != 0:
@@ -238,6 +295,10 @@ class HttpsInterceptionCollector:
         if apex == "apex" and not nsenter_available:
             raise HttpsInterceptionCollectorError(
                 "Android Conscrypt APEX is active but nsenter is unavailable"
+            )
+        if routing_probe != "ready":
+            raise HttpsInterceptionCollectorError(
+                "Android direct HTTPS routing support is unavailable"
             )
         self._preflight = HttpsInterceptionPreflight(
             serial=serial,
@@ -267,6 +328,11 @@ class HttpsInterceptionCollector:
             ("http_transactions", self.TRANSACTIONS_ARTIFACT, False),
             ("http_interception_metadata", self.METADATA_ARTIFACT, False),
             ("http_proxy_stderr", self.STDERR_ARTIFACT, True),
+            (
+                "http_direct_router_stderr",
+                self.ROUTER_STDERR_ARTIFACT,
+                True,
+            ),
         ):
             self.session.register_artifact(
                 kind=kind,
@@ -285,11 +351,16 @@ class HttpsInterceptionCollector:
         )
         bodies_dir = self.session.paths.root / self.BODIES_DIR
         stderr_path = self.session.paths.root / self.STDERR_ARTIFACT
+        router_stderr_path = (
+            self.session.paths.root / self.ROUTER_STDERR_ARTIFACT
+        )
         transactions_path.parent.mkdir(parents=True, exist_ok=True)
         bodies_dir.mkdir(parents=True, exist_ok=True)
         stderr_path.parent.mkdir(parents=True, exist_ok=True)
+        router_stderr_path.parent.mkdir(parents=True, exist_ok=True)
         transactions_path.touch(exist_ok=True)
         self._stderr = stderr_path.open("wb")
+        self._router_stderr = router_stderr_path.open("wb")
 
         self._temp_dir = Path(
             tempfile.mkdtemp(prefix="apk-research-https-")
@@ -332,6 +403,8 @@ class HttpsInterceptionCollector:
             self._ca_subject_hash = _subject_hash_old(ca_cert)
             self._inject_ca(ca_cert)
             self._configure_proxy()
+            self._start_direct_router()
+            self._configure_direct_routing()
         except Exception as exc:
             self._cleanup_best_effort()
             message = str(exc) or exc.__class__.__name__
@@ -394,6 +467,9 @@ class HttpsInterceptionCollector:
         if self._stderr is not None:
             self._stderr.close()
             self._stderr = None
+        if self._router_stderr is not None:
+            self._router_stderr.close()
+            self._router_stderr = None
         self._stopped_utc = _iso_utc(self.clock())
         self._finished = True
 
@@ -576,10 +652,212 @@ test -s "$SYSTEM/{self._ca_subject_hash}.0"
             )
         self._proxy_configured = True
 
+    def _start_direct_router(self) -> None:
+        serial = self._serial
+        jar = resolve_agent_jar()
+        self.adb.make_remote_directory(
+            serial,
+            self.DIRECT_ROUTER_REMOTE_DIR,
+        )
+        self.adb.push_file(
+            serial,
+            jar,
+            self.DIRECT_ROUTER_REMOTE_JAR,
+            timeout=30.0,
+        )
+        if self._router_stderr is None:
+            raise HttpsInterceptionCollectorError(
+                "Direct HTTPS router diagnostics are unavailable"
+            )
+        command = [
+            str(self.adb.adb_path),
+            "-s",
+            serial,
+            "shell",
+            f"CLASSPATH={self.DIRECT_ROUTER_REMOTE_JAR}",
+            "app_process",
+            "/",
+            self.DIRECT_ROUTER_MAIN_CLASS,
+            "--listen-port",
+            str(self.DIRECT_ROUTER_PORT),
+            "--proxy-port",
+            str(self.DEVICE_PROXY_PORT),
+        ]
+        self._router_process = self.router_process_factory(
+            command,
+            self._router_stderr,
+        )
+        stdout = getattr(
+            self._router_process,
+            "stdout",
+            None,
+        )
+        if stdout is None:
+            raise HttpsInterceptionCollectorError(
+                "Direct HTTPS router has no startup channel"
+            )
+
+        holder: dict[str, bytes] = {}
+
+        def read_banner() -> None:
+            try:
+                holder["line"] = stdout.readline()
+            except Exception:
+                holder["line"] = b""
+
+        reader = threading.Thread(
+            target=read_banner,
+            daemon=True,
+            name="apk-research-direct-https-router-start",
+        )
+        reader.start()
+        reader.join(timeout=10.0)
+        if reader.is_alive():
+            raise HttpsInterceptionCollectorError(
+                "Direct HTTPS router did not become ready within 10 seconds"
+            )
+        raw = holder.get("line", b"")
+        if isinstance(raw, str):
+            line = raw.strip()
+        else:
+            line = raw.decode(
+                "utf-8",
+                errors="replace",
+            ).strip()
+        parts = line.split()
+        if (
+            len(parts) != 3
+            or parts[0] != "READY"
+            or not parts[1].isdigit()
+            or parts[2] != str(self.DIRECT_ROUTER_PORT)
+        ):
+            returncode = (
+                self._router_process.poll()
+                if self._router_process is not None
+                else None
+            )
+            raise HttpsInterceptionCollectorError(
+                "Direct HTTPS router startup failed: "
+                f"{line!r}; exit={returncode!r}"
+            )
+        self._router_pid = int(parts[1])
+
+    def _configure_direct_routing(self) -> None:
+        if self._package_uid is None:
+            raise HttpsInterceptionCollectorError(
+                "Package UID is unavailable for direct HTTPS routing"
+            )
+        script = f"""
+set -eu
+IPT=iptables
+OUT={self.DIRECT_OUT_CHAIN}
+PRE={self.DIRECT_PRE_CHAIN}
+MARK={self.DIRECT_ROUTE_MARK}
+MASK={self.DIRECT_ROUTE_MASK}
+TABLE={self.DIRECT_ROUTE_TABLE}
+PREF={self.DIRECT_ROUTE_PREF}
+UID={self._package_uid}
+PORT={self.DIRECT_ROUTER_PORT}
+
+while $IPT -w 2 -t mangle -C OUTPUT -j "$OUT" >/dev/null 2>&1; do
+  $IPT -w 2 -t mangle -D OUTPUT -j "$OUT"
+done
+while $IPT -w 2 -t mangle -C PREROUTING -j "$PRE" >/dev/null 2>&1; do
+  $IPT -w 2 -t mangle -D PREROUTING -j "$PRE"
+done
+$IPT -w 2 -t mangle -F "$OUT" >/dev/null 2>&1 || true
+$IPT -w 2 -t mangle -X "$OUT" >/dev/null 2>&1 || true
+$IPT -w 2 -t mangle -F "$PRE" >/dev/null 2>&1 || true
+$IPT -w 2 -t mangle -X "$PRE" >/dev/null 2>&1 || true
+while ip rule del pref "$PREF" >/dev/null 2>&1; do :; done
+ip route flush table "$TABLE" >/dev/null 2>&1 || true
+
+$IPT -w 2 -t mangle -N "$OUT"
+$IPT -w 2 -t mangle -N "$PRE"
+$IPT -w 2 -t mangle -A "$OUT"   -p tcp --dport 443 -m owner --uid-owner "$UID"   -j MARK --set-xmark "$MARK/$MASK"
+$IPT -w 2 -t mangle -A "$PRE"   -p tcp --dport 443 -m mark --mark "$MARK/$MASK"   -j TPROXY --on-ip 127.0.0.1 --on-port "$PORT"   --tproxy-mark "$MARK/$MASK"
+$IPT -w 2 -t mangle -A OUTPUT -j "$OUT"
+$IPT -w 2 -t mangle -A PREROUTING -j "$PRE"
+ip route add local 0.0.0.0/0 dev lo table "$TABLE"
+ip rule add pref "$PREF" fwmark "$MARK/$MASK" lookup "$TABLE"
+
+$IPT -w 2 -t mangle -C OUTPUT -j "$OUT"
+$IPT -w 2 -t mangle -C PREROUTING -j "$PRE"
+"""
+        self._shell_script(
+            script,
+            timeout=20.0,
+        )
+        self._direct_routing_configured = True
+
+    def _cleanup_direct_routing_best_effort(self) -> None:
+        if not self._serial:
+            return
+        script = f"""
+IPT=iptables
+OUT={self.DIRECT_OUT_CHAIN}
+PRE={self.DIRECT_PRE_CHAIN}
+TABLE={self.DIRECT_ROUTE_TABLE}
+PREF={self.DIRECT_ROUTE_PREF}
+while $IPT -w 2 -t mangle -C OUTPUT -j "$OUT" >/dev/null 2>&1; do
+  $IPT -w 2 -t mangle -D OUTPUT -j "$OUT" || break
+done
+while $IPT -w 2 -t mangle -C PREROUTING -j "$PRE" >/dev/null 2>&1; do
+  $IPT -w 2 -t mangle -D PREROUTING -j "$PRE" || break
+done
+$IPT -w 2 -t mangle -F "$OUT" >/dev/null 2>&1 || true
+$IPT -w 2 -t mangle -X "$OUT" >/dev/null 2>&1 || true
+$IPT -w 2 -t mangle -F "$PRE" >/dev/null 2>&1 || true
+$IPT -w 2 -t mangle -X "$PRE" >/dev/null 2>&1 || true
+while ip rule del pref "$PREF" >/dev/null 2>&1; do :; done
+ip route flush table "$TABLE" >/dev/null 2>&1 || true
+"""
+        try:
+            self._shell_script(
+                script,
+                timeout=15.0,
+            )
+        except Exception:
+            pass
+        self._direct_routing_configured = False
+
+    def _stop_direct_router_best_effort(self) -> None:
+        process = self._router_process
+        if process is not None and process.poll() is None:
+            try:
+                process.terminate()
+                process.wait(timeout=2.0)
+            except Exception:
+                try:
+                    process.kill()
+                except Exception:
+                    pass
+        self._router_process = None
+        if self._serial:
+            try:
+                if self._router_pid is not None:
+                    self.adb.shell_output(
+                        self._serial,
+                        "kill",
+                        str(self._router_pid),
+                    )
+            except Exception:
+                pass
+            try:
+                self._shell_script(
+                    f"rm -rf {self.DIRECT_ROUTER_REMOTE_DIR}",
+                    timeout=10.0,
+                )
+            except Exception:
+                pass
+        self._router_pid = None
+
     def _cleanup_device_best_effort(self) -> None:
         serial = self._serial
         if not serial:
             return
+        self._cleanup_direct_routing_best_effort()
+        self._stop_direct_router_best_effort()
         if self._proxy_configured:
             try:
                 previous = (
@@ -654,6 +932,12 @@ rm -rf /data/local/tmp/apk-research/https-ca /data/local/tmp/apk-research/https
             except Exception:
                 pass
             self._stderr = None
+        if self._router_stderr is not None:
+            try:
+                self._router_stderr.close()
+            except Exception:
+                pass
+            self._router_stderr = None
         self._cleanup_temp_dir()
 
     def _cleanup_temp_dir(self) -> None:
@@ -711,6 +995,14 @@ rm -rf /data/local/tmp/apk-research/https-ca /data/local/tmp/apk-research/https
                     else None
                 ),
                 "previous_android_proxy": self._previous_proxy,
+                "direct_https_routing": {
+                    "enabled": self._direct_routing_configured,
+                    "package_uid": self._package_uid,
+                    "target_tcp_port": 443,
+                    "router_port": self.DIRECT_ROUTER_PORT,
+                    "method": "tproxy-owner-mark-connect",
+                    "original_destination_preserved": True,
+                },
                 "system_ca_injected": self._ca_injected,
                 "system_ca_injection_succeeded": self._ca_injection_succeeded,
                 "ca_sha256": self._ca_sha256 or None,
@@ -721,6 +1013,9 @@ rm -rf /data/local/tmp/apk-research/https-ca /data/local/tmp/apk-research/https
                 "transport_intervention": {
                     "android_explicit_proxy_enabled": True,
                     "device_to_proxy_via_adb_reverse": True,
+                    "target_package_tcp_443_forced_through_analyzer": (
+                        self._direct_routing_configured
+                    ),
                     "may_change_quic_or_http3_behavior": True,
                     "raw_pcap_describes_the_intercepted_environment": True,
                 },
