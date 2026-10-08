@@ -229,6 +229,9 @@ class FakeContinuous:
         elif self.name == "socket_attribution":
             relative = "02_normalized/socket-attribution.jsonl"
             data = b"{}\n"
+        elif self.name == "https_interception":
+            relative = "02_normalized/http-transactions.jsonl"
+            data = b""
         else:
             raise AssertionError(self.name)
 
@@ -249,6 +252,11 @@ class FakeNetwork(FakeContinuous):
 
 
 class FakeAttribution(FakeContinuous):
+    def preflight(self) -> FakePreflight:
+        return FakePreflight()
+
+
+class FakeHttps(FakeContinuous):
     def preflight(self) -> FakePreflight:
         return FakePreflight()
 
@@ -309,6 +317,18 @@ def make_orchestrator(
             order=adb.order,
         )
 
+    def https_factory(
+        adb_value: Any,
+        session: SessionManager,
+        package_name: str,
+    ) -> FakeHttps:
+        assert package_name == "com.example.app"
+        return FakeHttps(
+            "https_interception",
+            session,
+            order=adb.order,
+        )
+
     orchestrator = ResearchOrchestrator(
         adb,  # type: ignore[arg-type]
         "emulator-5554",
@@ -320,6 +340,7 @@ def make_orchestrator(
         screen_factory=screen_factory,  # type: ignore[arg-type]
         network_factory=network_factory,  # type: ignore[arg-type]
         attribution_factory=attribution_factory,  # type: ignore[arg-type]
+        https_factory=https_factory,  # type: ignore[arg-type]
     )
     return orchestrator, adb
 
@@ -444,6 +465,9 @@ def test_start_failure_creates_failed_research_zip(
         attribution_factory=lambda a, s: FakeAttribution(
             "socket_attribution", s
         ),  # type: ignore[arg-type]
+        https_factory=lambda a, s, p: FakeHttps(
+            "https_interception", s
+        ),  # type: ignore[arg-type]
     )
 
     with pytest.raises(OrchestratorError) as error:
@@ -482,6 +506,9 @@ def test_clean_launch_uses_single_restart_transaction_after_collectors(
         ),
         attribution_factory=lambda a, s: FakeAttribution(
             "socket_attribution", s, order=adb.order
+        ),
+        https_factory=lambda a, s, p: FakeHttps(
+            "https_interception", s, order=adb.order
         ),
     )
 
@@ -553,6 +580,10 @@ def test_clean_launch_rejects_reused_activity_instance(
         ),
         attribution_factory=lambda a, s: FakeAttribution(
             "socket_attribution",
+            s,
+        ),
+        https_factory=lambda a, s, p: FakeHttps(
+            "https_interception",
             s,
         ),
     )
