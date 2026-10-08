@@ -1,5 +1,27 @@
 # Refactoring and Architecture Log
 
+## v0.30.0 — Managed HTTPS traffic inspection
+
+### Active-interception boundary
+
+HTTPS visibility is implemented as a separate active collector rather than by pretending encrypted PCAP payload is plaintext. apk-research launches an isolated bundled mitmproxy worker, exposes it only through host loopback, connects the managed AVD with `adb reverse`, and applies an explicit Android proxy setting for the session.
+
+### Android 15 trust boundary
+
+The rooted AVD temporarily receives the research CA in the system trust view used by Conscrypt. For APEX-based Conscrypt, the writable certificate view is propagated into Zygote mount namespaces so newly launched applications can inherit it. Teardown restores the previous proxy, removes the reverse mapping and removes the temporary CA view.
+
+### Evidence boundary
+
+Decrypted transactions and bodies are derived active-interception evidence stored separately from `01_raw/network/traffic.pcap`. The PCAP remains authoritative for traffic actually observed in the intercepted research environment. Interception provenance explicitly records that the proxy may alter protocol selection, particularly QUIC/HTTP3.
+
+### Product boundary
+
+The desktop exposes a dedicated HTTP/HTTPS viewer with URL/method/status, headers and request/response bodies. v0.30.0 does not silently patch certificate pinning or custom trust stores and does not claim HTTP/3 decryption.
+
+### Release acceptance
+
+A real Android 15 AVD test installs a launchable APK, performs a genuine HTTPS request, and requires the exported transaction to contain the exact HTTPS URL, a decrypted TLS marker, HTTP 200 and a non-empty response body. Windows packaging separately starts the HTTPS worker from the built standalone executable and requires it to create its CA and reach ready state.
+
 ## v0.29.2 — MailRu-style installer/update split
 
 The previous single-installer design mixed first-install and update responsibilities. v0.29.2 adopts the already operating MailRu Desktop separation.
