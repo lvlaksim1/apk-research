@@ -181,6 +181,7 @@ class HttpsInterceptionCollector:
     )
     DEVICE_PROXY_PORT = 38887
     DIRECT_ROUTER_PORT = 38888
+    DIRECT_ROUTER_PORT_V6 = 38889
     DIRECT_ROUTER_REMOTE_DIR = (
         "/data/local/tmp/apk-research/https-router"
     )
@@ -237,6 +238,8 @@ class HttpsInterceptionCollector:
         self._package_uid: int | None = None
         self._router_pid: int | None = None
         self._direct_routing_configured = False
+        self._direct_routing_succeeded = False
+        self._direct_route_stats = ""
 
     @property
     def running(self) -> bool:
@@ -282,7 +285,10 @@ class HttpsInterceptionCollector:
             routing_probe = self._shell_script(
                 "command -v ip >/dev/null 2>&1 "
                 "&& command -v iptables >/dev/null 2>&1 "
+                "&& command -v ip6tables >/dev/null 2>&1 "
                 "&& iptables -t mangle -j TPROXY -h "
+                ">/dev/null 2>&1 "
+                "&& ip6tables -t mangle -j TPROXY -h "
                 ">/dev/null 2>&1 "
                 "&& echo ready || echo unavailable"
             ).strip()
@@ -463,6 +469,7 @@ class HttpsInterceptionCollector:
         elif process is not None:
             returncode = process.poll()
 
+        self._capture_direct_routing_stats_best_effort()
         self._cleanup_device_best_effort()
         if self._stderr is not None:
             self._stderr.close()
@@ -680,6 +687,8 @@ test -s "$SYSTEM/{self._ca_subject_hash}.0"
             self.DIRECT_ROUTER_MAIN_CLASS,
             "--listen-port",
             str(self.DIRECT_ROUTER_PORT),
+            "--listen-port-v6",
+            str(self.DIRECT_ROUTER_PORT_V6),
             "--proxy-port",
             str(self.DEVICE_PROXY_PORT),
         ]
@@ -726,10 +735,11 @@ test -s "$SYSTEM/{self._ca_subject_hash}.0"
             ).strip()
         parts = line.split()
         if (
-            len(parts) != 3
+            len(parts) != 4
             or parts[0] != "READY"
             or not parts[1].isdigit()
             or parts[2] != str(self.DIRECT_ROUTER_PORT)
+            or parts[3] != str(self.DIRECT_ROUTER_PORT_V6)
         ):
             returncode = (
                 self._router_process.poll()
@@ -750,6 +760,7 @@ test -s "$SYSTEM/{self._ca_subject_hash}.0"
         script = f"""
 set -eu
 IPT=iptables
+IP6T=ip6tables
 OUT={self.DIRECT_OUT_CHAIN}
 PRE={self.DIRECT_PRE_CHAIN}
 MARK={self.DIRECT_ROUTE_MARK}
@@ -757,60 +768,118 @@ MASK={self.DIRECT_ROUTE_MASK}
 TABLE={self.DIRECT_ROUTE_TABLE}
 PREF={self.DIRECT_ROUTE_PREF}
 UID={self._package_uid}
-PORT={self.DIRECT_ROUTER_PORT}
+PORT4={self.DIRECT_ROUTER_PORT}
+PORT6={self.DIRECT_ROUTER_PORT_V6}
 
-while $IPT -w 2 -t mangle -C OUTPUT -j "$OUT" >/dev/null 2>&1; do
-  $IPT -w 2 -t mangle -D OUTPUT -j "$OUT"
+for TOOL in "$IPT" "$IP6T"; do
+  while $TOOL -w 2 -t mangle -C OUTPUT -j "$OUT" >/dev/null 2>&1; do
+    $TOOL -w 2 -t mangle -D OUTPUT -j "$OUT"
+  done
+  while $TOOL -w 2 -t mangle -C PREROUTING -j "$PRE" >/dev/null 2>&1; do
+    $TOOL -w 2 -t mangle -D PREROUTING -j "$PRE"
+  done
+  $TOOL -w 2 -t mangle -F "$OUT" >/dev/null 2>&1 || true
+  $TOOL -w 2 -t mangle -X "$OUT" >/dev/null 2>&1 || true
+  $TOOL -w 2 -t mangle -F "$PRE" >/dev/null 2>&1 || true
+  $TOOL -w 2 -t mangle -X "$PRE" >/dev/null 2>&1 || true
 done
-while $IPT -w 2 -t mangle -C PREROUTING -j "$PRE" >/dev/null 2>&1; do
-  $IPT -w 2 -t mangle -D PREROUTING -j "$PRE"
-done
-$IPT -w 2 -t mangle -F "$OUT" >/dev/null 2>&1 || true
-$IPT -w 2 -t mangle -X "$OUT" >/dev/null 2>&1 || true
-$IPT -w 2 -t mangle -F "$PRE" >/dev/null 2>&1 || true
-$IPT -w 2 -t mangle -X "$PRE" >/dev/null 2>&1 || true
 while ip rule del pref "$PREF" >/dev/null 2>&1; do :; done
+while ip -6 rule del pref "$PREF" >/dev/null 2>&1; do :; done
 ip route flush table "$TABLE" >/dev/null 2>&1 || true
+ip -6 route flush table "$TABLE" >/dev/null 2>&1 || true
 
 $IPT -w 2 -t mangle -N "$OUT"
 $IPT -w 2 -t mangle -N "$PRE"
-$IPT -w 2 -t mangle -A "$OUT"   -p tcp --dport 443 -m owner --uid-owner "$UID"   -j MARK --set-xmark "$MARK/$MASK"
-$IPT -w 2 -t mangle -A "$PRE"   -p tcp --dport 443 -m mark --mark "$MARK/$MASK"   -j TPROXY --on-ip 127.0.0.1 --on-port "$PORT"   --tproxy-mark "$MARK/$MASK"
+$IPT -w 2 -t mangle -A "$OUT" \
+  -p tcp --dport 443 -m owner --uid-owner "$UID" \
+  -j MARK --set-xmark "$MARK/$MASK"
+$IPT -w 2 -t mangle -A "$PRE" \
+  -p tcp --dport 443 -m mark --mark "$MARK/$MASK" \
+  -j TPROXY --on-ip 127.0.0.1 --on-port "$PORT4" \
+  --tproxy-mark "$MARK/$MASK"
 $IPT -w 2 -t mangle -A OUTPUT -j "$OUT"
 $IPT -w 2 -t mangle -A PREROUTING -j "$PRE"
+
+$IP6T -w 2 -t mangle -N "$OUT"
+$IP6T -w 2 -t mangle -N "$PRE"
+$IP6T -w 2 -t mangle -A "$OUT" \
+  -p tcp --dport 443 -m owner --uid-owner "$UID" \
+  -j MARK --set-xmark "$MARK/$MASK"
+$IP6T -w 2 -t mangle -A "$PRE" \
+  -p tcp --dport 443 -m mark --mark "$MARK/$MASK" \
+  -j TPROXY --on-ip ::1 --on-port "$PORT6" \
+  --tproxy-mark "$MARK/$MASK"
+$IP6T -w 2 -t mangle -A OUTPUT -j "$OUT"
+$IP6T -w 2 -t mangle -A PREROUTING -j "$PRE"
+
 ip route add local 0.0.0.0/0 dev lo table "$TABLE"
 ip rule add pref "$PREF" fwmark "$MARK/$MASK" lookup "$TABLE"
+ip -6 route add local ::/0 dev lo table "$TABLE"
+ip -6 rule add pref "$PREF" fwmark "$MARK/$MASK" lookup "$TABLE"
 
 $IPT -w 2 -t mangle -C OUTPUT -j "$OUT"
 $IPT -w 2 -t mangle -C PREROUTING -j "$PRE"
+$IP6T -w 2 -t mangle -C OUTPUT -j "$OUT"
+$IP6T -w 2 -t mangle -C PREROUTING -j "$PRE"
 """
         self._shell_script(
             script,
             timeout=20.0,
         )
         self._direct_routing_configured = True
+        self._direct_routing_succeeded = True
+
+    def _capture_direct_routing_stats_best_effort(self) -> None:
+        if not self._serial or not self._direct_routing_configured:
+            return
+        script = f"""
+echo '=== ipv4-output ==='
+iptables -w 2 -t mangle -nvx -L {self.DIRECT_OUT_CHAIN} 2>/dev/null || true
+echo '=== ipv4-prerouting ==='
+iptables -w 2 -t mangle -nvx -L {self.DIRECT_PRE_CHAIN} 2>/dev/null || true
+echo '=== ipv6-output ==='
+ip6tables -w 2 -t mangle -nvx -L {self.DIRECT_OUT_CHAIN} 2>/dev/null || true
+echo '=== ipv6-prerouting ==='
+ip6tables -w 2 -t mangle -nvx -L {self.DIRECT_PRE_CHAIN} 2>/dev/null || true
+echo '=== ipv4-rule ==='
+ip rule show pref {self.DIRECT_ROUTE_PREF} 2>/dev/null || true
+echo '=== ipv6-rule ==='
+ip -6 rule show pref {self.DIRECT_ROUTE_PREF} 2>/dev/null || true
+"""
+        try:
+            self._direct_route_stats = self._shell_script(
+                script,
+                timeout=10.0,
+            ).strip()
+        except Exception:
+            self._direct_route_stats = ""
 
     def _cleanup_direct_routing_best_effort(self) -> None:
         if not self._serial:
             return
         script = f"""
 IPT=iptables
+IP6T=ip6tables
 OUT={self.DIRECT_OUT_CHAIN}
 PRE={self.DIRECT_PRE_CHAIN}
 TABLE={self.DIRECT_ROUTE_TABLE}
 PREF={self.DIRECT_ROUTE_PREF}
-while $IPT -w 2 -t mangle -C OUTPUT -j "$OUT" >/dev/null 2>&1; do
-  $IPT -w 2 -t mangle -D OUTPUT -j "$OUT" || break
+for TOOL in "$IPT" "$IP6T"; do
+  while $TOOL -w 2 -t mangle -C OUTPUT -j "$OUT" >/dev/null 2>&1; do
+    $TOOL -w 2 -t mangle -D OUTPUT -j "$OUT" || break
+  done
+  while $TOOL -w 2 -t mangle -C PREROUTING -j "$PRE" >/dev/null 2>&1; do
+    $TOOL -w 2 -t mangle -D PREROUTING -j "$PRE" || break
+  done
+  $TOOL -w 2 -t mangle -F "$OUT" >/dev/null 2>&1 || true
+  $TOOL -w 2 -t mangle -X "$OUT" >/dev/null 2>&1 || true
+  $TOOL -w 2 -t mangle -F "$PRE" >/dev/null 2>&1 || true
+  $TOOL -w 2 -t mangle -X "$PRE" >/dev/null 2>&1 || true
 done
-while $IPT -w 2 -t mangle -C PREROUTING -j "$PRE" >/dev/null 2>&1; do
-  $IPT -w 2 -t mangle -D PREROUTING -j "$PRE" || break
-done
-$IPT -w 2 -t mangle -F "$OUT" >/dev/null 2>&1 || true
-$IPT -w 2 -t mangle -X "$OUT" >/dev/null 2>&1 || true
-$IPT -w 2 -t mangle -F "$PRE" >/dev/null 2>&1 || true
-$IPT -w 2 -t mangle -X "$PRE" >/dev/null 2>&1 || true
 while ip rule del pref "$PREF" >/dev/null 2>&1; do :; done
+while ip -6 rule del pref "$PREF" >/dev/null 2>&1; do :; done
 ip route flush table "$TABLE" >/dev/null 2>&1 || true
+ip -6 route flush table "$TABLE" >/dev/null 2>&1 || true
 """
         try:
             self._shell_script(
@@ -996,12 +1065,18 @@ rm -rf /data/local/tmp/apk-research/https-ca /data/local/tmp/apk-research/https
                 ),
                 "previous_android_proxy": self._previous_proxy,
                 "direct_https_routing": {
-                    "enabled": self._direct_routing_configured,
+                    "enabled": self._direct_routing_succeeded,
+                    "active_at_metadata_write": (
+                        self._direct_routing_configured
+                    ),
                     "package_uid": self._package_uid,
                     "target_tcp_port": 443,
-                    "router_port": self.DIRECT_ROUTER_PORT,
+                    "router_port_ipv4": self.DIRECT_ROUTER_PORT,
+                    "router_port_ipv6": self.DIRECT_ROUTER_PORT_V6,
+                    "address_families": ["ipv4", "ipv6"],
                     "method": "tproxy-owner-mark-connect",
                     "original_destination_preserved": True,
+                    "rule_stats": self._direct_route_stats or None,
                 },
                 "system_ca_injected": self._ca_injected,
                 "system_ca_injection_succeeded": self._ca_injection_succeeded,
@@ -1014,7 +1089,7 @@ rm -rf /data/local/tmp/apk-research/https-ca /data/local/tmp/apk-research/https
                     "android_explicit_proxy_enabled": True,
                     "device_to_proxy_via_adb_reverse": True,
                     "target_package_tcp_443_forced_through_analyzer": (
-                        self._direct_routing_configured
+                        self._direct_routing_succeeded
                     ),
                     "may_change_quic_or_http3_behavior": True,
                     "raw_pcap_describes_the_intercepted_environment": True,
