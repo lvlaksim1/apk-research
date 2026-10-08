@@ -14,6 +14,7 @@ from typing import Any, Callable, Protocol
 from apk_research.collectors import (
     ContinuousScreenCollector,
     DeviceMetadataCollector,
+    HttpsInterceptionCollector,
     LogcatCollector,
     RawNetworkCollector,
     ScreenRecordingCollector,
@@ -70,6 +71,10 @@ NetworkFactory = Callable[
 AttributionFactory = Callable[
     [AdbClient, SessionManager],
     AttributionCollectorLike,
+]
+HttpsFactory = Callable[
+    [AdbClient, SessionManager, str],
+    CollectorLike,
 ]
 ScreenFactory = Callable[
     [AdbClient, SessionManager, int],
@@ -212,6 +217,18 @@ def _attribution_factory(
     return SocketAttributionCollector(adb, session)
 
 
+def _https_factory(
+    adb: AdbClient,
+    session: SessionManager,
+    package_name: str,
+) -> CollectorLike:
+    return HttpsInterceptionCollector(
+        adb,
+        session,
+        package_name=package_name,
+    )
+
+
 def _screen_factory(
     adb: AdbClient,
     session: SessionManager,
@@ -264,6 +281,7 @@ class ResearchOrchestrator:
         ),
         network_factory: NetworkFactory = _network_factory,
         attribution_factory: AttributionFactory = _attribution_factory,
+        https_factory: HttpsFactory = _https_factory,
         exporter: Exporter = export_research_zip,
         launch_mode: str = "continue",
         event_observer: EventObserver | None = None,
@@ -285,6 +303,7 @@ class ResearchOrchestrator:
         )
         self.network_factory = network_factory
         self.attribution_factory = attribution_factory
+        self.https_factory = https_factory
         self.exporter = exporter
         if launch_mode not in {
             "clean",
@@ -303,6 +322,7 @@ class ResearchOrchestrator:
         self.continuous_screen: CollectorLike | None = None
         self.network: NetworkCollectorLike | None = None
         self.attribution: AttributionCollectorLike | None = None
+        self.https_interception: CollectorLike | None = None
         self._started_collectors: list[tuple[str, CollectorLike]] = []
         self._event_registered = False
         self._user_action_registered = False
@@ -389,6 +409,24 @@ class ResearchOrchestrator:
                 ),
             )
 
+            self.https_interception = self.https_factory(
+                self.adb,
+                self.session,
+                self.package_name,
+            )
+            https_preflight = getattr(
+                self.https_interception,
+                "preflight",
+            )()
+            self._event(
+                "https_interception_preflight_completed",
+                details=(
+                    https_preflight.to_dict()
+                    if hasattr(https_preflight, "to_dict")
+                    else None
+                ),
+            )
+
             self.logcat = self.logcat_factory(
                 self.adb,
                 self.session,
@@ -415,6 +453,10 @@ class ResearchOrchestrator:
             self._start_collector(
                 "socket_attribution",
                 self.attribution,
+            )
+            self._start_collector(
+                "https_interception",
+                self.https_interception,
             )
             self._start_collector(
                 "continuous_screen",
