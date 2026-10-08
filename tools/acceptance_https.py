@@ -175,6 +175,7 @@ import android.os.Bundle;
 import android.widget.TextView;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.net.Proxy;
 import java.net.URL;
 import javax.net.ssl.HttpsURLConnection;
 
@@ -189,12 +190,13 @@ public final class MainActivity extends Activity {{
             try {{
                 URL url = new URL("{TARGET_URL}");
                 HttpsURLConnection connection =
-                    (HttpsURLConnection) url.openConnection();
+                    (HttpsURLConnection) url.openConnection(
+                        Proxy.NO_PROXY);
                 connection.setConnectTimeout(15000);
                 connection.setReadTimeout(15000);
                 connection.setRequestProperty(
                     "X-Apk-Research-Acceptance",
-                    "v0.30"
+                    "v0.30.1-direct"
                 );
                 int code = connection.getResponseCode();
                 InputStream stream =
@@ -347,6 +349,22 @@ public final class MainActivity extends Activity {{
     return signed
 
 
+def _read_interception_metadata(
+    archive_path: Path,
+) -> dict:
+    with zipfile.ZipFile(
+        archive_path
+    ) as archive:
+        return json.loads(
+            archive.read(
+                "02_normalized/http-interception.json"
+            ).decode(
+                "utf-8",
+                errors="replace",
+            )
+        )
+
+
 def _read_transactions(
     archive_path: Path,
 ) -> list[dict]:
@@ -454,8 +472,20 @@ def main() -> int:
                     + result.session_status
                 )
 
+            archive_path = Path(result.archive)
+            metadata = _read_interception_metadata(
+                archive_path
+            )
+            routing = (
+                metadata.get("direct_https_routing")
+                or {}
+            )
+            if not routing.get("enabled"):
+                raise RuntimeError(
+                    "Direct HTTPS routing was not active"
+                )
             transactions = _read_transactions(
-                Path(result.archive)
+                archive_path
             )
             matches = [
                 item
@@ -518,6 +548,7 @@ def main() -> int:
                         "response_bytes": body.get(
                             "size"
                         ),
+                        "direct_https_routing": True,
                         "archive": result.archive,
                     },
                     ensure_ascii=False,
