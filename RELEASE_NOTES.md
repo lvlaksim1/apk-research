@@ -1,40 +1,37 @@
-# apk-research v0.30.0 — HTTPS Traffic Inspection
+# apk-research v0.30.1 — Direct HTTPS Routing
 
-v0.30.0 adds first-class inspection of decrypted HTTPS traffic in the managed Android research environment.
+v0.30.1 extends HTTPS traffic analysis for applications that open TLS sockets directly and ignore Android's system proxy setting.
 
-## HTTPS interception
+## Direct package routing
 
 During a research session apk-research now:
-- starts an isolated bundled HTTPS proxy worker;
-- routes the managed Android emulator through it using `adb reverse`;
-- injects the research CA into the rooted Android 15 system trust environment;
-- records decrypted HTTP transactions where interception succeeds;
-- restores Android proxy/routing state during teardown.
+- keeps the existing application-managed local HTTPS analyzer and research CA;
+- identifies the UID of the researched package;
+- applies routing only to that package's direct TCP/443 connections;
+- preserves the original remote destination inside the managed Android environment;
+- forwards those connections into the same HTTP/HTTPS analysis path already used in v0.30.0;
+- removes the temporary routing rules and Android helper process during cleanup.
 
-The private CA key remains in the proxy runtime configuration and is not exported into the Research ZIP.
+Applications that already honor the Android proxy continue using the existing path.
 
-## Research ZIP
+## Verification target
 
-New evidence includes:
-- `02_normalized/http-transactions.jsonl`;
-- `02_normalized/http-bodies/*`;
-- `02_normalized/http-interception.json`;
-- `01_raw/network/https-proxy.stderr.txt`.
+The Android 15 acceptance APK now opens `https://example.com/` with `Proxy.NO_PROXY`, explicitly bypassing the Android system proxy.
 
-Transactions retain URL, method, protocol, request/response headers, status, timing and body references.
+The release gate therefore requires the direct-routing path itself to produce a readable HTTPS transaction with:
+- the exact target URL;
+- HTTP status 200;
+- a non-empty response body;
+- `direct_https_routing.enabled = true` in the Research ZIP metadata.
 
-## Desktop UI
+## Evidence
 
-The Results tab now has an **HTTP/HTTPS** viewer with search plus separate request/response header and body panes. JSON is formatted for reading; binary payloads are shown as bounded hexadecimal previews.
+The Research ZIP keeps the existing HTTP/HTTPS transaction files and adds diagnostics for the Android direct-routing helper.
 
-## Verification
-
-The real Android 15 release gate installs a dedicated test APK and requires a genuine `https://example.com/` request to be decrypted and exported with HTTP status 200 and a non-empty response body.
+Passive RAW PCAP remains an independent record of traffic observed in the configured research environment.
 
 ## Boundaries
 
-This is active interception, not passive observation. The Research ZIP records that the explicit Android proxy can change transport behavior. RAW PCAP remains the source of truth for traffic actually observed in that research environment.
+v0.30.1 targets TCP/443. HTTP/3/QUIC remains outside this release contract.
 
-Applications using certificate pinning or a custom trust store can still reject interception. v0.30.0 detects proxy errors but does not claim a universal pinning bypass.
-
-HTTP/3/QUIC decryption is not claimed by this release.
+Applications that use certificate pinning or their own trust store may still reject the research CA; this release does not claim otherwise.
