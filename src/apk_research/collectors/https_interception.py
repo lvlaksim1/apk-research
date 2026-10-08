@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -216,20 +217,14 @@ class HttpsInterceptionCollector:
         try:
             self.adb.ensure_ready(serial)
             uid = self.adb.get_uid(serial)
-            apex = self.adb.shell_output(
-                serial,
-                "sh",
-                "-c",
+            apex = self._shell_script(
                 "if [ -d /apex/com.android.conscrypt/cacerts ]; "
-                "then echo apex; else echo legacy; fi",
+                "then echo apex; else echo legacy; fi"
             ).strip()
             nsenter_available = (
                 "nsenter"
-                in self.adb.shell_output(
-                    serial,
-                    "sh",
-                    "-c",
-                    "command -v nsenter || true",
+                in self._shell_script(
+                    "command -v nsenter || true"
                 )
             )
         except AdbError as exc:
@@ -518,10 +513,7 @@ if [ -d "$APEX" ]; then
 fi
 test -s "$SYSTEM/{self._ca_subject_hash}.0"
 """
-        output = self.adb.shell_output(
-            serial,
-            "sh",
-            "-c",
+        output = self._shell_script(
             script,
             timeout=30.0,
         )
@@ -530,6 +522,19 @@ test -s "$SYSTEM/{self._ca_subject_hash}.0"
                 "Android rejected temporary CA injection: " + output.strip()
             )
         self._ca_injected = True
+
+    def _shell_script(
+        self,
+        script: str,
+        *,
+        timeout: float = 10.0,
+    ) -> str:
+        remote = "sh -c " + shlex.quote(script)
+        return self.adb.shell_output(
+            self._serial,
+            remote,
+            timeout=timeout,
+        )
 
     def _configure_proxy(self) -> None:
         serial = self._serial
@@ -621,10 +626,7 @@ fi
 umount "$SYSTEM" 2>/dev/null || true
 rm -rf /data/local/tmp/apk-research/https-ca /data/local/tmp/apk-research/https
 """
-                self.adb.shell_output(
-                    serial,
-                    "sh",
-                    "-c",
+                self._shell_script(
                     script,
                     timeout=30.0,
                 )
