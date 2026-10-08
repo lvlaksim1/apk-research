@@ -19,16 +19,19 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Small rooted Android-side TCP router used only inside AVD-RESEARCH.
+ * Rooted Android-side TCP router used only inside AVD-RESEARCH.
  *
- * The kernel keeps the original destination with TPROXY. This process accepts
- * the redirected TCP socket, reads that destination with getsockname(), opens
- * an HTTP CONNECT tunnel to the already configured local HTTPS analyzer, and
- * then relays bytes in both directions.
+ * Linux keeps the original destination for sockets delivered through TPROXY.
+ * This process accepts those sockets, reads the preserved destination with
+ * getsockname(), opens an HTTP CONNECT tunnel to the already configured local
+ * HTTPS analyzer, and relays bytes in both directions.
  */
 public final class DirectHttpsRouter {
     private static final int SOL_IP = 0;
+    private static final int SOL_IPV6 = 41;
     private static final int IP_TRANSPARENT = 19;
+    private static final int IPV6_TRANSPARENT = 75;
+    private static final int IPV6_V6ONLY = 26;
     private static final int CONNECT_TIMEOUT_MS = 8000;
     private static final int MAX_CONNECT_HEADER = 16384;
     private static final int BUFFER_SIZE = 32768;
@@ -37,7 +40,8 @@ public final class DirectHttpsRouter {
     }
 
     public static void main(String[] args) {
-        int listenPort = 0;
+        int listenPortV4 = 0;
+        int listenPortV6 = 0;
         int proxyPort = 0;
         try {
             for (int index = 0; index < args.length; index += 2) {
@@ -45,7 +49,9 @@ public final class DirectHttpsRouter {
                     throw new IllegalArgumentException("missing argument value");
                 }
                 if ("--listen-port".equals(args[index])) {
-                    listenPort = parsePort(args[index + 1]);
+                    listenPortV4 = parsePort(args[index + 1]);
+                } else if ("--listen-port-v6".equals(args[index])) {
+                    listenPortV6 = parsePort(args[index + 1]);
                 } else if ("--proxy-port".equals(args[index])) {
                     proxyPort = parsePort(args[index + 1]);
                 } else {
@@ -53,11 +59,15 @@ public final class DirectHttpsRouter {
                             "unknown argument: " + args[index]);
                 }
             }
-            if (listenPort == 0 || proxyPort == 0) {
+            if (listenPortV4 == 0
+                    || listenPortV6 == 0
+                    || proxyPort == 0) {
                 throw new IllegalArgumentException(
-                        "usage: --listen-port <port> --proxy-port <port>");
+                        "usage: --listen-port <port> "
+                                + "--listen-port-v6 <port> "
+                                + "--proxy-port <port>");
             }
-            run(listenPort, proxyPort);
+            run(listenPortV4, listenPortV6, proxyPort);
         } catch (Throwable error) {
             System.err.println(
                     "apk-research-direct-https-router: "
@@ -81,12 +91,72 @@ public final class DirectHttpsRouter {
         return port;
     }
 
-    private static void run(int listenPort, int proxyPort)
-            throws Exception {
+    private static void run(
+            int listenPortV4,
+            int listenPortV6,
+            int proxyPort) throws Exception {
+        FileDescriptor listenerV4 = null;
+        FileDescriptor listenerV6 = null;
+        try {
+            listenerV4 = openListenerV4(listenPortV4);
+            listenerV6 = openListenerV6(listenPortV6);
+
+            final FileDescriptor finalListenerV4 = listenerV4;
+            final FileDescriptor finalListenerV6 = listenerV6;
+            AtomicInteger sequence = new AtomicInteger();
+
+            Thread acceptV4 = new Thread(
+                    () -> acceptLoop(
+                            finalListenerV4,
+                            proxyPort,
+                            sequence,
+                            "v4"),
+                    "apk-research-direct-https-accept-v4");
+            Thread acceptV6 = new Thread(
+                    () -> acceptLoop(
+                            finalListenerV6,
+                            proxyPort,
+                            sequence,
+                            "v6"),
+                    "apk-research-direct-https-accept-v6");
+            acceptV4.setDaemon(true);
+            acceptV6.setDaemon(true);
+            acceptV4.start();
+            acceptV6.start();
+
+            System.out.println(
+                    "READY "
+                            + Process.myPid()
+                            + " "
+                            + listenPortV4
+                            + " "
+                            + listenPortV6);
+            System.out.flush();
+
+            while (true) {
+                try {
+                    acceptV4.join();
+                    acceptV6.join();
+                    throw new IOException(
+                            "direct HTTPS router listener stopped");
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        } finally {
+            closeFd(listenerV4);
+            closeFd(listenerV6);
+        }
+    }
+
+    private static FileDescriptor openListenerV4(
+            int listenPort) throws Exception {
         FileDescriptor listener = Os.socket(
                 OsConstants.AF_INET,
                 OsConstants.SOCK_STREAM,
                 OsConstants.IPPROTO_TCP);
+        boolean success = false;
         try {
             Os.setsockoptInt(
                     listener,
@@ -103,25 +173,80 @@ public final class DirectHttpsRouter {
                     java.net.InetAddress.getByName("0.0.0.0"),
                     listenPort);
             Os.listen(listener, 128);
+            success = true;
+            return listener;
+        } finally {
+            if (!success) {
+                closeFd(listener);
+            }
+        }
+    }
 
-            System.out.println(
-                    "READY " + Process.myPid() + " " + listenPort);
-            System.out.flush();
+    private static FileDescriptor openListenerV6(
+            int listenPort) throws Exception {
+        FileDescriptor listener = Os.socket(
+                OsConstants.AF_INET6,
+                OsConstants.SOCK_STREAM,
+                OsConstants.IPPROTO_TCP);
+        boolean success = false;
+        try {
+            Os.setsockoptInt(
+                    listener,
+                    OsConstants.SOL_SOCKET,
+                    OsConstants.SO_REUSEADDR,
+                    1);
+            Os.setsockoptInt(
+                    listener,
+                    SOL_IPV6,
+                    IPV6_V6ONLY,
+                    1);
+            Os.setsockoptInt(
+                    listener,
+                    SOL_IPV6,
+                    IPV6_TRANSPARENT,
+                    1);
+            Os.bind(
+                    listener,
+                    java.net.InetAddress.getByName("::"),
+                    listenPort);
+            Os.listen(listener, 128);
+            success = true;
+            return listener;
+        } finally {
+            if (!success) {
+                closeFd(listener);
+            }
+        }
+    }
 
-            AtomicInteger sequence = new AtomicInteger();
-            while (true) {
+    private static void acceptLoop(
+            FileDescriptor listener,
+            int proxyPort,
+            AtomicInteger sequence,
+            String family) {
+        while (true) {
+            try {
                 FileDescriptor client = Os.accept(
                         listener,
                         null);
                 Thread worker = new Thread(
                         () -> handleClient(client, proxyPort),
                         "apk-research-direct-https-"
+                                + family
+                                + "-"
                                 + sequence.incrementAndGet());
                 worker.setDaemon(true);
                 worker.start();
+            } catch (Throwable error) {
+                System.err.println(
+                        "apk-research-direct-https-router-"
+                                + family
+                                + ": "
+                                + error.getClass().getSimpleName()
+                                + ": "
+                                + String.valueOf(error.getMessage()));
+                return;
             }
-        } finally {
-            closeFd(listener);
         }
     }
 
@@ -144,6 +269,12 @@ public final class DirectHttpsRouter {
                                 + destination.getPort());
             }
 
+            String authority = authority(destination);
+            System.err.println(
+                    "route "
+                            + authority);
+            System.err.flush();
+
             proxy = new Socket();
             proxy.setTcpNoDelay(true);
             proxy.connect(
@@ -159,7 +290,6 @@ public final class DirectHttpsRouter {
                     new BufferedOutputStream(
                             proxy.getOutputStream());
 
-            String authority = authority(destination);
             String connect =
                     "CONNECT "
                             + authority
@@ -185,6 +315,11 @@ public final class DirectHttpsRouter {
                         "local HTTPS analyzer rejected CONNECT: "
                                 + firstLine);
             }
+
+            System.err.println(
+                    "connected "
+                            + authority);
+            System.err.flush();
 
             final Socket relayProxy = proxy;
             Thread upload = new Thread(
@@ -227,6 +362,7 @@ public final class DirectHttpsRouter {
                             + error.getClass().getSimpleName()
                             + ": "
                             + String.valueOf(error.getMessage()));
+            System.err.flush();
             closePair(client, proxy, closed);
         }
     }
@@ -236,6 +372,10 @@ public final class DirectHttpsRouter {
         String host = destination.getAddress() != null
                 ? destination.getAddress().getHostAddress()
                 : destination.getHostString();
+        int scope = host.indexOf('%');
+        if (scope >= 0) {
+            host = host.substring(0, scope);
+        }
         if (host.indexOf(':') >= 0
                 && !host.startsWith("[")) {
             host = "[" + host + "]";
