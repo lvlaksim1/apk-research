@@ -1,5 +1,27 @@
 # Refactoring and Architecture Log
 
+## v0.30.1 — Direct package HTTPS routing
+
+### Routing boundary
+
+The researched package UID receives a temporary TCP/443-only routing rule inside the rooted managed Android environment. Applications that honor the normal Android proxy keep the v0.30.0 path; direct sockets are sent to a small Android-side router.
+
+### Original-destination invariant
+
+The kernel preserves the original IPv4 destination for direct TCP/443 sockets. The Android-side router reads that destination and opens a standard HTTP CONNECT tunnel to the existing local HTTPS analyzer through the established `adb reverse` channel. The analyzer therefore receives the real destination without relying on application proxy behavior.
+
+### Isolation and cleanup
+
+The rule is UID-scoped to the researched package and does not apply to apk-research infrastructure processes. Temporary packet-mark/routing state, the Android helper process and its files are removed during collector teardown.
+
+### Acceptance boundary
+
+The Android 15 acceptance APK explicitly uses `Proxy.NO_PROXY` for `https://example.com/`. Release acceptance requires a readable transaction with HTTP 200, a non-empty body and metadata confirming direct HTTPS routing was enabled.
+
+### Scope boundary
+
+v0.30.1 covers IPv4 TCP/443. HTTP/3/QUIC and application-specific certificate trust behavior remain separate bounded cases.
+
 ## v0.30.0 — Managed HTTPS traffic inspection
 
 ### Active-interception boundary
