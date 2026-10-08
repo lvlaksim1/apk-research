@@ -7,6 +7,7 @@ import android.system.OsConstants;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
@@ -22,9 +23,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Rooted Android-side TCP router used only inside AVD-RESEARCH.
  *
  * Linux keeps the original destination for sockets delivered through TPROXY.
- * This process accepts those sockets, reads the preserved destination with
- * getsockname(), opens an HTTP CONNECT tunnel to the already configured local
- * HTTPS analyzer, and relays bytes in both directions.
+ * This process accepts those sockets, reads the preserved destination, reads
+ * the first TLS record to recover SNI when available, opens an HTTP CONNECT
+ * tunnel to the local HTTPS analyzer, and relays bytes in both directions.
  */
 public final class DirectHttpsRouter {
     private static final int SOL_IP = 0;
@@ -34,6 +35,7 @@ public final class DirectHttpsRouter {
     private static final int IPV6_V6ONLY = 26;
     private static final int CONNECT_TIMEOUT_MS = 8000;
     private static final int MAX_CONNECT_HEADER = 16384;
+    private static final int MAX_TLS_RECORD = 65540;
     private static final int BUFFER_SIZE = 32768;
 
     private DirectHttpsRouter() {
@@ -133,16 +135,13 @@ public final class DirectHttpsRouter {
                             + listenPortV6);
             System.out.flush();
 
-            while (true) {
-                try {
-                    acceptV4.join();
-                    acceptV6.join();
-                    throw new IOException(
-                            "direct HTTPS router listener stopped");
-                } catch (InterruptedException error) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
+            try {
+                acceptV4.join();
+                acceptV6.join();
+                throw new IOException(
+                        "direct HTTPS router listener stopped");
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
             }
         } finally {
             closeFd(listenerV4);
@@ -245,6 +244,7 @@ public final class DirectHttpsRouter {
                                 + error.getClass().getSimpleName()
                                 + ": "
                                 + String.valueOf(error.getMessage()));
+                System.err.flush();
                 return;
             }
         }
@@ -269,10 +269,20 @@ public final class DirectHttpsRouter {
                                 + destination.getPort());
             }
 
-            String authority = authority(destination);
+            byte[] initialTls = readInitialTlsRecord(client);
+            String serverName = parseTlsSni(initialTls);
+            String destinationAuthority = authority(destination);
+            String connectAuthority = (
+                    serverName == null || serverName.isEmpty()
+                    ? destinationAuthority
+                    : serverName + ":" + destination.getPort()
+            );
+
             System.err.println(
                     "route "
-                            + authority);
+                            + destinationAuthority
+                            + " via "
+                            + connectAuthority);
             System.err.flush();
 
             proxy = new Socket();
@@ -292,9 +302,9 @@ public final class DirectHttpsRouter {
 
             String connect =
                     "CONNECT "
-                            + authority
+                            + connectAuthority
                             + " HTTP/1.1\r\nHost: "
-                            + authority
+                            + connectAuthority
                             + "\r\nProxy-Connection: keep-alive\r\n\r\n";
             proxyOutput.write(
                     connect.getBytes(
@@ -316,9 +326,12 @@ public final class DirectHttpsRouter {
                                 + firstLine);
             }
 
+            proxyOutput.write(initialTls);
+            proxyOutput.flush();
+
             System.err.println(
                     "connected "
-                            + authority);
+                            + connectAuthority);
             System.err.flush();
 
             final Socket relayProxy = proxy;
@@ -365,6 +378,154 @@ public final class DirectHttpsRouter {
             System.err.flush();
             closePair(client, proxy, closed);
         }
+    }
+
+    private static byte[] readInitialTlsRecord(
+            FileDescriptor source) throws Exception {
+        byte[] header = new byte[5];
+        readExact(source, header, 0, header.length);
+        if ((header[0] & 0xff) != 22) {
+            throw new IOException(
+                    "direct TCP/443 stream did not start with TLS handshake");
+        }
+        int bodyLength =
+                ((header[3] & 0xff) << 8)
+                        | (header[4] & 0xff);
+        int total = 5 + bodyLength;
+        if (bodyLength <= 0 || total > MAX_TLS_RECORD) {
+            throw new IOException(
+                    "invalid initial TLS record length " + bodyLength);
+        }
+        byte[] record = new byte[total];
+        System.arraycopy(
+                header,
+                0,
+                record,
+                0,
+                header.length);
+        readExact(
+                source,
+                record,
+                header.length,
+                bodyLength);
+        return record;
+    }
+
+    private static void readExact(
+            FileDescriptor source,
+            byte[] data,
+            int offset,
+            int length) throws Exception {
+        int position = offset;
+        int remaining = length;
+        while (remaining > 0) {
+            int count = Os.read(
+                    source,
+                    data,
+                    position,
+                    remaining);
+            if (count <= 0) {
+                throw new IOException(
+                        "direct TCP stream closed during TLS preface");
+            }
+            position += count;
+            remaining -= count;
+        }
+    }
+
+    private static String parseTlsSni(
+            byte[] record) {
+        try {
+            int position = 5;
+            if ((record[position++] & 0xff) != 1) {
+                return null;
+            }
+            int handshakeLength =
+                    ((record[position++] & 0xff) << 16)
+                            | ((record[position++] & 0xff) << 8)
+                            | (record[position++] & 0xff);
+            int handshakeEnd = Math.min(
+                    record.length,
+                    position + handshakeLength);
+            if (position + 34 > handshakeEnd) {
+                return null;
+            }
+
+            position += 2;
+            position += 32;
+
+            int sessionLength = record[position++] & 0xff;
+            position += sessionLength;
+            if (position + 2 > handshakeEnd) {
+                return null;
+            }
+
+            int cipherLength =
+                    ((record[position++] & 0xff) << 8)
+                            | (record[position++] & 0xff);
+            position += cipherLength;
+            if (position + 1 > handshakeEnd) {
+                return null;
+            }
+
+            int compressionLength =
+                    record[position++] & 0xff;
+            position += compressionLength;
+            if (position + 2 > handshakeEnd) {
+                return null;
+            }
+
+            int extensionsLength =
+                    ((record[position++] & 0xff) << 8)
+                            | (record[position++] & 0xff);
+            int extensionsEnd = Math.min(
+                    handshakeEnd,
+                    position + extensionsLength);
+
+            while (position + 4 <= extensionsEnd) {
+                int type =
+                        ((record[position++] & 0xff) << 8)
+                                | (record[position++] & 0xff);
+                int length =
+                        ((record[position++] & 0xff) << 8)
+                                | (record[position++] & 0xff);
+                int extensionEnd = position + length;
+                if (extensionEnd > extensionsEnd) {
+                    return null;
+                }
+                if (type == 0 && length >= 5) {
+                    int listLength =
+                            ((record[position] & 0xff) << 8)
+                                    | (record[position + 1] & 0xff);
+                    int item = position + 2;
+                    int listEnd = Math.min(
+                            extensionEnd,
+                            item + listLength);
+                    while (item + 3 <= listEnd) {
+                        int nameType =
+                                record[item++] & 0xff;
+                        int nameLength =
+                                ((record[item++] & 0xff) << 8)
+                                        | (record[item++] & 0xff);
+                        if (item + nameLength > listEnd) {
+                            return null;
+                        }
+                        if (nameType == 0 && nameLength > 0) {
+                            return new String(
+                                    record,
+                                    item,
+                                    nameLength,
+                                    StandardCharsets.US_ASCII);
+                        }
+                        item += nameLength;
+                    }
+                }
+                position = extensionEnd;
+            }
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+        return null;
     }
 
     private static String authority(
