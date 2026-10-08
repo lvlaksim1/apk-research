@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.30.1] - 2026-10-08
+
+### Added
+- UID-scoped routing for direct TCP/443 connections from the researched Android package.
+- Android-side router that preserves the original destination and forwards direct TLS sockets into the local HTTPS analyzer.
+- Raw diagnostics for the Android direct-routing helper.
+
+### Changed
+- The real Android 15 HTTPS acceptance APK now uses `Proxy.NO_PROXY`, so the gate verifies applications that ignore the Android system proxy rather than only proxy-aware clients.
+- Windows update acceptance now verifies a real v0.30.0 → v0.30.1 upgrade.
+
+### Evidence boundaries
+- Direct routing applies only to the researched package UID and TCP/443.
+- Passive RAW PCAP remains independent evidence for traffic observed in the configured research environment.
+- HTTP/3/QUIC and certificate-pinned/custom-trust applications remain separate bounded cases.
+
 ## [0.30.0] - 2026-10-08
 
 ### Added
