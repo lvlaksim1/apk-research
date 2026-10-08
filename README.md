@@ -1,5 +1,13 @@
 # apk-research
 
+## v0.30.0 — HTTPS Traffic Inspection
+
+v0.30.0 adds first-class display of decrypted HTTPS traffic in the managed Android research environment. During research apk-research starts its bundled interception worker, routes the managed emulator through it with `adb reverse`, temporarily places the research CA into the rooted Android 15 trust environment, and stores decrypted HTTP transactions when interception succeeds.
+
+The Results tab now includes an **HTTP/HTTPS** viewer with search plus request/response headers and bodies. JSON/text bodies are rendered readably; binary bodies receive a bounded hexadecimal preview. The Research ZIP stores transaction metadata, body artifacts, interception provenance and proxy diagnostics separately from the authoritative passive PCAP.
+
+This is an active research intervention. Certificate-pinned applications and custom trust stores may reject interception, and HTTP/3/QUIC decryption is not claimed by v0.30.0. The real Android 15 gate proves a genuine HTTPS request is decrypted and exported before release.
+
 ## v0.29.2 — Separate Setup/Update Installers
 
 v0.29.2 adopts the installer model already proven in `lvlaksim1/mailru-desktop`.
