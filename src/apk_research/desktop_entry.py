@@ -26,6 +26,7 @@ def _gui_smoke_test() -> int:
     assert hasattr(window, "update_status_label")
     assert hasattr(window, "install_package_button")
     assert hasattr(window, "launch_package_button")
+    assert hasattr(window, "results_http")
     window.close()
     app.processEvents()
     return 0
