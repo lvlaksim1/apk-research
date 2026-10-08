@@ -4,23 +4,29 @@
 
 ### Routing boundary
 
-The researched package UID receives a temporary TCP/443-only routing rule inside the rooted managed Android environment. Applications that honor the normal Android proxy keep the v0.30.0 path; direct sockets are sent to a small Android-side router.
+The researched package UID receives temporary TCP/443-only routing inside the rooted managed Android environment. Applications that use the normal Android proxy keep the v0.30.0 path; direct sockets are handled by a small Android-side router.
 
-### Original-destination invariant
+Both IPv4 and IPv6 paths are configured. The routing rules are UID-scoped, so apk-research infrastructure processes are not included.
 
-The kernel preserves the original IPv4 destination for direct TCP/443 sockets. The Android-side router reads that destination and opens a standard HTTP CONNECT tunnel to the existing local HTTPS analyzer through the established `adb reverse` channel. The analyzer therefore receives the real destination without relying on application proxy behavior.
+### Destination and server-name preservation
+
+Linux preserves the original socket destination for the direct-routing path. The Android-side router also reads the first TLS record and extracts SNI when present. It then opens a standard HTTP CONNECT tunnel to the existing local HTTPS analyzer, preferring the SNI hostname and falling back to the preserved IP destination.
+
+This avoids relying on application proxy behavior while retaining the server identity needed for normal TLS certificate handling.
 
 ### Isolation and cleanup
 
-The rule is UID-scoped to the researched package and does not apply to apk-research infrastructure processes. Temporary packet-mark/routing state, the Android helper process and its files are removed during collector teardown.
+Temporary packet-mark/routing state, the Android helper process and its files are removed during collector teardown. The final Research ZIP records both the historical fact that direct routing was successfully enabled and the rule diagnostics collected before cleanup.
 
 ### Acceptance boundary
 
-The Android 15 acceptance APK explicitly uses `Proxy.NO_PROXY` for `https://example.com/`. Release acceptance requires a readable transaction with HTTP 200, a non-empty body and metadata confirming direct HTTPS routing was enabled.
+The Android 15 acceptance APK creates a direct TLS socket to `127.0.0.1:443` with SNI/Host `example.com`. Release acceptance requires a readable `https://example.com/` transaction with HTTP 200 and a non-empty body. The full ordinary AVD research acceptance must then still pass.
+
+This structure isolates the routing proof from Android DNS and direct Internet reachability in CI.
 
 ### Scope boundary
 
-v0.30.1 covers IPv4 TCP/443. HTTP/3/QUIC and application-specific certificate trust behavior remain separate bounded cases.
+v0.30.1 covers TCP/443. HTTP/3/QUIC and application-specific certificate trust behavior remain separate bounded cases.
 
 ## v0.30.0 — Managed HTTPS traffic inspection
 

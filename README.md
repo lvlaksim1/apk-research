@@ -2,11 +2,13 @@
 
 ## v0.30.1 — Direct HTTPS Routing
 
-v0.30.1 extends the HTTP/HTTPS viewer to applications that create direct TCP/443 connections and ignore Android's system proxy. apk-research now applies temporary UID-scoped routing only to the researched package, preserves each original destination inside the managed Android environment, and passes those direct TLS connections into the same local HTTPS analyzer used by v0.30.0.
+v0.30.1 extends the HTTP/HTTPS viewer to applications that create direct TCP/443 connections instead of using Android's system proxy. apk-research applies temporary UID-scoped routing only to the researched package, preserves the destination, and uses TLS SNI when available so the local HTTPS analyzer keeps the intended server name.
 
-The Android 15 release test now opens `https://example.com/` with `Proxy.NO_PROXY`. A successful gate therefore proves the direct-routing path itself rather than relying on a proxy-aware client.
+Both IPv4 and IPv6 paths are prepared inside the rooted managed Android environment. Applications that already use the normal Android proxy keep the v0.30.0 path.
 
-The routing rules and Android helper process are removed during session cleanup. RAW PCAP remains independent evidence. HTTP/3/QUIC and applications that reject the research CA remain outside this release contract.
+The Android 15 release test creates a direct TLS socket to `127.0.0.1:443` with SNI/Host `example.com`. A successful gate therefore proves the direct package-routing path itself without relying on Android DNS or direct Internet reachability. The verified test returned HTTP/1.1 200 with a 577-byte response body, after which the full standard AVD research acceptance also passed.
+
+Temporary routing state and the Android helper process are removed during session cleanup. RAW PCAP remains independent evidence. HTTP/3/QUIC and applications that reject the research CA remain outside this release contract.
 
 ## v0.30.0 — HTTPS Traffic Inspection
 
