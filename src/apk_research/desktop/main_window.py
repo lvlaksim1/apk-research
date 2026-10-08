@@ -44,6 +44,9 @@ from apk_research.desktop.android_view import (
 from apk_research.desktop.controller import (
     DesktopController,
 )
+from apk_research.desktop.http_window import (
+    HttpTransactionsWindow,
+)
 from apk_research.desktop.updater import (
     DownloadedUpdate,
     ReleaseInfo,
@@ -142,6 +145,7 @@ class MainWindow(QMainWindow):
         self._update_download_thread: _UpdateDownloadThread | None = None
         self._update_busy = False
         self._applying_update = False
+        self._http_windows: list[HttpTransactionsWindow] = []
         self._build_ui()
         self._connect_signals()
         self._refresh_component_state()
@@ -491,6 +495,9 @@ class MainWindow(QMainWindow):
         self.results_timeline = QPushButton(
             "Research Timeline"
         )
+        self.results_http = QPushButton(
+            "HTTP/HTTPS"
+        )
         self.results_open = QPushButton(
             "Открыть папку"
         )
@@ -505,6 +512,9 @@ class MainWindow(QMainWindow):
         )
         buttons.addWidget(
             self.results_timeline
+        )
+        buttons.addWidget(
+            self.results_http
         )
         buttons.addWidget(
             self.results_open
@@ -836,6 +846,9 @@ class MainWindow(QMainWindow):
         )
         self.results_timeline.clicked.connect(
             self._inspect_selected_timeline
+        )
+        self.results_http.clicked.connect(
+            self._inspect_selected_http
         )
         self.results_open.clicked.connect(
             self._open_selected_archive_folder
@@ -1809,6 +1822,25 @@ class MainWindow(QMainWindow):
             self.controller.inspect_timeline(
                 path
             )
+
+    def _inspect_selected_http(
+        self,
+    ) -> None:
+        path = self._selected_table_path(
+            self.results_table
+        )
+        if not path:
+            return
+        window = HttpTransactionsWindow(
+            path,
+            self,
+        )
+        window.setAttribute(
+            Qt.WidgetAttribute.WA_DeleteOnClose,
+            True,
+        )
+        self._http_windows.append(window)
+        window.show()
 
     def _open_selected_archive_folder(
         self,
