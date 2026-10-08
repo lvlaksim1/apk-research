@@ -847,7 +847,7 @@ class AndroidSidecar:
         if process is not None:
             try:
                 process_exit_code = process.wait(
-                    timeout=3.0
+                    timeout=self.timeout
                 )
             except Exception:
                 try:
