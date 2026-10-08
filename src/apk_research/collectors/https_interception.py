@@ -192,6 +192,7 @@ class HttpsInterceptionCollector:
         self._proxy_configured = False
         self._reverse_configured = False
         self._ca_injected = False
+        self._ca_injection_succeeded = False
 
     @property
     def running(self) -> bool:
@@ -214,6 +215,7 @@ class HttpsInterceptionCollector:
             raise HttpsInterceptionCollectorError(
                 "HTTPS interception currently requires the managed emulator"
             )
+        self._serial = serial
         try:
             self.adb.ensure_ready(serial)
             uid = self.adb.get_uid(serial)
@@ -237,7 +239,6 @@ class HttpsInterceptionCollector:
             raise HttpsInterceptionCollectorError(
                 "Android Conscrypt APEX is active but nsenter is unavailable"
             )
-        self._serial = serial
         self._preflight = HttpsInterceptionPreflight(
             serial=serial,
             root=True,
@@ -522,6 +523,7 @@ test -s "$SYSTEM/{self._ca_subject_hash}.0"
                 "Android rejected temporary CA injection: " + output.strip()
             )
         self._ca_injected = True
+        self._ca_injection_succeeded = True
 
     def _shell_script(
         self,
@@ -710,6 +712,7 @@ rm -rf /data/local/tmp/apk-research/https-ca /data/local/tmp/apk-research/https
                 ),
                 "previous_android_proxy": self._previous_proxy,
                 "system_ca_injected": self._ca_injected,
+                "system_ca_injection_succeeded": self._ca_injection_succeeded,
                 "ca_sha256": self._ca_sha256 or None,
                 "ca_subject_hash_old": self._ca_subject_hash or None,
                 "http3_enabled": False,
