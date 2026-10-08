@@ -10,6 +10,12 @@ from .device_metadata import (
     DeviceMetadataResult,
     MetadataCollectorError,
 )
+from .https_interception import (
+    HttpsInterceptionCollector,
+    HttpsInterceptionCollectorError,
+    HttpsInterceptionPreflight,
+    HttpsInterceptionResult,
+)
 from .logcat import (
     LogcatCollector,
     LogcatCollectorError,
@@ -42,6 +48,10 @@ __all__ = [
     "DeviceMetadataCollector",
     "DeviceMetadataResult",
     "MetadataCollectorError",
+    "HttpsInterceptionCollector",
+    "HttpsInterceptionCollectorError",
+    "HttpsInterceptionPreflight",
+    "HttpsInterceptionResult",
     "LogcatCollector",
     "LogcatCollectorError",
     "LogcatResult",

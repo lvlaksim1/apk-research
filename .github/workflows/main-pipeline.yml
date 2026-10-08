@@ -64,7 +64,7 @@ jobs:
                 ;;
             esac
             case "$file" in
-              src/apk_research/*|android_sidecar/*|tools/acceptance_avd.py|tools/acceptance_sidecar.py|tools/build_android_sidecar.py|tools/check_emulator_grpc.py|.github/workflows/avd-research-acceptance.yml)
+              src/apk_research/*|android_sidecar/*|tools/acceptance_avd.py|tools/acceptance_https.py|tools/acceptance_sidecar.py|tools/build_android_sidecar.py|tools/check_emulator_grpc.py|.github/workflows/avd-research-acceptance.yml)
                 AVD=true
                 ;;
             esac

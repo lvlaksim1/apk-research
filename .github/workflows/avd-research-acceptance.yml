@@ -157,6 +157,9 @@ jobs:
       - name: Run real XAPK install acceptance
         run: python tools/acceptance_xapk.py
 
+      - name: Run HTTPS interception acceptance
+        run: python tools/acceptance_https.py
+
       - name: Run real AVD acceptance
         run: python tools/acceptance_avd.py
 

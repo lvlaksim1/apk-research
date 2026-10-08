@@ -49,6 +49,7 @@ def create_terminal_session(
         "logcat",
         "screen_recording",
         "raw_network",
+        "https_interception",
     ):
         manager.register_collector(
             name,
@@ -67,6 +68,8 @@ def create_terminal_session(
         "01_raw/screen/screen-0001.mp4": b"mp4-data",
         "01_raw/network/traffic.pcap": b"pcap-data-for-export",
         "02_normalized/target.json": b"{}\n",
+        "02_normalized/http-transactions.jsonl": b"",
+        "02_normalized/http-interception.json": b'{"status":"completed"}\n',
     }
 
     source_for = {
@@ -80,6 +83,8 @@ def create_terminal_session(
         "01_raw/screen/screen-0001.mp4": "screen_recording",
         "01_raw/network/traffic.pcap": "raw_network",
         "02_normalized/target.json": "device_metadata",
+        "02_normalized/http-transactions.jsonl": "https_interception",
+        "02_normalized/http-interception.json": "https_interception",
     }
 
     for relative, data in files.items():
@@ -96,6 +101,7 @@ def create_terminal_session(
         "logcat",
         "screen_recording",
         "raw_network",
+        "https_interception",
     ):
         manager.update_collector(name, "completed")
 
