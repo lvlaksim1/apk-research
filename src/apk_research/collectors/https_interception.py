@@ -718,6 +718,12 @@ rm -rf /data/local/tmp/apk-research/https-ca /data/local/tmp/apk-research/https
                 "http3_enabled": False,
                 "active_interception": True,
                 "passive_pcap_independent": True,
+                "transport_intervention": {
+                    "android_explicit_proxy_enabled": True,
+                    "device_to_proxy_via_adb_reverse": True,
+                    "may_change_quic_or_http3_behavior": True,
+                    "raw_pcap_describes_the_intercepted_environment": True,
+                },
                 "transaction_count": (
                     self._transaction_count()
                     if transaction_count is None
