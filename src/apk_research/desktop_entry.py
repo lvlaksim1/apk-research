@@ -32,6 +32,14 @@ def _gui_smoke_test() -> int:
 
 
 def main() -> int:
+    if "--https-proxy-worker" in sys.argv:
+        from apk_research.https_proxy_worker import (
+            main as https_proxy_main,
+        )
+
+        index = sys.argv.index("--https-proxy-worker")
+        return https_proxy_main(sys.argv[index + 1 :])
+
     if "--self-test" in sys.argv:
         from apk_research import __version__
         from apk_research.desktop.components import (
