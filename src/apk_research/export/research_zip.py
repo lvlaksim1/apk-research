@@ -21,6 +21,7 @@ _REQUIRED_COLLECTORS = (
     "logcat",
     "screen_recording",
     "raw_network",
+    "https_interception",
 )
 _REQUIRED_FIXED_FILES = (
     "00_manifest/session.json",
