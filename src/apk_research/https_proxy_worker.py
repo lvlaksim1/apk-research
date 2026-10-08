@@ -5,11 +5,10 @@ import asyncio
 import json
 import os
 import time
-from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Any
 
-from mitmproxy import http, options
+from mitmproxy import http, options, version as mitmproxy_version
 from mitmproxy.tools.dump import DumpMaster
 
 
@@ -47,6 +46,8 @@ class ResearchTransactionRecorder:
         self.bodies_dir = bodies_dir
         self.ready_path = ready_path
         self.error_path = error_path
+        self.transactions_path.parent.mkdir(parents=True, exist_ok=True)
+        self.bodies_dir.mkdir(parents=True, exist_ok=True)
         self.sequence = 0
 
     def running(self) -> None:
@@ -66,7 +67,7 @@ class ResearchTransactionRecorder:
             json.dumps(
                 {
                     "status": "ready",
-                    "mitmproxy_version": package_version("mitmproxy"),
+                    "mitmproxy_version": mitmproxy_version.VERSION,
                     "pid": os.getpid(),
                     "monotonic_ns": time.monotonic_ns(),
                 },
