@@ -1,40 +1,48 @@
-# apk-research v0.30.0 — HTTPS Traffic Inspection
+# apk-research v0.30.1 — Direct HTTPS Routing
 
-v0.30.0 adds first-class inspection of decrypted HTTPS traffic in the managed Android research environment.
+v0.30.1 extends HTTPS traffic analysis to applications that create direct TCP/443 connections and do not use Android's system proxy setting.
 
-## HTTPS interception
+## Direct package routing
 
 During a research session apk-research now:
-- starts an isolated bundled HTTPS proxy worker;
-- routes the managed Android emulator through it using `adb reverse`;
-- injects the research CA into the rooted Android 15 system trust environment;
-- records decrypted HTTP transactions where interception succeeds;
-- restores Android proxy/routing state during teardown.
+- keeps the existing application-managed local HTTPS analyzer and research CA;
+- identifies the UID of the researched package;
+- applies temporary routing only to that package's direct TCP/443 connections;
+- supports both IPv4 and IPv6 routing inside the managed Android environment;
+- reads the TLS ClientHello and uses SNI when available so the analyzer retains the intended server name;
+- sends those direct TLS connections into the same HTTP/HTTPS analysis path already used by v0.30.0;
+- removes the temporary routing rules and Android helper process during cleanup.
 
-The private CA key remains in the proxy runtime configuration and is not exported into the Research ZIP.
-
-## Research ZIP
-
-New evidence includes:
-- `02_normalized/http-transactions.jsonl`;
-- `02_normalized/http-bodies/*`;
-- `02_normalized/http-interception.json`;
-- `01_raw/network/https-proxy.stderr.txt`.
-
-Transactions retain URL, method, protocol, request/response headers, status, timing and body references.
-
-## Desktop UI
-
-The Results tab now has an **HTTP/HTTPS** viewer with search plus separate request/response header and body panes. JSON is formatted for reading; binary payloads are shown as bounded hexadecimal previews.
+Applications that already honor the Android proxy continue using the existing path.
 
 ## Verification
 
-The real Android 15 release gate installs a dedicated test APK and requires a genuine `https://example.com/` request to be decrypted and exported with HTTP status 200 and a non-empty response body.
+The Android 15 release test creates a direct TLS socket to Android loopback `127.0.0.1:443` and supplies SNI/Host `example.com`. It does not rely on Android DNS or direct Internet routing and does not use the Android system proxy.
+
+Release acceptance requires:
+- the direct package-routing mode to be enabled;
+- the exact URL `https://example.com/` to appear in the exported HTTP/HTTPS evidence;
+- HTTP status 200;
+- a non-empty response body;
+- the full existing AVD research acceptance to remain valid afterward.
+
+The verified branch run returned HTTP/1.1 200 with a 577-byte response body.
+
+## Evidence
+
+The Research ZIP keeps:
+- `02_normalized/http-transactions.jsonl`;
+- `02_normalized/http-bodies/*`;
+- `02_normalized/http-interception.json`;
+- `01_raw/network/https-proxy.stderr.txt`;
+- `01_raw/network/https-direct-router.stderr.txt`.
+
+The HTTPS metadata records whether direct routing was successfully enabled during the session, the target package UID, IPv4/IPv6 helper ports and rule diagnostics.
+
+Passive RAW PCAP remains an independent record of traffic observed in the configured research environment.
 
 ## Boundaries
 
-This is active interception, not passive observation. The Research ZIP records that the explicit Android proxy can change transport behavior. RAW PCAP remains the source of truth for traffic actually observed in that research environment.
+v0.30.1 targets TCP/443. HTTP/3/QUIC remains outside this release contract.
 
-Applications using certificate pinning or a custom trust store can still reject interception. v0.30.0 detects proxy errors but does not claim a universal pinning bypass.
-
-HTTP/3/QUIC decryption is not claimed by this release.
+Applications that reject the research CA because of certificate pinning or application-owned trust rules remain a separate bounded case.

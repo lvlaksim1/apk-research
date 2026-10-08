@@ -1,5 +1,15 @@
 # apk-research
 
+## v0.30.1 — Direct HTTPS Routing
+
+v0.30.1 extends the HTTP/HTTPS viewer to applications that create direct TCP/443 connections instead of using Android's system proxy. apk-research applies temporary UID-scoped routing only to the researched package, preserves the destination, and uses TLS SNI when available so the local HTTPS analyzer keeps the intended server name.
+
+Both IPv4 and IPv6 paths are prepared inside the rooted managed Android environment. Applications that already use the normal Android proxy keep the v0.30.0 path.
+
+The Android 15 release test creates a direct TLS socket to `127.0.0.1:443` with SNI/Host `example.com`. A successful gate therefore proves the direct package-routing path itself without relying on Android DNS or direct Internet reachability. The verified test returned HTTP/1.1 200 with a 577-byte response body, after which the full standard AVD research acceptance also passed.
+
+Temporary routing state and the Android helper process are removed during session cleanup. RAW PCAP remains independent evidence. HTTP/3/QUIC and applications that reject the research CA remain outside this release contract.
+
 ## v0.30.0 — HTTPS Traffic Inspection
 
 v0.30.0 adds first-class display of decrypted HTTPS traffic in the managed Android research environment. During research apk-research starts its bundled interception worker, routes the managed emulator through it with `adb reverse`, temporarily places the research CA into the rooted Android 15 trust environment, and stores decrypted HTTP transactions when interception succeeds.

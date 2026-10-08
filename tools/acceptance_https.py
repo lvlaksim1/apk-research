@@ -97,7 +97,10 @@ def _run_d8(
     _run(command)
 
 
-def _build_apk(root: Path) -> Path:
+def _build_apk(
+    root: Path,
+    target_ipv4: str,
+) -> Path:
     sdk = _sdk_root()
     build_tools = _newest_build_tools(sdk)
     android_jar = (
@@ -175,8 +178,14 @@ import android.os.Bundle;
 import android.widget.TextView;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.net.URL;
-import javax.net.ssl.HttpsURLConnection;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import javax.net.ssl.SNIHostName;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 
 public final class MainActivity extends Activity {{
     @Override
@@ -187,34 +196,58 @@ public final class MainActivity extends Activity {{
         setContentView(view);
         new Thread(() -> {{
             try {{
-                URL url = new URL("{TARGET_URL}");
-                HttpsURLConnection connection =
-                    (HttpsURLConnection) url.openConnection();
-                connection.setConnectTimeout(15000);
-                connection.setReadTimeout(15000);
-                connection.setRequestProperty(
-                    "X-Apk-Research-Acceptance",
-                    "v0.30"
-                );
-                int code = connection.getResponseCode();
-                InputStream stream =
-                    code >= 400
-                    ? connection.getErrorStream()
-                    : connection.getInputStream();
+                SSLSocket socket = (SSLSocket)
+                    SSLSocketFactory.getDefault().createSocket();
+                socket.connect(
+                    new InetSocketAddress("{target_ipv4}", 443),
+                    15000);
+                socket.setSoTimeout(15000);
+
+                SSLParameters parameters =
+                    socket.getSSLParameters();
+                parameters.setServerNames(
+                    Collections.singletonList(
+                        new SNIHostName("example.com")));
+                parameters.setEndpointIdentificationAlgorithm(
+                    "HTTPS");
+                socket.setSSLParameters(parameters);
+                socket.startHandshake();
+
+                OutputStream output = socket.getOutputStream();
+                String request =
+                    "GET / HTTP/1.1\\r\\n"
+                    + "Host: example.com\\r\\n"
+                    + "Connection: close\\r\\n"
+                    + "X-Apk-Research-Acceptance: "
+                    + "v0.30.1-direct\\r\\n\\r\\n";
+                output.write(
+                    request.getBytes(
+                        StandardCharsets.ISO_8859_1));
+                output.flush();
+
+                InputStream stream = socket.getInputStream();
                 ByteArrayOutputStream out =
                     new ByteArrayOutputStream();
-                if (stream != null) {{
-                    byte[] buffer = new byte[4096];
-                    int count;
-                    while ((count = stream.read(buffer)) >= 0) {{
-                        out.write(buffer, 0, count);
-                    }}
-                    stream.close();
+                byte[] buffer = new byte[4096];
+                int count;
+                while ((count = stream.read(buffer)) >= 0) {{
+                    out.write(buffer, 0, count);
                 }}
+                stream.close();
+                socket.close();
+
+                String rawResponse =
+                    new String(
+                        out.toByteArray(),
+                        StandardCharsets.ISO_8859_1);
+                int code =
+                    rawResponse.startsWith("HTTP/1.1 200")
+                    || rawResponse.startsWith("HTTP/1.0 200")
+                    ? 200
+                    : 0;
                 String result =
                     "HTTPS " + code + " bytes=" + out.size();
                 runOnUiThread(() -> view.setText(result));
-                connection.disconnect();
             }} catch (Exception error) {{
                 runOnUiThread(
                     () -> view.setText(
@@ -347,6 +380,22 @@ public final class MainActivity extends Activity {{
     return signed
 
 
+def _read_interception_metadata(
+    archive_path: Path,
+) -> dict:
+    with zipfile.ZipFile(
+        archive_path
+    ) as archive:
+        return json.loads(
+            archive.read(
+                "02_normalized/http-interception.json"
+            ).decode(
+                "utf-8",
+                errors="replace",
+            )
+        )
+
+
 def _read_transactions(
     archive_path: Path,
 ) -> list[dict]:
@@ -379,7 +428,15 @@ def main() -> int:
         prefix="apk-research-https-acceptance-"
     ) as raw:
         root = Path(raw)
-        apk = _build_apk(root)
+        # Loopback is guaranteed to be routable inside Android itself.
+        # The Android helper reads SNI from the TLS ClientHello, so the
+        # local HTTPS analyzer still receives example.com:443 as the
+        # destination. This isolates the routing test from CI networking.
+        target_ipv4 = "127.0.0.1"
+        apk = _build_apk(
+            root,
+            target_ipv4,
+        )
         try:
             _run(
                 [
@@ -410,6 +467,7 @@ def main() -> int:
                 json.dumps(
                     {
                         "event": "https_acceptance_started",
+                        "direct_target_ipv4": target_ipv4,
                         **started.to_dict(),
                     },
                     ensure_ascii=False,
@@ -454,8 +512,20 @@ def main() -> int:
                     + result.session_status
                 )
 
+            archive_path = Path(result.archive)
+            metadata = _read_interception_metadata(
+                archive_path
+            )
+            routing = (
+                metadata.get("direct_https_routing")
+                or {}
+            )
+            if not routing.get("enabled"):
+                raise RuntimeError(
+                    "Direct HTTPS routing was not active"
+                )
             transactions = _read_transactions(
-                Path(result.archive)
+                archive_path
             )
             matches = [
                 item
@@ -518,6 +588,8 @@ def main() -> int:
                         "response_bytes": body.get(
                             "size"
                         ),
+                        "direct_https_routing": True,
+                        "direct_target_ipv4": target_ipv4,
                         "archive": result.archive,
                     },
                     ensure_ascii=False,

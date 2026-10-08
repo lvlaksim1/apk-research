@@ -173,7 +173,7 @@ jobs:
       - name: Upgrade previous release with dedicated update installer
         shell: pwsh
         run: |
-          $previousVersion = "0.29.2"
+          $previousVersion = "0.30.0"
           $previousInstaller = Join-Path $env:RUNNER_TEMP "apk-research-setup_v$previousVersion.exe"
           $previousUrl = "https://github.com/lvlaksim1/apk-research/releases/download/v$previousVersion/apk-research-setup_v$previousVersion.exe"
           Invoke-WebRequest -Uri $previousUrl -OutFile $previousInstaller
