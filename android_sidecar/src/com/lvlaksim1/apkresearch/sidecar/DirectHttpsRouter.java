@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * then relays bytes in both directions.
  */
 public final class DirectHttpsRouter {
+    private static final int SOL_IP = 0;
     private static final int IP_TRANSPARENT = 19;
     private static final int CONNECT_TIMEOUT_MS = 8000;
     private static final int MAX_CONNECT_HEADER = 16384;
@@ -94,7 +95,7 @@ public final class DirectHttpsRouter {
                     1);
             Os.setsockoptInt(
                     listener,
-                    OsConstants.SOL_IP,
+                    SOL_IP,
                     IP_TRANSPARENT,
                     1);
             Os.bind(
