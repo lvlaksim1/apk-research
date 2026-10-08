@@ -4,49 +4,56 @@ Last reconciled: 2026-10-08.
 
 ## Product
 
-- Current release/main commit: `0f9d949e5158860a51d4e83624fa1cbf3db121cc`.
-- Latest release: `v0.29.2`.
-- Full installer: `apk-research-setup_v0.29.2.exe`.
-- Update installer: `apk-research-update_v0.29.2.exe`.
-- Setup SHA-256: `6acc5b72337faa92cfd930ed88151445fb218eb580b54eb4e5f65112b457c1f0`.
-- Update SHA-256: `812382bbf61613f296e011c4fead9d5ede00bab9fb44679c76a6b27a542d4821`.
+- Current release/main commit: `1d75ec32d80cdea2af172035d43d12d3284978fa`.
+- Latest release: `v0.30.0`.
+- Full installer: `apk-research-setup_v0.30.0.exe`.
+- Update installer: `apk-research-update_v0.30.0.exe`.
+- Setup SHA-256: `6f9f39c67a88344e7181316c6c6445660f2e1d066deaca09ba13f1ec20954e1a`.
+- Update SHA-256: `4189ff6af7c793bef0db99c673b5838d0a8e6a7ad039cb80b688012353484e1a`.
 - Latest release target verified live on 2026-10-08: exact main SHA above.
 
-## v0.29.2
+## v0.30.0
 
-The Windows packaging/update path matches MailRu Desktop structurally: distinct Setup and Update installers, direct Windows-shell launch of Update, same AppId, fixed per-user install directory, and Inno-owned Windows shortcut recreation.
+The application now displays decrypted HTTP/HTTPS transaction content where the managed research environment can establish trust:
+- URL and method;
+- request headers/body;
+- response status;
+- response headers/body;
+- HTTP protocol and timing;
+- searchable dedicated HTTP/HTTPS results viewer.
 
-SHA-256 verification remains mandatory and validates both published installers.
+The managed Android environment is routed through an application-owned local HTTPS proxy over `adb reverse`. A temporary research CA is trusted in the rooted Android 15 system environment for the session.
 
-The explicit Android Home button is removed.
+The Research ZIP records HTTP transaction metadata/bodies and routing/trust provenance separately from passive RAW PCAP.
 
 ## Verification
 
-PR #24 is merged at the exact baseline SHA and main pipeline #141 passed:
+PR #26 is merged.
+
+Main pipeline #143 passed:
 - full CI;
-- real AVD acceptance;
-- Windows standalone and GUI smoke;
+- real Android 15 AVD acceptance;
+- actual HTTPS request to `https://example.com/` with status 200 and non-empty 577-byte response body;
+- full existing AVD research acceptance after the HTTPS test;
+- Windows standalone build and GUI smoke;
+- standalone HTTPS component smoke;
 - full + update installer build;
-- real v0.29.1 → v0.29.2 dedicated update acceptance;
+- real v0.29.2 → v0.30.0 dedicated update acceptance;
 - clean-Windows Android provisioning;
 - GitHub Release publication.
 
+WHPX remains advisory/non-publication-gating.
+
+## Known bounded limitations
+
+Applications with certificate pinning or application-owned trust stores may reject the research CA.
+
+HTTP/3/QUIC content decryption is not claimed by v0.30.0.
+
 ## Owner cancellation
 
-On 2026-10-08 the owner explicitly cancelled the previously open requirement to place installed APK/XAPK applications as shortcuts on the managed Android home screen.
-
-That work is no longer active and is not a blocker.
-
-## Active development direction
-
-The owner clarified that the next required product capability is display of decrypted HTTPS traffic inside apk-research.
-
-The target is actual HTTP transaction content where decryption succeeds: URL, method/status, headers and request/response bodies. Existing TLS/QUIC metadata from passive PCAP analysis does not satisfy this requirement.
-
-Passive RAW PCAP remains an independent source of truth. HTTPS interception is an active research technique and its use/effects must be recorded explicitly.
-
-Certificate pinning/custom trust and HTTP/3/QUIC are separate capability tiers and must not be overclaimed.
+The Android home-screen shortcut requirement remains cancelled.
 
 ## Development status
 
-v0.29.2 is the verified baseline. HTTPS traffic inspection is the active next product stage.
+v0.30.0 is the verified baseline. The requested HTTPS traffic display stage is complete. No further product stage is authorized yet.
