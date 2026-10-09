@@ -56,4 +56,6 @@ The Android home-screen shortcut requirement remains cancelled.
 
 ## Development status
 
-v0.30.0 is the verified baseline. The requested HTTPS traffic display stage is complete. No further product stage is authorized yet.
+v0.30.0 is the verified published baseline, but its generic HTTPS acceptance does not establish working HTTPS inspection for the owner-tested `com.evrasia` APK. Prior-chat analysis of `20261008T020126.928669Z-e336ad57.research.zip` reported 23 direct TCP connections to remote port 443 (21 to `evrasia.spb.ru`) and zero entries in `http-transactions.jsonl`. This report must be corroborated against the archive before making implementation claims.
+
+**A newer owner directive from 2026-10-08 is active:** implement automatic routing of relevant target HTTPS traffic into the local analyzer even when the Android application ignores the configured system proxy. The old "no additional stage authorized" statement is superseded. No newer application commit, successful test or published update is verified as of 2026-10-10.

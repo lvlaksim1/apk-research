@@ -36,8 +36,8 @@ Do not claim universal HTTPS decryption. Certificate pinning/custom trust and HT
 
 ## Current product plan
 
-No additional product feature stage is authorized after v0.30.0.
+The owner subsequently authorized a bounded HTTPS routing correction for applications that bypass the Android system proxy. Begin with the reported `com.evrasia` evidence from `20261008T020126.928669Z-e336ad57.research.zip`, independently re-check archive evidence and then inspect the current routing/proxy implementation. Develop and verify a robust automatic routing path without weakening protected Android runtime or forensic invariants. Preserve explicit technical boundaries (application-controlled trust and QUIC/HTTP3 remain unclaimed unless separately verified).
 
-The next practical step is owner validation on representative real APK/XAPK targets. If a target does not expose readable HTTPS transactions, diagnose the concrete reason first and only then define a bounded follow-up.
+The previous "no further stage is authorized" assertion was true at the v0.30.0 seal but is superseded by the later 2026-10-08 owner directive. No subsequent implementation/release is verified in GitHub as of 2026-10-10.
 
 The Android home-screen shortcut requirement remains cancelled.

@@ -36,3 +36,15 @@ Do not resume this work unless explicitly reopened.
 Status: active.
 
 Reconcile live product/release/CI before consequential changes and preserve all verified evidence/runtime boundaries.
+
+## Active — HTTPS traffic of applications that bypass the Android system proxy
+
+Status: **active / implementation not verified**.
+
+Following the owner archive analysis on 2026-10-08, the owner directed the manager to implement automatic handling/routing of HTTPS traffic emitted by target Android applications that do not use the system proxy, beginning with `com.evrasia`.
+
+Acceptance objective: in a controlled research session, applicable target HTTPS requests and responses should be available in the desktop HTTP/HTTPS viewer and Research ZIP where the technical trust and protocol conditions allow. Preserve independent RAW PCAP provenance, explicit session routing diagnostics, previous installation/update behavior and the known restrictions from v0.30.0.
+
+Next action: re-read the supplied archive (if accessible) and relevant code, establish a narrow viable routing design, implement on a dedicated branch, verify on real Android 15 AVD and affected APK, then deliver via the accepted Setup/Update release process after required acceptance gates. Do not mark this commitment complete merely because the v0.30.0 generic HTTPS test passed.
+
+- source: Owner instruction following analysis of `20261008T020126.928669Z-e336ad57.research.zip`.

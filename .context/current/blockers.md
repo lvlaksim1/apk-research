@@ -22,3 +22,7 @@ Not a blocker. The owner cancelled this requirement on 2026-10-08.
 ## WHPX
 
 WHPX remains advisory/non-publication-gating.
+
+## Active owner-target gap after v0.30.0
+
+The prior-chat `com.evrasia` archive reportedly contains direct remote HTTPS connections but no readable HTTP transaction evidence. The generic system-proxy implementation does not cover an application that bypasses that proxy. Root cause at the precise socket/routing level and a robust automatic routing solution have not been validated in this reinstantiated runtime. Certificate-specific causes must not be asserted for this case without packet/proxy evidence. This is an active owner-target requirement, not a retroactive blocker to the already published v0.30.0.

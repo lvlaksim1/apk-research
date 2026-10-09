@@ -40,3 +40,15 @@ The Android home-screen shortcut requirement was explicitly cancelled by the own
 ## Protected product semantics
 
 APK/XAPK handling, hidden Emulator → gRPC/MMAP → AndroidView, v0.10.5 startup sequencing, Research ZIP, RAW PCAP authority, evidence semantics and the accepted dual-source screen model remain protected.
+
+## Owner-directed HTTPS follow-up after the v0.30.0 capsule (2026-10-08)
+
+The owner inspected the real archive `20261008T020126.928669Z-e336ad57.research.zip` after publication of v0.30.0. Prior-chat analysis reported 23 TCP connections to remote port 443, of which 21 connected to `evrasia.spb.ru`; the `02_normalized/http-transactions.jsonl` transaction list was empty. The analyzed `com.evrasia` application used direct HTTPS connections rather than the configured Android system proxy. These archive-specific observations are carried forward from the prior conversation and should be revalidated against the actual archive before a code-level diagnosis or claims of successful remediation.
+
+Subsequently the owner expressly directed the manager to implement automatic routing of target HTTPS connections that disregard the Android system proxy to the local HTTPS analyzer. This is an ACTIVE owner commitment, chronologically newer than generation 25, and supersedes the old claim that no further feature work is authorized. No implementation, test or release after v0.30.0 is verified in GitHub as of 2026-10-10.
+
+For owner-visible communications, use neutral accurate language such as "HTTPS traffic analysis" and "HTTPS routing"; avoid the terminology the owner expressly prohibited.
+
+- authority: direct owner instruction in 2026-10-08 project chat;
+- technical evidence: prior-chat Research ZIP analysis, not yet rechecked in this reinstantiated runtime;
+- product confirmation: GitHub main and latest release checked 2026-10-10.

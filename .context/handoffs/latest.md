@@ -1,40 +1,25 @@
 # Latest Handoff
 
-Generation: 25
-Date: 2026-10-08
-Checkpoint: v0.30.0 HTTPS traffic display released and verified.
+Generation: 26
+Date: 2026-10-10
+Persistent manager: `apk-research-project-manager`
+Manager-state authority: `context`
+Product authority: `main`
 
-Persistent manager: `apk-research-project-manager`.
+## Verified published baseline
 
-Verified product baseline: **apk-research v0.30.0** at `1d75ec32d80cdea2af172035d43d12d3284978fa`.
+The latest checked product commit on `main` is `1d75ec32d80cdea2af172035d43d12d3284978fa`, with published v0.30.0. Main pipeline #143 completed release acceptance. Separate full and update assets were released:
+- Setup: `apk-research-setup_v0.30.0.exe`, SHA-256 `6f9f39c67a88344e7181316c6c6445660f2e1d066deaca09ba13f1ec20954e1a`.
+- Update: `apk-research-update_v0.30.0.exe`, SHA-256 `4189ff6af7c793bef0db99c673b5838d0a8e6a7ad039cb80b688012353484e1a`.
 
-Live reconciliation on 2026-10-08 confirmed:
-- `main` HEAD = `1d75ec32d80cdea2af172035d43d12d3284978fa`;
-- latest GitHub Release = `v0.30.0`, targeting that exact SHA;
-- main pipeline #143 = success;
-- dedicated Update installer = `apk-research-update_v0.30.0.exe`.
+v0.30.0's generic HTTPS analysis, request/response viewer and real Android 15 HTTPS acceptance are verified. Protected RAW PCAP provenance and Android runtime invariants remain binding.
 
-Release assets:
-- Setup: `apk-research-setup_v0.30.0.exe`, SHA-256 `6f9f39c67a88344e7181316c6c6445660f2e1d066deaca09ba13f1ec20954e1a`, 47,454,995 bytes.
-- Update: `apk-research-update_v0.30.0.exe`, SHA-256 `4189ff6af7c793bef0db99c673b5838d0a8e6a7ad039cb80b688012353484e1a`, 47,455,368 bytes.
+## Newer owner directive, not represented in generation 25
 
-COMPLETED OWNER REQUIREMENT:
-apk-research now displays decrypted HTTP/HTTPS request/response content where the managed research environment can establish trust.
+On 2026-10-08, after analyzing owner-supplied archive `20261008T020126.928669Z-e336ad57.research.zip`, the owner explicitly instructed the manager to implement automatic HTTPS routing to the local analyzer for applications that bypass Android system proxy configuration. Previously reported archive findings: `com.evrasia` used direct remote HTTPS connections, with 23 connections on TCP/443 (21 to `evrasia.spb.ru`) and no readable normalized HTTP transactions. The new runtime must verify these archive-specific details before asserting precise causal mechanisms.
 
-Verified behavior:
-- local application-managed HTTPS proxy;
-- Android routing through `adb reverse`;
-- temporary trusted research CA on rooted Android 15;
-- HTTP transaction metadata and bodies stored in Research ZIP;
-- dedicated searchable HTTP/HTTPS desktop viewer;
-- actual Android 15 HTTPS request to `https://example.com/` returned HTTP 200 with a non-empty 577-byte response body;
-- full existing AVD research acceptance remained healthy afterward;
-- real v0.29.2 → v0.30.0 update verification passed.
+**Status: ACTIVE, not implemented/verified in GitHub.** The former statement that no further development was authorized is superseded. Next step: inspect archived evidence and source, implement a constrained routing correction on a dedicated branch, verify a representative real APK and publish only through accepted release gates.
 
-BOUNDARIES:
-Certificate pinning/custom application trust and HTTP/3/QUIC content decryption are not claimed by v0.30.0.
+## Other commitments
 
-OWNER CANCELLATION:
-The Android home-screen shortcut requirement remains cancelled.
-
-No further product stage is authorized. Next useful evidence should come from owner validation on representative real APK/XAPK targets.
+The Android home-screen shortcut requirement was expressly cancelled by the owner on 2026-10-08; do not reinstate. Application-defined trust/certificate pinning and QUIC/HTTP3 decryption are not claimed as implemented.
