@@ -51,7 +51,7 @@ jobs:
             Sort-Object FullName |
             Select-Object -Last 1
           if (-not $sdkmanager) { throw "sdkmanager.bat not found" }
-          & $sdkmanager.FullName "platforms;android-35" "build-tools;35.0.0"
+          & $sdkmanager.FullName "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Android sidecar
@@ -62,6 +62,9 @@ jobs:
 
       - name: Run tests
         run: python -m pytest -q
+
+      - name: Build Android HTTPS route executable
+        run: python tools/build_android_https_route.py
 
       - name: Build application icon
         run: python tools/build_app_icon.py
