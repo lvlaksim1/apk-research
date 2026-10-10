@@ -80,6 +80,12 @@ class AndroidView(QLabel):
         self._input_height = 0
         self._rotation = 0
 
+    def save_screenshot(self, path: str) -> bool:
+        """Save the original Android frame, not a scaled desktop screenshot."""
+        if self._source_image is None or self._source_image.isNull():
+            return False
+        return bool(self._source_image.copy().save(str(path), "PNG"))
+
     def set_frame(self, frame) -> None:
         encoding = getattr(frame, "encoding", "")
         row_order = getattr(
