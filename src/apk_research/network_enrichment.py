@@ -17,6 +17,7 @@ DNS_PATH = "02_normalized/dns.jsonl"
 TLS_PATH = "02_normalized/tls-sessions.jsonl"
 LINKS_PATH = "02_normalized/action-network-links.jsonl"
 TIMINGS_PATH = "02_normalized/network-timings.jsonl"
+SCREEN_PATH = "02_normalized/screen-timing.jsonl"
 SUMMARY_PATH = "02_normalized/network-enrichment.json"
 
 INPUT_PCAP = "01_raw/network/traffic.pcap"
@@ -341,6 +342,23 @@ def derive_network_evidence(root: Path) -> dict:
                 tls.append({"timestamp": when, "source": src, "source_port": src_port,
                             "destination": dst, "destination_port": dst_port,
                             **info, "source_evidence": "pcap_handshake"})
+    # Match DNS replies to earlier same-ID questions only when both
+    # endpoints agree. Unmatched records are preserved without a fabricated
+    # DNS resolution time.
+    outstanding_dns: dict[tuple, float] = {}
+    for row in dns:
+        identity = (row["id"], row["source"], row["destination"])
+        if not row["response"]:
+            outstanding_dns[identity] = row["timestamp"]
+        else:
+            start = outstanding_dns.pop(
+                (row["id"], row["destination"], row["source"]), None
+            )
+            if start is not None and row["timestamp"] >= start:
+                row["dns_elapsed_ms"] = round(
+                    (row["timestamp"] - start) * 1000, 3,
+                )
+
     actions = sorted(
         [(ts, action) for action in _jsonl(root / INPUT_ACTIONS)
          if (ts := _epoch(action.get("host_utc"))) is not None],
@@ -379,8 +397,32 @@ def derive_network_evidence(root: Path) -> dict:
                     "note": "Time proximity does not establish causality",
                 })
 
+    # PTS values and frame counts are genuine Android media timestamps.
+    # Do not infer when visible content changes in response to a tap.
+    screen_rows: list[dict] = []
+    screen_meta = root / "02_normalized/continuous-screen.json"
+    if screen_meta.is_file():
+        try:
+            metadata = json.loads(screen_meta.read_text(encoding="utf-8"))
+            if (isinstance(metadata, dict)
+                    and metadata.get("first_pts_us") is not None):
+                screen_rows.append({
+                    "source": "continuous-screen",
+                    "first_pts_us": metadata.get("first_pts_us"),
+                    "last_pts_us": metadata.get("last_pts_us"),
+                    "media_frame_count": metadata.get("media_frame_count"),
+                    "presentation_span_seconds": metadata.get(
+                        "presentation_span_seconds"
+                    ),
+                    "clock_domain": "device-media-presentation",
+                    "action_to_visual_change_ms": None,
+                    "visual_latency_measured": False,
+                })
+        except (OSError, ValueError):
+            pass
     files = {
-        DNS_PATH: dns, TLS_PATH: tls, LINKS_PATH: links, TIMINGS_PATH: timings,
+        DNS_PATH: dns, TLS_PATH: tls, LINKS_PATH: links,
+        TIMINGS_PATH: timings, SCREEN_PATH: screen_rows,
     }
     for path, records in files.items():
         _write_jsonl(root / path, records)
@@ -389,6 +431,7 @@ def derive_network_evidence(root: Path) -> dict:
         "unsupported_or_fragmented_packets": unsupported,
         "dns_records": len(dns), "tls_hellos": len(tls),
         "http_timings": len(timings), "action_links": len(links),
+        "screen_timing_records": len(screen_rows),
         "limits": [
             "TLS records spanning packets require reassembly and may be absent",
             "DNS-over-HTTPS and QUIC are not decoded as ordinary DNS/TLS",
