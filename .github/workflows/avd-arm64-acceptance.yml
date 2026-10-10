@@ -39,6 +39,22 @@ jobs:
       - name: Install Python package
         run: python -m pip install -e ".[dev,transport]"
 
+      - name: Verify project-managed Google APIs image catalog
+        shell: bash
+        run: |
+          python - <<'PY'
+          from apk_research.desktop.components import (
+              ARM_COMPATIBLE_SYSTEM_IMAGE_PACKAGE,
+              ComponentManager,
+          )
+          manager = ComponentManager(".arm64-catalog-probe")
+          manager.select_profile("google_apis")
+          archive = manager.resolve_required_archives()[-1]
+          assert archive.package_path == ARM_COMPATIBLE_SYSTEM_IMAGE_PACKAGE
+          assert archive.url and archive.size
+          print("PROJECT_GOOGLE_APIS_CATALOG=PASS", archive.package_path, archive.size)
+          PY
+
       - name: Install official Android SDK image and NDK
         shell: bash
         run: |
