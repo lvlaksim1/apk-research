@@ -473,6 +473,47 @@ class DesktopController(QObject):
             value,
         )
 
+    def run_emulator_action(self, action: str, *values: str) -> None:
+        """Execute an emulator control without blocking live screen rendering."""
+        allowed_during_capture = {"recent", "volume_up", "volume_down",
+                                  "rotate", "location"}
+        if (self.orchestrator is not None
+                and getattr(self.orchestrator.session, "status", None) is not None
+                and getattr(self.orchestrator.session.status, "value", None)
+                == "active"
+                and action not in allowed_during_capture):
+            self.error.emit(
+                "Это действие доступно после завершения записи ZIP"
+            )
+            return
+        self._thread(self._emulator_action_worker, action, values)
+
+    def _emulator_action_worker(
+        self, action: str, values: tuple[str, ...],
+    ) -> None:
+        try:
+            if action == "restart":
+                self._stop_screen.set()
+                if self._screen_thread is not None:
+                    self._screen_thread.join(timeout=10.0)
+                    if self._screen_thread.is_alive():
+                        raise RuntimeError("Видеопоток Android ещё не завершён")
+                self.runtime.stop()
+                self.runtime.ensure_ready(
+                    self._progress_callback,
+                    self._display_ready_callback,
+                )
+                self._start_screen_stream(wait_for_first_frame=True)
+                detail = "Android перезагружен"
+            else:
+                detail = self.runtime.emulator_action(action, *values)
+            self.log.emit(detail or "Команда Android выполнена")
+        except Exception as exc:
+            self.error.emit(
+                "Действие Android не выполнено: "
+                + (str(exc) or exc.__class__.__name__)
+            )
+
     def close(self) -> None:
         self._stop_research.set()
         self._stop_screen.set()
