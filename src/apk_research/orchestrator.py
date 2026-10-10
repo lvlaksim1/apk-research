@@ -31,7 +31,7 @@ from apk_research.timeline import USER_ACTIONS_ARTIFACT
 from apk_research.timeline_engine import build_research_timeline
 from apk_research.network_enrichment import (
     derive_network_evidence, DNS_PATH, TLS_PATH, LINKS_PATH,
-    TIMINGS_PATH, SUMMARY_PATH,
+    TIMINGS_PATH, SCREEN_PATH, SUMMARY_PATH,
 )
 
 Clock = Callable[[], datetime]
@@ -1151,6 +1151,7 @@ class ResearchOrchestrator:
                 (TLS_PATH, "tls_handshakes"),
                 (LINKS_PATH, "action_network_links"),
                 (TIMINGS_PATH, "network_timings"),
+                (SCREEN_PATH, "screen_recording_timing"),
                 (SUMMARY_PATH, "network_enrichment_metadata"),
             ):
                 session.register_artifact(
