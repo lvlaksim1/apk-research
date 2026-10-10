@@ -489,6 +489,10 @@ def main() -> int:
                 if mode not in {"system", "direct"}:
                     continue
                 modes.add(mode)
+                if mode == "direct" and (
+                    (transaction.get("interception") or {}).get("route") != "direct"
+                ):
+                    raise RuntimeError("Direct HTTPS flow has no confirmed route")
                 response = transaction.get("response") or {}
                 body = response.get("body") or {}
                 if not (transaction.get("interception") or {}).get(

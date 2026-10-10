@@ -59,9 +59,9 @@ class LiveHttpsView(QWidget):
         outer.addLayout(search_row)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
-        self.table = QTableWidget(0, 5)
+        self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(
-            ["Время", "Метод", "Сервер", "Адрес запроса", "Ответ"]
+            ["Время", "Метод", "Сервер", "Адрес запроса", "Ответ", "Маршрут"]
         )
         self.table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
@@ -239,6 +239,8 @@ class LiveHttpsView(QWidget):
                     str(record.get("host") or parsed.hostname or "—"),
                     parsed.path + (("?" + parsed.query) if parsed.query else ""),
                     str((record.get("response") or {}).get("status_code") or "Ошибка"),
+                    ("Прямой" if (record.get("interception") or {}).get("route") == "direct"
+                     else "Системный/не определён"),
                 ]
                 for col, value in enumerate(values):
                     cell = QTableWidgetItem(value)
@@ -265,6 +267,7 @@ class LiveHttpsView(QWidget):
             str(record.get("method") or "") + " " + str(record.get("url") or "")
             + "\nHTTP: " + str(response.get("status_code") or "Ошибка")
             + "\nДлительность: " + str(record.get("duration_ms") or 0) + " мс"
+            + "\nМаршрут: " + str((record.get("interception") or {}).get("route") or "не определён")
             + ("\nОшибка: " + str(record.get("error")) if record.get("error") else "")
         )
         self.request_headers.setPlainText(_header_text(request.get("headers")))

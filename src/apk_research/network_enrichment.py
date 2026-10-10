@@ -223,6 +223,20 @@ def build_network_enrichment(session) -> dict[str, Any]:
             result["counts"] = _parse_network(root, dns_file, tls_file)
             result["counts"]["temporal_links"] = _action_network_links(root, link_file)
             result["counts"]["screen_chunks"] = _screen_timing(root, screen_file)
+            http = _read_jsonl(root / "02_normalized/http-transactions.jsonl")
+            result["counts"]["http_transactions"] = len(http)
+            result["counts"]["https_direct"] = sum(
+                (item.get("interception") or {}).get("route") == "direct"
+                for item in http
+            )
+            result["counts"]["request_bytes"] = sum(
+                int(((item.get("request") or {}).get("body") or {}).get("size") or 0)
+                for item in http
+            )
+            result["counts"]["response_bytes"] = sum(
+                int(((item.get("response") or {}).get("body") or {}).get("size") or 0)
+                for item in http
+            )
     except Exception as exc:
         # Derived enrichment must not destroy a complete raw recording.
         result["status"] = "incomplete"

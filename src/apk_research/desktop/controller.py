@@ -483,6 +483,11 @@ class DesktopController(QObject):
                 "Завершите исследование перед этой операцией Android"
             )
             return
+        stamp = self._host_utc_now()
+        self._record_user_action(
+            "android_tool", {"action": action},
+            host_started_utc=stamp, host_utc=stamp,
+        )
         self._thread(self._device_action_worker, action, *args)
 
     def _device_action_worker(self, action: str, *args) -> None:
