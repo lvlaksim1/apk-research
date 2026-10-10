@@ -692,7 +692,8 @@ class AndroidRuntime:
         self,
         package_path: str | os.PathLike[str],
         progress: RuntimeProgress | None = None,
-    ) -> None:
+        before_profile_switch: Callable[[], None] | None = None,
+    ) -> bool:
         """Select an official ARM-compatible private AVD before starting video."""
         self.components.ensure_host_tools(progress)
         source = Path(package_path).expanduser().resolve()
@@ -705,12 +706,12 @@ class AndroidRuntime:
 
             validate_apk_set(badgings)
             if self.components.profile == "google_apis":
-                return
+                return False
             try:
                 validate_apk_set(
                     badgings, device_abis=("x86_64", "x86"),
                 )
-                return
+                return False
             except PackageInputError as original_mismatch:
                 try:
                     validate_apk_set(
@@ -730,9 +731,12 @@ class AndroidRuntime:
                 None,
                 None,
             )
+            if before_profile_switch is not None:
+                before_profile_switch()
             if self._device_online() or self.process is not None:
                 self.stop()
             self.components.select_profile("google_apis")
+            return True
         except PackageInputError as exc:
             raise AndroidRuntimeError(str(exc)) from exc
 
