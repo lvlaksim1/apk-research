@@ -117,8 +117,12 @@ static void copy_both_ways(int client, int upstream) {
         if (rc < 0) break;
         if (rc == 0) continue;
         for (int i = 0; i < 2; i++) {
-            if (streams[i].revents & (POLLERR | POLLHUP | POLLNVAL)) return;
-            if (!(streams[i].revents & POLLIN)) continue;
+            // Read buffered bytes before observing socket closure.
+            if (!(streams[i].revents & POLLIN)) {
+                if (streams[i].revents & (POLLERR | POLLHUP | POLLNVAL))
+                    return;
+                continue;
+            }
             ssize_t n = recv(streams[i].fd, data, sizeof(data), 0);
             if (n <= 0) return;
             if (write_all(streams[1-i].fd, data, (size_t)n) != 0) return;
