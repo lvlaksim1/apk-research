@@ -19,6 +19,14 @@ def _gui_smoke_test() -> int:
     assert window.tabs.tabText(0) == "Исследование"
     assert window.tabs.tabText(1) == "HTTPS • онлайн"
     assert window.https_view is not None
+    assert len(window.emulator_buttons) >= 11
+    for action in (
+        "back", "home", "recent", "volume_up", "volume_down",
+        "rotate", "screenshot", "fullscreen", "install", "restart",
+        "more",
+    ):
+        assert action in window.emulator_buttons
+        assert window.emulator_buttons[action].toolTip()
     assert hasattr(window, "install_package_button")
     assert hasattr(window, "stop_button")
     assert hasattr(window, "check_updates_button")

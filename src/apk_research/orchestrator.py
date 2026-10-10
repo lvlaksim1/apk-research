@@ -29,6 +29,10 @@ from apk_research.session import (
 from apk_research.targets import AdbClient, AdbError, validate_package_name
 from apk_research.timeline import USER_ACTIONS_ARTIFACT
 from apk_research.timeline_engine import build_research_timeline
+from apk_research.network_enrichment import (
+    derive_network_evidence, DNS_PATH, TLS_PATH, LINKS_PATH,
+    TIMINGS_PATH, SCREEN_PATH, SUMMARY_PATH,
+)
 
 Clock = Callable[[], datetime]
 
@@ -838,6 +842,7 @@ class ResearchOrchestrator:
 
         self._stop_started_collectors()
         self._write_screen_ab_comparison()
+        self._write_network_enrichment()
 
         if (
             session.status == SessionStatus.STOPPING
@@ -961,6 +966,7 @@ class ResearchOrchestrator:
         try:
             self._stop_started_collectors()
             self._write_screen_ab_comparison()
+            self._write_network_enrichment()
         except Exception:
             pass
 
@@ -1132,6 +1138,36 @@ class ResearchOrchestrator:
                 raw=False,
             )
             self._screen_ab_registered = True
+
+    def _write_network_enrichment(self) -> None:
+        """Derive optional summaries without altering original evidence."""
+        session = self._require_session()
+        if (session.paths.root / SUMMARY_PATH).exists():
+            return
+        try:
+            summary = derive_network_evidence(session.paths.root)
+            for relative, kind in (
+                (DNS_PATH, "dns_transactions"),
+                (TLS_PATH, "tls_handshakes"),
+                (LINKS_PATH, "action_network_links"),
+                (TIMINGS_PATH, "network_timings"),
+                (SCREEN_PATH, "screen_recording_timing"),
+                (SUMMARY_PATH, "network_enrichment_metadata"),
+            ):
+                session.register_artifact(
+                    kind=kind, relative_path=relative,
+                    source="offline-pcap-http-analysis", raw=False,
+                )
+            self._event(
+                "network_enrichment_completed", details=summary,
+            )
+        except Exception as exc:
+            # Optional summaries may not compromise the independent raw PCAP
+            # or prevent a complete original Research ZIP from being saved.
+            self._event(
+                "network_enrichment_unavailable",
+                details={"error": str(exc) or exc.__class__.__name__},
+            )
 
     def _ensure_event_log(self) -> None:
         session = self._require_session()

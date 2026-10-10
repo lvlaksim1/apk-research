@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.34.0] - 2026-10-10
+
+### Added
+- LDPlayer-style in-window Android control panel, standard device navigation, volume, orientation, screenshot, fullscreen, application install and reboot.
+- Additional menu for Android shared-storage file transfer, app stop/clear/settings, GPS position, acceleration sensor and PC clipboard text.
+- Offline Research ZIP DNS records, visible TLS hello characteristics, DNS/HTTP timing data, user-action/HTTP temporal candidates, screen media timing, and a provenance summary.
+- Android input validation and GUI smoke/unit tests.
+
+### Preserved
+- Independent complete RAW PCAP and HTTP response bodies, recording and checksum verification, existing direct HTTPS routing and ARM64/XAPK support, two-tab simplified interface, separate setup and update packages.
+
+
 ## [0.33.0] - 2026-10-10
 
 - Simplified actual Windows entrypoint to a two-tab Research / Live HTTPS main window; removed technical UI navigation while preserving all evidence collectors.

@@ -176,6 +176,40 @@ def main() -> int:
                     "02_normalized/research-timeline.json"
                 )
             )
+        # A full research session must carry the new offline-derived
+        # evidence alongside the original independent raw PCAP.
+        with zipfile.ZipFile(result.archive) as archive:
+            expected_new = (
+                "02_normalized/dns.jsonl",
+                "02_normalized/tls-sessions.jsonl",
+                "02_normalized/network-timings.jsonl",
+                "02_normalized/action-network-links.jsonl",
+                "02_normalized/screen-timing.jsonl",
+                "02_normalized/network-enrichment.json",
+            )
+            missing_new = [p for p in expected_new if p not in archive.namelist()]
+            if missing_new:
+                raise RuntimeError(
+                    "Research ZIP is missing expanded network evidence: "
+                    + repr(missing_new)
+                )
+            extra_summary = json.loads(
+                archive.read("02_normalized/network-enrichment.json")
+            )
+            if int(extra_summary.get("packets_scanned") or 0) <= 0:
+                raise RuntimeError(
+                    "Expanded network evidence did not process RAW PCAP"
+                )
+            if "01_raw/network/traffic.pcap" not in archive.namelist():
+                raise RuntimeError("Original PCAP was not preserved")
+            print(json.dumps({
+                "event": "expanded_network_acceptance",
+                "status": "ok",
+                "packets_scanned": extra_summary["packets_scanned"],
+                "dns_records": extra_summary["dns_records"],
+                "tls_hellos": extra_summary["tls_hellos"],
+            }, ensure_ascii=False))
+
         if "LaunchState: COLD" not in launch_evidence:
             raise RuntimeError(
                 "Clean launch did not produce LaunchState: COLD"

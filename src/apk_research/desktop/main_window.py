@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import zipfile
+from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import (
@@ -23,6 +24,8 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
+    QInputDialog,
+    QMenu,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -34,6 +37,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -495,10 +499,11 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self.android_hint)
         android_layout.addLayout(toolbar)
         self.android_view = AndroidView()
-        android_layout.addWidget(
-            self.android_view,
-            1,
-        )
+        screen_and_tools = QHBoxLayout()
+        screen_and_tools.setSpacing(5)
+        screen_and_tools.addWidget(self.android_view, 1)
+        screen_and_tools.addWidget(self._build_emulator_toolbar())
+        android_layout.addLayout(screen_and_tools, 1)
 
         splitter.addWidget(left)
         splitter.addWidget(android_container)
@@ -506,6 +511,183 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(1, 1)
         layout.addWidget(splitter, 1)
         return page
+
+    def _build_emulator_toolbar(self) -> QWidget:
+        panel = QWidget()
+        panel.setFixedWidth(48)
+        panel.setObjectName("emulatorControls")
+        panel.setStyleSheet(
+            "QWidget#emulatorControls {background:#242630;"
+            " border:1px solid #363945; border-radius:6px;}"
+            "QToolButton {background:transparent; color:#e4e7ee;"
+            " font-size:20px; border:0px; padding:2px;}"
+            "QToolButton:hover {background:#3b4153; border-radius:5px;}"
+        )
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(3)
+        self.emulator_buttons = {}
+
+        def add_button(action: str, symbol: str, hint: str):
+            button = QToolButton(panel)
+            button.setText(symbol)
+            button.setToolTip(hint)
+            button.setAccessibleName(hint)
+            button.setFixedSize(36, 36)
+            button.clicked.connect(
+                lambda checked=False, name=action:
+                self._emulator_button_action(name)
+            )
+            layout.addWidget(button)
+            self.emulator_buttons[action] = button
+
+        for action, symbol, hint in (
+            ("back", "‹", "Назад"),
+            ("home", "⌂", "Главный экран Android"),
+            ("recent", "▣", "Последние приложения"),
+            ("volume_up", "＋", "Громкость выше"),
+            ("volume_down", "－", "Громкость ниже"),
+            ("rotate", "⟳", "Повернуть экран"),
+            ("screenshot", "▧", "Снимок экрана в PNG"),
+            ("fullscreen", "⛶", "Полноэкранный режим"),
+            ("install", "APK", "Выбрать и установить APK/XAPK"),
+            ("restart", "↻", "Перезагрузить Android"),
+        ):
+            add_button(action, symbol, hint)
+        layout.addStretch(1)
+
+        extra = QToolButton(panel)
+        extra.setText("⋯")
+        extra.setToolTip("Дополнительные действия")
+        extra.setAccessibleName("Дополнительные действия")
+        extra.setFixedSize(36, 36)
+        extra.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        menu = QMenu(extra)
+        for action, label in (
+            ("push_file", "Передать файл в Android…"),
+            ("pull_file", "Получить файл из Android…"),
+            ("stop_app", "Остановить приложение"),
+            ("clear_app", "Очистить данные приложения…"),
+            ("settings_app", "Настройки приложения"),
+            ("location", "Задать геолокацию…"),
+            ("shake", "Встряхнуть устройство"),
+            ("paste_text", "Ввести текст из буфера ПК"),
+        ):
+            menu.addAction(
+                label,
+                lambda checked=False, name=action:
+                self._emulator_button_action(name)
+            )
+        extra.setMenu(menu)
+        layout.addWidget(extra)
+        self.emulator_buttons["more"] = extra
+        return panel
+
+    def _emulator_button_action(self, action: str) -> None:
+        if action == "back":
+            self.controller.keyevent(4)
+            return
+        if action == "home":
+            self.controller.keyevent(3)
+            return
+        if action == "fullscreen":
+            self.showNormal() if self.isFullScreen() else self.showFullScreen()
+            return
+        if action == "install":
+            if self._choose_apk():
+                self._install_selected_package()
+            return
+        if action == "screenshot":
+            folder = default_runtime_root() / "screenshots"
+            folder.mkdir(parents=True, exist_ok=True)
+            suggested = folder / (
+                "android-" + datetime.now().strftime("%Y%m%d-%H%M%S")
+                + ".png"
+            )
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Сохранить снимок Android", str(suggested),
+                "Изображения PNG (*.png)",
+            )
+            if path:
+                if not self.android_view.save_screenshot(path):
+                    QMessageBox.warning(
+                        self, "Снимок экрана",
+                        "Изображение Android пока недоступно",
+                    )
+            return
+        if action == "paste_text":
+            value = QApplication.clipboard().text()
+            if value:
+                self.controller.text_input(value)
+            return
+        active = self._research_active
+        if action in {
+            "restart", "push_file", "pull_file", "stop_app",
+            "clear_app", "settings_app", "shake",
+        } and active:
+            QMessageBox.information(
+                self, "Исследование выполняется",
+                "Завершите исследование и сохраните ZIP перед этим действием.",
+            )
+            return
+        if action in {"restart", "clear_app"}:
+            message = (
+                "Android будет перезапущен. Данные приложений сохранятся."
+                if action == "restart"
+                else "Все данные выбранного приложения будут удалены. Продолжить?"
+            )
+            if QMessageBox.question(
+                self, "Подтверждение действия", message,
+            ) != QMessageBox.StandardButton.Yes:
+                return
+        if action in {"stop_app", "clear_app", "settings_app"}:
+            if not self.controller.package_name:
+                QMessageBox.information(
+                    self, "Приложение", "Сначала установите APK/XAPK",
+                )
+                return
+            self.controller.run_emulator_action(
+                action, self.controller.package_name,
+            )
+            return
+        if action == "push_file":
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Файл для Android",
+            )
+            if not path:
+                return
+            self.controller.run_emulator_action(action, path)
+            return
+        if action == "pull_file":
+            remote, ok = QInputDialog.getText(
+                self, "Получить файл", "Путь Android (начинается с /sdcard/):",
+                text="/sdcard/Download/",
+            )
+            if not ok or not remote.strip():
+                return
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Куда сохранить файл", Path(remote).name,
+            )
+            if path:
+                self.controller.run_emulator_action(
+                    action, remote.strip(), path,
+                )
+            return
+        if action == "location":
+            lat, ok = QInputDialog.getDouble(
+                self, "Координаты Android", "Широта:", 0.0, -90, 90, 6,
+            )
+            if not ok:
+                return
+            lon, ok = QInputDialog.getDouble(
+                self, "Координаты Android", "Долгота:", 0.0, -180, 180, 6,
+            )
+            if ok:
+                self.controller.run_emulator_action(
+                    action, str(lat), str(lon),
+                )
+            return
+        self.controller.run_emulator_action(action)
 
     def _build_results_tab(self) -> QWidget:
         page = QWidget()
@@ -827,6 +1009,7 @@ class MainWindow(QMainWindow):
             self._on_progress
         )
         c.log.connect(self._append_log)
+        c.emulatorActionFinished.connect(self._on_emulator_action_finished)
         c.error.connect(self._on_error)
         c.environmentReady.connect(
             self._on_environment_ready
@@ -1152,7 +1335,7 @@ class MainWindow(QMainWindow):
             )
         )
 
-    def _choose_apk(self) -> None:
+    def _choose_apk(self) -> bool:
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Выберите APK или XAPK",
@@ -1160,7 +1343,7 @@ class MainWindow(QMainWindow):
             "Пакеты Android (*.apk *.xapk)",
         )
         if not path:
-            return
+            return False
         self._selected_package_path = path
         self.apk_path.setText(path)
         self.package_label.setText(
@@ -1176,6 +1359,7 @@ class MainWindow(QMainWindow):
             "○ Пакет выбран — не установлен"
         )
         self.status_package.setStyleSheet("")
+        return True
 
     def _install_selected_package(self) -> None:
         path = self._selected_package_path
@@ -1592,6 +1776,13 @@ class MainWindow(QMainWindow):
             self.status_adb.setStyleSheet(
                 "color: #238636;"
             )
+
+    def _on_emulator_action_finished(
+        self, action: str, detail: str,
+    ) -> None:
+        self.global_status.setText(detail)
+        if action in {"push_file", "pull_file", "clear_app", "restart"}:
+            QMessageBox.information(self, "Android", detail)
 
     def _on_error(
         self,
