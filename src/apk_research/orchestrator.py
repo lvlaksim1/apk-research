@@ -865,6 +865,24 @@ class ResearchOrchestrator:
                     },
                 )
 
+        try:
+            from apk_research.network_enrichment import (
+                build_network_enrichment,
+            )
+            enrichment = build_network_enrichment(session)
+            self._event(
+                "network_enrichment_finished",
+                details={
+                    "status": enrichment.get("status"),
+                    "counts": enrichment.get("counts"),
+                },
+            )
+        except Exception as exc:
+            self._event(
+                "network_enrichment_failed",
+                details={"error": str(exc) or exc.__class__.__name__},
+            )
+
         if session.status == SessionStatus.STOPPING:
             session.finish()
 
