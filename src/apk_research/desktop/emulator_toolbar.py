@@ -73,7 +73,9 @@ class EmulatorToolPanel(QWidget):
 
     def set_ready(self, ready: bool, *, recording: bool, busy: bool) -> None:
         for key, button in self.buttons.items():
-            button.setEnabled(ready and not busy)
+            # Recording occupies the session worker for its entire lifetime;
+            # navigation, screenshot and rotation must remain responsive.
+            button.setEnabled(ready and (not busy or recording))
             if key in {"restart", "clear_data", "send_file", "get_file",
                        "location", "stop_app", "app_settings"} and recording:
                 button.setEnabled(False)
