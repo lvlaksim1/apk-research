@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.34.0] - 2026-10-10
+
+### Added
+- Right-hand Android emulator panel with Back/Home/Recents, volume, rotation, PNG screenshot, fullscreen, safe restart and APK/XAPK install.
+- Android Download file transfers, geolocation, selected-app stop/settings and confirmed data clearing; protected while recording.
+- Observable DNS, TLS handshake, temporal action/network association, screen-recording timing and a quantitative enrichment summary in Research ZIP.
+- Direct-route provenance in each compatible HTTPS transaction and in the live HTTPS table; unknown routes are not guessed.
+- Regression tests for network evidence, GUI actions, route tagging and original archive integrity.
+
+### Preserved and limited
+- Two-tab Research / Live HTTPS interface, raw packet/video/HTTP evidence, root and both Android ABIs, separate Setup/Update installers.
+- DNS-over-HTTPS is not reconstructed from encrypted payloads. Temporal action links do not establish causality.
+- No universal guarantee of all TLS handshakes or zero dropped packets.
+
+
 ## [0.33.0] - 2026-10-10
 
 - Simplified actual Windows entrypoint to a two-tab Research / Live HTTPS main window; removed technical UI navigation while preserving all evidence collectors.
