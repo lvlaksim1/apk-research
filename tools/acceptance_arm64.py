@@ -118,7 +118,7 @@ public final class MainActivity extends Activity {{
             Log.i("{LOG_TAG}", "{MARKER}");
         }} catch (Throwable error) {{
             Log.e("{LOG_TAG}", "NATIVE_LOAD_FAILED: " + error);
-            throw error;
+            throw new RuntimeException(error);
         }}
     }}
 }}
