@@ -457,6 +457,81 @@ class DesktopController(QObject):
             keycode,
         )
 
+    def system_keyevent(self, keycode: int) -> None:
+        if keycode not in {3, 4, 24, 25, 187}:
+            self.error.emit("Неподдерживаемая системная кнопка")
+            return
+        stamp = self._host_utc_now()
+        self._record_user_action(
+            "android_button", {"keycode": keycode},
+            host_started_utc=stamp, host_utc=stamp,
+        )
+        self._queue_input("system_keyevent", keycode)
+
+    def device_action(self, action: str, *args) -> None:
+        """Run explicit emulator maintenance outside the UI thread."""
+        blocked_while_recording = {
+            "restart", "stop_app", "app_settings", "clear_data",
+            "send_file", "get_file", "location",
+        }
+        if (
+            action in blocked_while_recording
+            and self._research_thread is not None
+            and self._research_thread.is_alive()
+        ):
+            self.error.emit(
+                "Завершите исследование перед этой операцией Android"
+            )
+            return
+        self._thread(self._device_action_worker, action, *args)
+
+    def _device_action_worker(self, action: str, *args) -> None:
+        try:
+            if action == "restart":
+                self._set_busy(True)
+                self._stop_screen.set()
+                if self._screen_thread is not None:
+                    self._screen_thread.join(timeout=10.0)
+                    if self._screen_thread.is_alive():
+                        raise RuntimeError(
+                            "Не удалось завершить предыдущий видеопоток"
+                        )
+                self._screen_thread = None
+                self.runtime.stop()
+                self.runtime.ensure_ready(
+                    self._progress_callback, self._display_ready_callback,
+                )
+                self._start_screen_stream(wait_for_first_frame=True)
+                self.environmentReady.emit(self.runtime.diagnostics())
+            elif action == "rotate":
+                self.runtime.rotate_display(bool(args[0]))
+            elif action == "location":
+                self.runtime.set_geo_location(float(args[0]), float(args[1]))
+            elif action == "stop_app" and self.package_name:
+                self.runtime.stop_target_package(self.package_name)
+            elif action == "clear_data" and self.package_name:
+                self.runtime.clear_target_data(self.package_name)
+            elif action == "app_settings" and self.package_name:
+                self.runtime.open_target_settings(self.package_name)
+            elif action == "send_file":
+                remote = self.runtime.send_download(Path(str(args[0])))
+                self.log.emit("Файл передан в Android: " + remote)
+            elif action == "get_file":
+                target = self.runtime.receive_download(
+                    str(args[0]), Path(str(args[1]))
+                )
+                self.log.emit("Файл получен: " + str(target))
+            else:
+                raise RuntimeError(
+                    "Неподдерживаемое действие или приложение не выбрано"
+                )
+            self.log.emit("Команда Android выполнена: " + action)
+        except Exception as exc:
+            self.error.emit(str(exc) or exc.__class__.__name__)
+        finally:
+            if action == "restart":
+                self._set_busy(False)
+
     def text_input(self, value: str) -> None:
         timestamp = self._host_utc_now()
         self._record_user_action(
