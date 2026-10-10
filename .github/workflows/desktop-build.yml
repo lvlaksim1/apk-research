@@ -173,10 +173,14 @@ jobs:
       - name: Upgrade previous release with dedicated update installer
         shell: pwsh
         run: |
-          $previousVersion = "0.29.2"
+          # The repository intentionally retains only the latest published
+          # release. Never pin a historical installer that may be deleted.
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/lvlaksim1/apk-research/releases/latest" -Headers @{ "User-Agent" = "apk-research-ci" }
+          $previousVersion = $release.tag_name.TrimStart("v")
           $previousInstaller = Join-Path $env:RUNNER_TEMP "apk-research-setup_v$previousVersion.exe"
-          $previousUrl = "https://github.com/lvlaksim1/apk-research/releases/download/v$previousVersion/apk-research-setup_v$previousVersion.exe"
-          Invoke-WebRequest -Uri $previousUrl -OutFile $previousInstaller
+          $asset = $release.assets | Where-Object { $_.name -eq "apk-research-setup_v$previousVersion.exe" } | Select-Object -First 1
+          if (-not $asset) { throw "Published release has no setup installer: $previousVersion" }
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $previousInstaller
 
           $defaultDir = Join-Path $env:LOCALAPPDATA "Programs\apk-research"
           if (Test-Path $defaultDir) {

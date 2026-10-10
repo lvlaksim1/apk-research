@@ -23,9 +23,15 @@ ANDROID_SYSTEM_IMAGE_XML = urllib.parse.urljoin(
     ANDROID_REPOSITORY_BASE,
     "sys-img/android/sys-img2-3.xml",
 )
+GOOGLE_APIS_SYSTEM_IMAGE_XML = urllib.parse.urljoin(
+    ANDROID_REPOSITORY_BASE,
+    "sys-img/google_apis/sys-img2-3.xml",
+)
 
 AVD_NAME = "apk_research_api35"
+ARM_COMPATIBLE_AVD_NAME = "apk_research_api35_google_apis"
 SYSTEM_IMAGE_PACKAGE = "system-images;android-35;default;x86_64"
+ARM_COMPATIBLE_SYSTEM_IMAGE_PACKAGE = "system-images;android-35;google_apis;x86_64"
 BUILD_TOOLS_PACKAGE = "build-tools;35.0.0"
 
 
@@ -133,25 +139,75 @@ class ComponentManager:
         )
         sdk_root = component_root / "android-sdk"
         avd_home = component_root / "avd"
-        self.paths = AndroidPaths(
-            root=component_root,
+
+        self._component_root = component_root
+        self._profile_file = component_root / "active-avd-profile.json"
+        self._profile = "default"
+        try:
+            saved = json.loads(
+                self._profile_file.read_text(encoding="utf-8")
+            )
+            if isinstance(saved, dict) and saved.get("profile") == "google_apis":
+                self._profile = "google_apis"
+        except (OSError, ValueError):
+            pass
+        self.paths = self._paths_for_profile(self._profile)
+        self._metadata_path = component_root / "components.json"
+
+    @property
+    def profile(self) -> str:
+        return self._profile
+
+    @property
+    def avd_name(self) -> str:
+        return ARM_COMPATIBLE_AVD_NAME if self._profile == "google_apis" else AVD_NAME
+
+    @property
+    def system_image_package(self) -> str:
+        return (
+            ARM_COMPATIBLE_SYSTEM_IMAGE_PACKAGE
+            if self._profile == "google_apis" else SYSTEM_IMAGE_PACKAGE
+        )
+
+    @property
+    def system_image_repository(self) -> str:
+        return (
+            GOOGLE_APIS_SYSTEM_IMAGE_XML
+            if self._profile == "google_apis" else ANDROID_SYSTEM_IMAGE_XML
+        )
+
+    def _paths_for_profile(self, profile: str) -> AndroidPaths:
+        sdk_root = self._component_root / "android-sdk"
+        avd_home = self._component_root / "avd"
+        image_tag = "google_apis" if profile == "google_apis" else "default"
+        avd_name = ARM_COMPATIBLE_AVD_NAME if profile == "google_apis" else AVD_NAME
+        return AndroidPaths(
+            root=self._component_root,
             sdk_root=sdk_root,
             avd_home=avd_home,
-            cache=component_root / "cache",
+            cache=self._component_root / "cache",
             adb=sdk_root / "platform-tools" / "adb.exe",
             emulator=sdk_root / "emulator" / "emulator.exe",
             aapt2=sdk_root / "build-tools" / "35.0.0" / "aapt2.exe",
-            system_image=(
-                sdk_root
-                / "system-images"
-                / "android-35"
-                / "default"
-                / "x86_64"
-            ),
-            avd_ini=avd_home / f"{AVD_NAME}.ini",
-            avd_dir=avd_home / f"{AVD_NAME}.avd",
+            system_image=sdk_root / "system-images" / "android-35" / image_tag / "x86_64",
+            avd_ini=avd_home / f"{avd_name}.ini",
+            avd_dir=avd_home / f"{avd_name}.avd",
         )
-        self._metadata_path = component_root / "components.json"
+
+    def select_profile(self, profile: str) -> None:
+        if profile not in {"default", "google_apis"}:
+            raise ComponentInstallError(f"Неподдерживаемый профиль Android: {profile}")
+        self._profile = profile
+        self.paths = self._paths_for_profile(profile)
+
+    def persist_selected_profile(self) -> None:
+        self.paths.root.mkdir(parents=True, exist_ok=True)
+        temporary = self._profile_file.with_suffix(".json.tmp")
+        temporary.write_text(
+            json.dumps({"profile": self._profile}, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, self._profile_file)
 
     def state(self) -> ComponentState:
         return ComponentState(
@@ -179,7 +235,7 @@ class ComponentManager:
             ANDROID_REPOSITORY_XML
         )
         system_image_xml = self._download_bytes(
-            ANDROID_SYSTEM_IMAGE_XML
+            self.system_image_repository
         )
         return [
             select_archive_from_repository_xml(
@@ -208,18 +264,19 @@ class ComponentManager:
             ),
             select_archive_from_repository_xml(
                 system_image_xml,
-                SYSTEM_IMAGE_PACKAGE,
+                self.system_image_package,
                 host_os="windows",
                 base_url=repository_base_url(
-                    ANDROID_SYSTEM_IMAGE_XML
+                    self.system_image_repository
                 ),
             ),
         ]
 
-    def ensure_all(
+    def ensure_host_tools(
         self,
         progress: ProgressCallback | None = None,
-    ) -> ComponentState:
+    ) -> None:
+        """Install APK metadata tools without downloading a system image."""
         self.paths.root.mkdir(parents=True, exist_ok=True)
         self.paths.sdk_root.mkdir(parents=True, exist_ok=True)
         self.paths.cache.mkdir(parents=True, exist_ok=True)
@@ -227,31 +284,31 @@ class ComponentManager:
 
         if not self.state().platform_tools:
             self._install_repository_package(
-                "platform-tools",
-                self.paths.sdk_root / "platform-tools",
-                mode="named-directory",
-                progress=progress,
+                "platform-tools", self.paths.sdk_root / "platform-tools",
+                mode="named-directory", progress=progress,
             )
         if not self.state().emulator:
             self._install_repository_package(
-                "emulator",
-                self.paths.sdk_root / "emulator",
-                mode="named-directory",
-                progress=progress,
+                "emulator", self.paths.sdk_root / "emulator",
+                mode="named-directory", progress=progress,
             )
         if not self.state().build_tools:
             self._install_repository_package(
-                BUILD_TOOLS_PACKAGE,
-                self.paths.sdk_root / "build-tools" / "35.0.0",
-                mode="find-aapt2",
-                progress=progress,
+                BUILD_TOOLS_PACKAGE, self.paths.sdk_root / "build-tools" / "35.0.0",
+                mode="find-aapt2", progress=progress,
             )
+
+    def ensure_all(
+        self,
+        progress: ProgressCallback | None = None,
+    ) -> ComponentState:
+        self.ensure_host_tools(progress)
         if not self.state().system_image:
             self._install_repository_package(
-                SYSTEM_IMAGE_PACKAGE,
+                self.system_image_package,
                 self.paths.system_image,
                 mode="find-system-img",
-                repository_url=ANDROID_SYSTEM_IMAGE_XML,
+                repository_url=self.system_image_repository,
                 progress=progress,
             )
 
@@ -300,10 +357,11 @@ class ComponentManager:
         self.paths.avd_home.mkdir(parents=True, exist_ok=True)
         self.paths.avd_dir.mkdir(parents=True, exist_ok=True)
 
-        relative_image = "system-images\\android-35\\default\\x86_64\\"
+        image_tag = "google_apis" if self.profile == "google_apis" else "default"
+        relative_image = f"system-images\\android-35\\{image_tag}\\x86_64\\"
         config = "\n".join(
             [
-                "AvdId=" + AVD_NAME,
+                "AvdId=" + self.avd_name,
                 "PlayStore.enabled=false",
                 "abi.type=x86_64",
                 "avd.ini.displayname=apk-research Android 15",
@@ -339,8 +397,8 @@ class ComponentManager:
                 "showDeviceFrame=no",
                 "skin.dynamic=yes",
                 "skin.name=1080x1920",
-                "tag.display=Default",
-                "tag.id=default",
+                "tag.display=" + ("Google APIs" if self.profile == "google_apis" else "Default"),
+                f"tag.id={image_tag}",
                 "target=android-35",
                 "vm.heapSize=256",
             ]
@@ -355,7 +413,7 @@ class ComponentManager:
             [
                 "avd.ini.encoding=UTF-8",
                 f"path={self.paths.avd_dir}",
-                f"path.rel=avd\\{AVD_NAME}.avd",
+                f"path.rel=avd\\{self.avd_name}.avd",
                 "target=android-35",
             ]
         ) + "\n"

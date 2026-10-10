@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.31.0] - 2026-10-10
+
+### Added
+- Automatic ARM-only APK/XAPK ABI preflight before boot, a separate Android 15 Google APIs x86_64 emulator and official native ARM instruction translation.
+- Persistent choice of the separate profile after its successful boot; the legacy default AVD userdata is untouched.
+- Explicit check of advertised ARM64 support before attempting installation.
+- Unit tests for profile selection, isolation and ARM64 split installation.
+- Real AVD acceptance test that must install an ARM64-only XAPK and successfully load its ARM64 JNI library.
+
+### Preserved
+- Existing x86_64 AVD, rooted Android / gRPC-MMAP, verified package validation, RAW PCAP, research evidence and separate Setup/Update installers.
+
+
 ## [0.30.0] - 2026-10-08
 
 ### Added
