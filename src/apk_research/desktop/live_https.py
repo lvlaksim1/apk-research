@@ -19,56 +19,12 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
+from apk_research.desktop.live_https_reader import IncrementalHttpReader
 from apk_research.desktop.http_window import (
     _decode_body, _header_text, TRANSACTIONS_ARTIFACT, BODIES_PREFIX,
 )
 
 MAX_PREVIEW_BYTES = 128 * 1024
-POLL_CHUNK_BYTES = 1024 * 1024
-
-
-class IncrementalHttpReader:
-    """Consume complete UTF-8 JSONL records without duplicating partial lines."""
-
-    def __init__(self, path: Path) -> None:
-        self.path = Path(path)
-        self.offset = 0
-        self.pending = b""
-        self.invalid_records = 0
-
-    def poll(self) -> list[dict]:
-        try:
-            size = self.path.stat().st_size
-        except FileNotFoundError:
-            return []
-        if size < self.offset:
-            self.offset = 0
-            self.pending = b""
-        try:
-            with self.path.open("rb") as stream:
-                stream.seek(self.offset)
-                chunk = stream.read(POLL_CHUNK_BYTES)
-        except OSError:
-            return []
-        self.offset += len(chunk)
-        if not chunk:
-            return []
-        parts = (self.pending + chunk).split(b"\n")
-        self.pending = parts.pop()
-        result = []
-        for line in parts:
-            if not line.strip():
-                continue
-            try:
-                item = json.loads(line.decode("utf-8"))
-            except (ValueError, UnicodeError):
-                self.invalid_records += 1
-                continue
-            if isinstance(item, dict):
-                result.append(item)
-        return result
-
-
 class LiveHttpsView(QWidget):
     """Read-only live display of requests and responses for current session."""
 
