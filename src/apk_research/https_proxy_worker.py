@@ -49,6 +49,22 @@ class ResearchTransactionRecorder:
         self.transactions_path.parent.mkdir(parents=True, exist_ok=True)
         self.bodies_dir.mkdir(parents=True, exist_ok=True)
         self.sequence = 0
+        self._direct_client_ids: set[str] = set()
+
+    def http_connect(self, flow: http.HTTPFlow) -> None:
+        """Mark connections belonging to the explicit native HTTPS route."""
+        if flow.request.headers.get("X-Apk-Research-Route") == "direct":
+            self._direct_client_ids.add(str(flow.client_conn.id))
+
+    def _route(self, flow: http.HTTPFlow) -> str:
+        client = getattr(flow, "client_conn", None)
+        identifier = getattr(client, "id", None)
+        return (
+            "direct"
+            if identifier is not None
+            and str(identifier) in self._direct_client_ids
+            else "system-or-undetermined"
+        )
 
     def running(self) -> None:
         self.transactions_path.parent.mkdir(
@@ -123,6 +139,7 @@ class ResearchTransactionRecorder:
                 "active": True,
                 "tls_decrypted": request.scheme.lower() == "https",
                 "backend": "mitmproxy",
+                "route": self._route(flow),
             },
             "request": {
                 "headers": _headers(request),
@@ -169,6 +186,7 @@ class ResearchTransactionRecorder:
                 "active": True,
                 "tls_decrypted": False,
                 "backend": "mitmproxy",
+                "route": self._route(flow),
             },
             "request": {
                 "headers": _headers(request),

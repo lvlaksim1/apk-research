@@ -489,6 +489,10 @@ def main() -> int:
                 if mode not in {"system", "direct"}:
                     continue
                 modes.add(mode)
+                if mode == "direct" and (
+                    (transaction.get("interception") or {}).get("route") != "direct"
+                ):
+                    raise RuntimeError("Direct HTTPS flow has no confirmed route")
                 response = transaction.get("response") or {}
                 body = response.get("body") or {}
                 if not (transaction.get("interception") or {}).get(
@@ -521,6 +525,30 @@ def main() -> int:
                 if "CONNECTION_ROUTED destination=" not in route_log:
                     raise RuntimeError(
                         "Android routing log does not confirm direct TCP/443"
+                    )
+                for required in (
+                    "02_normalized/dns.jsonl",
+                    "02_normalized/tls-sessions.jsonl",
+                    "02_normalized/action-network-links.jsonl",
+                    "02_normalized/screen-timing.jsonl",
+                    "02_normalized/network-enrichment.json",
+                ):
+                    if required not in evidence.namelist():
+                        raise RuntimeError(
+                            "Missing required derived evidence file: " + required
+                        )
+                enrichment = json.loads(evidence.read(
+                    "02_normalized/network-enrichment.json"
+                ))
+                if enrichment.get("status") != "complete":
+                    raise RuntimeError(
+                        "Network enrichment incomplete: " + str(enrichment)
+                    )
+                if int(
+                    (enrichment.get("counts") or {}).get("http_transactions") or 0
+                ) < 2:
+                    raise RuntimeError(
+                        "Network enrichment omitted actual HTTP transactions"
                     )
 
             print(
