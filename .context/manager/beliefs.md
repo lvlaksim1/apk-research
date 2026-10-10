@@ -2,7 +2,7 @@
 
 ## Verified baseline
 
-Current product baseline is **apk-research v0.32.0** at `a2f0bbbca364714d37f7697ffa5ccb8204bc94b1`. The previous verified baseline was v0.31.0.
+Current product baseline is **apk-research v0.33.0** at `3f3f1144e0ea8944a065e7d5950fd07fd1e17abf`. The previous verified baseline was v0.32.0.
 
 Historical 2026-10-08 reconciliation confirmed the then-current v0.30.0 release. PR #26 delivered the HTTPS traffic analysis feature and was merged at `7f603fa95231d936039ed6dac222b11d5189ad2d`; the current main commit synchronizes release documentation and retriggered the standard release pipeline.
 
@@ -86,3 +86,13 @@ Direct-route log: 22 CONNECTION_ROUTED entries, including 21 to 217.197.238.66:4
 Independent raw PCAP: 22,525 packets captured; tcpdump reported 615 packets dropped by kernel. Network inventory 93 flows, 20 attributed with EXACT/HIGH/MEDIUM confidence and 73 UNKNOWN. This limits packet completeness and socket-owner attribution but does not negate the 32 readable HTTPS responses. Android SSL/certificate warnings in logcat came from unrelated PIDs, so they cannot establish failures of app com.evrasia. No logged FATAL EXCEPTION or ANR for com.evrasia in this archive.
 
 The owner's previously unverified direct HTTPS target is NOW **field-verified functional** under v0.32.0. A future improvement to raw PCAP completeness/ownership accuracy is distinct and requires bounded scoping. Scope remains IPv4 TCP/443; no assertions about QUIC, IPv6 or arbitrary trust/pinning.
+
+## Verified v0.33.0 minimal Research/Live HTTPS desktop (2026-10-10)
+
+Owner requested to remove the overwhelming technical UI and retain two functions: full Research ZIP and dynamic HTTPS request/response viewing. PR #31 merged to main `3f3f1144e0ea8944a065e7d5950fd07fd1e17abf`; main pipeline #146 attempt 1 SUCCESS, GitHub Release v0.33.0 targets that exact commit.
+
+The actual desktop entrypoint now launches base `MainWindow` instead of the inherited UI stack that added extra Network/Evidence/Packet/Investigator tabs. Visible navigation is precisely Research and Live HTTPS; Program menu preserves updater and Android maintenance. Underlying collection modules, ZIP artifacts and independent RAW PCAP are unchanged.
+
+`LiveHttpsView` tails complete HTTP JSONL entries every 500 ms, supports filtering and request/response inspection, a 128-KiB display-only body preview, live counters beside Android, and opening completed/previous ZIPs. The reader waits for complete lines and avoids duplicate records. `tcpdump -B 16384 -s 0 -U` increases the kernel capture buffer to 16 MiB and retains full packet length; it cannot guarantee zero packet loss.
+
+Main gate #146 includes unit tests, actual Android 15 AVD research/HTTPS ZIP, standalone Windows GUI, verified v0.32.0 to v0.33.0 in-place update, clean Windows provisioning and release publication. Assets: Setup SHA-256 `70788ed8a2cf8885eea5beb77df1cd560ad41aaa67d49978ba9e972def114718`; Update SHA-256 `a6db937f410f03b49fbc8bff4791a93b367d905245a5b4554aaeab0adb12b38a`.

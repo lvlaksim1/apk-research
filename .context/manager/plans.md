@@ -55,3 +55,7 @@ Obtain a real v0.32.0 session on the owner's target app, compare route log (actu
 The owner supplied a v0.32.0 session of com.evrasia. Its HTTP records, route journal, session status and 99/99 checksum verification establish that selected-app direct HTTPS analysis now works for the previously problematic target. Historic notes instructing a future field validation are superseded by this observation.
 
 Next possible investigation: packet loss (615 kernel drops), unassigned ownership (73 of 93 flow entries), and optional per-transaction route source labels. Do not assume these are equivalent to lost HTTP transactions. Do not change implementation without agreeing on scope. Never commit the private Research ZIP or any authentication contents.
+
+## v0.33.0 field usability and completeness follow-up
+
+The simplification is complete and published. Request the owner's field confirmation that precisely two tabs appear, the current HTTPS list updates while interacting with the Android screen, ZIP is created, and existing studies remain accessible. If a new archive is supplied, measure actual packet drops after the new 16-MiB kernel buffer instead of asserting the issue is fixed. Technical workspace tabs remain out of the main window by explicit owner decision; do not restore them without permission.

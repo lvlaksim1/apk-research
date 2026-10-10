@@ -1,27 +1,32 @@
 # Latest Handoff
 
-Generation: 29
+Generation: 30
 Date: 2026-10-10
 Persistent manager: apk-research-project-manager
 Product authority: main
 Manager-state authority: context
 
-## Published baseline
+## Published product release
 
-apk-research v0.32.0, exact main/release SHA a2f0bbbca364714d37f7697ffa5ccb8204bc94b1; pipeline #145 attempt 1 success. Separate Setup and Update assets are published. Preserve all prior Android and evidence invariants.
+apk-research **v0.33.0**, exact main/release commit `3f3f1144e0ea8944a065e7d5950fd07fd1e17abf`. PR #31 merged; main pipeline **#146 attempt 1 SUCCESS**, including unit tests, real Android 15 research/HTTPS acceptance, standalone Windows GUI verification, full + update installers, actual v0.32.0 to v0.33.0 upgrade, clean Windows provisioning and publication.
 
-## Owner target field verification — CONFIRMED
+Published assets:
+- Setup `apk-research-setup_v0.33.0.exe`, SHA256 `70788ed8a2cf8885eea5beb77df1cd560ad41aaa67d49978ba9e972def114718`.
+- Update `apk-research-update_v0.33.0.exe`, SHA256 `a6db937f410f03b49fbc8bff4791a93b367d905245a5b4554aaeab0adb12b38a`.
+- `SHA256SUMS.txt` published.
 
-Owner uploaded private archive 20261010T021552.574206Z-3e8e2043.research.zip from an actual com.evrasia research session using v0.32.0. ZIP integrity checks: 99/99 valid; status complete, no degraded collectors/errors. It contains 32 readable HTTP(S) transactions (28 HTTP 200, 4 HTTP 301) with 4,669,225 total response-body bytes. 23 transactions relate to evrasia.spb.ru (13 API, 10 images), plus one evrasia.rest response. Native route diagnostics contain 21 successful direct TCP/443 entries to 217.197.238.66 and one to a mapping-service IP. Temporary Android UID route cleanup confirmed, UID 10210 uniquely identified the target package. Hence the original owner issue of direct HTTPS without readable requests is **resolved in this measured session**.
+## Owner-directed simplified UX — COMPLETE
 
-## Remaining measured quality issues
+The Windows entrypoint now uses a MainWindow with exactly two user-visible tabs: `Исследование` and `HTTPS • онлайн`. The previous inherited UI stack creating Network, Evidence, Packets, Investigator and similar tabs is no longer the default. A small Program menu retains updater/Android maintenance; Research retains APK/XAPK, Android view, start/finish controls and ZIP directory access. The Android header shows a live HTTPS count and quick navigation button.
 
-Raw TCP dump reported 22,525 captured packets and 615 kernel drops. Of 93 normalized network flow entries, only 20 were attributed at EXACT/HIGH/MEDIUM; 73 UNKNOWN. These concern packet capture reliability and ownership correlation, not the demonstrated presence of HTTP responses. No new changes authorized for these yet. Per-transaction provenance of direct vs configured system proxy is not explicitly represented.
+The new HTTPS viewer incrementally reads completed JSONL records from the running session every 500 ms, shows method, host, path, HTTP status, headers and body preview, and switches to ZIP data when finished. Full body files remain in Research ZIP; preview is capped at 128 KiB for responsiveness. All mandatory collectors and archive artifacts continue unchanged.
 
-## Confidentiality
+RAW capture uses `tcpdump -B 16384 -s 0 -U`: 16-MiB kernel buffer, full packet lengths. This aims to reduce prior packet drops, not a guarantee. Next real archive should measure actual drops.
 
-The ZIP has authenticated API responses with access_token and refresh_token fields. Treat the entire ZIP as private; no values or archive copies are to be put in a public GitHub repository. Only aggregate project conclusions are suitable for durable context.
+## Previously completed HTTPS field validation
 
-## Boundaries
+The user's actual v0.32.0 `com.evrasia` ZIP from 2026-10-10 showed 32 readable HTTPS transactions (23 target domain), 21 direct route journal connections to target address, complete session and 99/99 hashes. Former direct-HTTPS gap remains verified resolved in that run. Do not misinterpret v0.33.0 as a TLS protocol change.
 
-No universal HTTPS claims: current routing covers selected-app IPv4 TCP/443; app-specific trust, IPv6 and UDP/QUIC need separate evidence. Preserve independent RAW PCAP, Android 15 ARM64 profiles, installer architecture and cancellation of home-screen shortcut. Use neutral owner-visible terminology.
+## Remaining constraints
+
+Never publish owner ZIPs or authentication contents; prior private sample contained token fields. Preserve Android ARM64/XAPK, root/gRPC/MMAP, research provenance and independent RAW PCAP. Home-screen shortcut cancelled. Use neutral owner-visible language.

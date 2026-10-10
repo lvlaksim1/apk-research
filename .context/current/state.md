@@ -4,11 +4,11 @@ Last reconciled: 2026-10-10.
 
 ## Product
 
-- Current release/main commit: `a2f0bbbca364714d37f7697ffa5ccb8204bc94b1`.
-- Latest release: `v0.32.0`.
-- Full installer: `apk-research-setup_v0.32.0.exe` (SHA256 `226d8b4bf12ccab0b07620b8110107354b15873c1f1f93c925bc28d0f2c1c070`).
-- Update installer: `apk-research-update_v0.32.0.exe` (SHA256 `aed61edabbf81e865aa49c16743793886e2bbe5e9394f64b71e75fb7eeedd0cc`).
-- Main pipeline #145 attempt 1 SUCCESS (2026-10-10); GitHub Release targets exact main SHA.
+- Current release/main commit: `3f3f1144e0ea8944a065e7d5950fd07fd1e17abf`.
+- Latest release: `v0.33.0`.
+- Full installer: `apk-research-setup_v0.33.0.exe` (SHA256 `70788ed8a2cf8885eea5beb77df1cd560ad41aaa67d49978ba9e972def114718`).
+- Update installer: `apk-research-update_v0.33.0.exe` (SHA256 `a6db937f410f03b49fbc8bff4791a93b367d905245a5b4554aaeab0adb12b38a`).
+- Main pipeline #146 attempt 1 SUCCESS (2026-10-10); GitHub Release targets exact main SHA.
 
 ## v0.30.0
 
@@ -83,3 +83,12 @@ Uploaded private evidence: 20261010T021552.574206Z-3e8e2043.research.zip, produc
 - Recorded auth JSON includes access/refresh token fields; these values and the private ZIP MUST NOT be posted to public GitHub.
 
 **The com.evrasia-specific previous HTTPS gap is verified resolved for this observed run.** Older paragraphs in this history calling for a future target test are superseded.
+
+## v0.33.0 — simplified study window and live HTTPS
+
+- Only Research and Live HTTPS tabs are visible at actual program entrypoint. Technical results tabs no longer added by the historical desktop subclass stack.
+- HTTPS transactions are displayed during an active session at 500-ms intervals from incremental JSONL; full request/response evidence remains in ZIP, with UI previews limited to 128 KiB.
+- Research tab includes live count and quick switch to HTTPS, direct ZIP folder access, Russian progress and archive completion status.
+- Mandatory RAW network, screen, actions, logcat, HTTPS, attribution, other evidence collection and integrity workflow remain enabled automatically.
+- Capture buffer enlarged to 16 MiB, full packet snaplen retained; actual field packet drop reductions remain unverified until the next owner research ZIP.
+- Windows setup and v0.32.0 → v0.33.0 update, real AVD research and clean Windows provisioning all passed.

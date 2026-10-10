@@ -4,7 +4,7 @@ Last reconciled: 2026-10-10.
 
 ## Release blockers
 
-None for published v0.32.0. Main pipeline #145 attempt 1 passed all mandatory gates.
+None for published v0.33.0. Main pipeline #146 attempt 1 passed all mandatory gates.
 
 ## HTTPS traffic analysis boundaries
 
@@ -40,3 +40,7 @@ The owner-specific `com.evrasia` deployment is not yet verified, although the ge
 The direct HTTPS routing capability is no longer awaiting target proof: the actual app produced 32 readable responses and 21 route journal entries to its server. This closes the prior field-verification blocker for the observed run.
 
 Quality observations, not blockers to the v0.32.0 publication: 615 kernel packet drops in tcpdump; 73 of 93 network flow entries UNKNOWN for ownership attribution. No evidence that these caused missing HTTP transactions. Scope remains IPv4 TCP/443 and certificate trust assumptions remain bounded. The owner ZIP contains authentication data, so it must not be copied to public project storage.
+
+## Follow-up limitations after v0.33.0
+
+The 16-MiB kernel tcpdump buffer is a preventative improvement; zero packet drops are not proven and must be measured in a future owner ZIP. Live HTTPS rows represent completed request/response transaction records as written by the analyzer; they are not evidence that all encrypted transport data became readable. Default/Google APIs AVD and all prior known protocol/trust boundaries remain. Technical tabs were intentionally removed from main navigation by owner request, without deleting ZIP evidence.

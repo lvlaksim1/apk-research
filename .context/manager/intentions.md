@@ -74,3 +74,7 @@ Private evidence: owner Research ZIP 20261010T021552.574206Z-3e8e2043.research.z
 ## Observation only — capture completeness and attribution
 
 tcpdump reported 615 kernel-dropped packets out of a session with 22,525 captured packets; flow inventory 93, of which 73 have UNKNOWN ownership attribution. The user has not separately authorized changes to these subsystems; first propose measurable, scoped improvements if requested.
+
+## Completed — simplified Research + live HTTPS user interface (v0.33.0)
+
+Owner requested to remove the other complicated result/analysis tabs and focus on maximum Research ZIP completeness plus live HTTPS requests for the studied application. Implemented only two visible tabs via actual Windows entrypoint, one-click HTTPS access and counter, automatic JSONL updating every 500 ms and completed ZIP viewing; removed technical UI navigation but retained all collectors and data, updater and maintenance in Program menu. Full-length RAW PCAP capture buffer raised to 16 MiB, with no unsupported guarantee of zero packet drops. PR #31, main `3f3f1144e0ea8944a065e7d5950fd07fd1e17abf`, pipeline #146 attempt 1 SUCCESS; versioned standalone setup and update installers released.
