@@ -1052,6 +1052,89 @@ class AndroidRuntime:
             key,
         )
 
+    def emulator_action(self, action: str, *values: str) -> str:
+        """Control the managed Android 15 device using documented ADB actions.
+
+        Actions that mutate an installed app are explicitly addressed to the
+        package selected in the desktop UI. Commands are argument arrays,
+        not shell expressions.
+        """
+        if not self._device_online():
+            raise AndroidRuntimeError("Сначала подготовьте Android")
+        if action == "recent":
+            return self._adb_shell("input", "keyevent", "187").stdout.strip()
+        if action == "volume_up":
+            return self._adb_shell("input", "keyevent", "24").stdout.strip()
+        if action == "volume_down":
+            return self._adb_shell("input", "keyevent", "25").stdout.strip()
+        if action == "rotate":
+            previous = getattr(self, "_manual_rotation", 0)
+            target = 1 if previous == 0 else 0
+            self._adb_shell("settings", "put", "system",
+                            "accelerometer_rotation", "0")
+            self._adb_shell("settings", "put", "system",
+                            "user_rotation", str(target))
+            self._manual_rotation = target
+            return "Ориентация изменена"
+        if action in {"stop_app", "clear_app", "settings_app"}:
+            if len(values) != 1:
+                raise AndroidRuntimeError("Не указано приложение Android")
+            package = validate_package_name(values[0])
+            if action == "stop_app":
+                self._adb_shell("am", "force-stop", package)
+            elif action == "clear_app":
+                self._adb_shell("pm", "clear", package)
+            else:
+                self._adb_shell(
+                    "am", "start", "-a",
+                    "android.settings.APPLICATION_DETAILS_SETTINGS",
+                    "-d", "package:" + package,
+                )
+            return "Команда приложения выполнена"
+        if action == "location":
+            if len(values) != 2:
+                raise AndroidRuntimeError("Нужны широта и долгота")
+            lat, lon = (float(values[0]), float(values[1]))
+            if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                raise AndroidRuntimeError("Координаты за пределами диапазона")
+            result = self._run(
+                [str(self.paths.adb), "-s", self.SERIAL, "emu",
+                 "geo", "fix", str(lon), str(lat)],
+                timeout=20,
+            )
+            return result.stdout.strip() or "Координаты установлены"
+        if action == "push_file":
+            if len(values) != 1:
+                raise AndroidRuntimeError("Не указан файл для передачи")
+            source = Path(values[0]).resolve()
+            if not source.is_file():
+                raise AndroidRuntimeError("Файл не найден")
+            filename = source.name
+            if "/" in filename or "\\\\" in filename:
+                raise AndroidRuntimeError("Недопустимое имя файла")
+            target = "/sdcard/Download/" + filename
+            self._run(
+                [str(self.paths.adb), "-s", self.SERIAL,
+                 "push", str(source), target], timeout=120,
+            )
+            return "Передан файл: " + target
+        if action == "pull_file":
+            if len(values) != 2:
+                raise AndroidRuntimeError("Не указаны пути файлов")
+            remote, destination = values
+            if (not remote.startswith("/sdcard/")
+                    or ".." in remote.split("/")):
+                raise AndroidRuntimeError(
+                    "Получение разрешено только из /sdcard/"
+                )
+            self._run(
+                [str(self.paths.adb), "-s", self.SERIAL,
+                 "pull", remote, str(Path(destination).resolve())],
+                timeout=120,
+            )
+            return "Файл получен: " + destination
+        raise AndroidRuntimeError("Неизвестная команда эмулятора: " + action)
+
     def text(self, value: str) -> None:
         self._run_required_input(
             "send_text",
