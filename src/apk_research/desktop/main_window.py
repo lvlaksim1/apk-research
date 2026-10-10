@@ -18,6 +18,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QDialog,
     QFileDialog,
     QGridLayout,
     QGroupBox,
@@ -47,6 +48,7 @@ from apk_research.desktop.controller import (
 from apk_research.desktop.http_window import (
     HttpTransactionsWindow,
 )
+from apk_research.desktop.live_https import LiveHttpsView
 from apk_research.desktop.updater import (
     DownloadedUpdate,
     ReleaseInfo,
@@ -149,8 +151,6 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._connect_signals()
         self._refresh_component_state()
-        self._refresh_results()
-        self._refresh_sessions()
         QTimer.singleShot(
             500,
             self.controller.refresh_diagnostics,
@@ -223,7 +223,7 @@ class MainWindow(QMainWindow):
             "font-size: 22px; font-weight: 600;"
         )
         subtitle = QLabel(
-            "Android application research environment"
+            "Полный архив исследования и HTTPS в реальном времени"
         )
         subtitle.setStyleSheet(
             "color: #7b838c;"
@@ -242,28 +242,37 @@ class MainWindow(QMainWindow):
         root.addLayout(header)
 
         self.tabs = QTabWidget()
-        self.tabs.addTab(
-            self._build_research_tab(),
-            "Исследование",
-        )
-        self.tabs.addTab(
-            self._build_results_tab(),
-            "Результаты",
-        )
-        self.tabs.addTab(
-            self._build_sessions_tab(),
-            "История",
-        )
-        self.tabs.addTab(
-            self._build_diagnostics_tab(),
-            "Диагностика",
-        )
-        self.tabs.addTab(
-            self._build_settings_tab(),
-            "Настройки",
-        )
+        self.tabs.addTab(self._build_research_tab(), "Исследование")
+        self.https_view = LiveHttpsView(self)
+        self.tabs.addTab(self.https_view, "HTTPS • онлайн")
         root.addWidget(self.tabs, 1)
         self.setCentralWidget(central)
+
+        # Keep evidence collectors and service operations unchanged.
+        # Technical pages are no longer part of main navigation.
+        self._hidden_pages = [
+            self._build_results_tab(),
+            self._build_sessions_tab(),
+            self._build_diagnostics_tab(),
+        ]
+        for page in self._hidden_pages:
+            page.setParent(self)
+            page.hide()
+
+        self._service_dialog = QDialog(self)
+        self._service_dialog.setWindowTitle("Обновление и обслуживание")
+        self._service_dialog.resize(620, 520)
+        service_layout = QVBoxLayout(self._service_dialog)
+        service_layout.addWidget(self._build_settings_tab())
+        menu = self.menuBar().addMenu("Программа")
+        menu.addAction(
+            "Открыть папку ZIP",
+            lambda: self._open_folder(default_runtime_root()),
+        )
+        menu.addAction(
+            "Обновление и обслуживание…",
+            self._service_dialog.show,
+        )
 
     def _build_research_tab(self) -> QWidget:
         page = QWidget()
@@ -282,9 +291,7 @@ class MainWindow(QMainWindow):
             0,
         )
 
-        apk_group = QGroupBox(
-            "1. Исследуемое приложение"
-        )
+        apk_group = QGroupBox("1. Приложение")
         apk_layout = QVBoxLayout(apk_group)
         self.apk_path = QLineEdit()
         self.apk_path.setReadOnly(True)
@@ -328,9 +335,7 @@ class MainWindow(QMainWindow):
         )
         left_layout.addWidget(apk_group)
 
-        status_group = QGroupBox(
-            "2. Готовность среды"
-        )
+        status_group = QGroupBox("2. Готовность к записи")
         status_layout = QGridLayout(
             status_group
         )
@@ -339,7 +344,7 @@ class MainWindow(QMainWindow):
         )
         self.status_adb = QLabel("○ ADB")
         self.status_root = QLabel("○ Root")
-        self.status_network = QLabel("○ PCAP")
+        self.status_network = QLabel("○ Полная запись")
         self.status_package = QLabel("○ APK/XAPK")
         statuses = [
             self.status_android,
@@ -349,11 +354,9 @@ class MainWindow(QMainWindow):
             self.status_package,
         ]
         for row, widget in enumerate(statuses):
-            status_layout.addWidget(
-                widget,
-                row,
-                0,
-            )
+            status_layout.addWidget(widget, row, 0)
+        self.status_adb.hide()
+        self.status_root.hide()
         self.prepare_button = QPushButton(
             "Подготовить Android"
         )
@@ -438,6 +441,19 @@ class MainWindow(QMainWindow):
             self.session_label
         )
         left_layout.addWidget(run_group)
+        archive_note = QLabel(
+            "В ZIP автоматически сохраняются сетевые пакеты, "
+            "HTTPS-запросы и ответы, экран, действия и диагностика. "
+            "Отдельно включать запись не требуется."
+        )
+        archive_note.setWordWrap(True)
+        archive_note.setStyleSheet("color: #7b838c;")
+        left_layout.addWidget(archive_note)
+        self.zip_folder_button = QPushButton("Открыть папку с ZIP")
+        self.zip_folder_button.clicked.connect(
+            lambda: self._open_folder(default_runtime_root())
+        )
+        left_layout.addWidget(self.zip_folder_button)
         left_layout.addStretch(1)
 
         android_container = QWidget()
@@ -1408,6 +1424,11 @@ class MainWindow(QMainWindow):
         data: dict,
     ) -> None:
         self._research_active = True
+        session_path = data.get("session_root")
+        if session_path:
+            self.https_view.begin_session(
+                str(session_path), str(data.get("package") or "")
+            )
         self.session_label.setText(
             "ACTIVE\n"
             f"{data.get('session_id', '')}\n"
@@ -1425,7 +1446,7 @@ class MainWindow(QMainWindow):
         self.install_package_button.setEnabled(False)
         self.launch_package_button.setEnabled(False)
         self.status_network.setText(
-            "● PCAP записывается"
+            "● Сетевые пакеты записываются"
         )
         self.status_network.setStyleSheet(
             "color: #238636;"
@@ -1493,18 +1514,10 @@ class MainWindow(QMainWindow):
             bool(self.controller.package_name)
         )
         self.status_network.setText(
-            "● PCAP сохранён"
+            "● Сетевые пакеты сохранены"
         )
+        self.https_view.finish_session(self._last_archive)
         self._refresh_results()
-        self._refresh_sessions()
-        self.tabs.setCurrentIndex(1)
-        self.result_details.setPlainText(
-            json.dumps(
-                data,
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
 
     def _on_archive_inspection(
         self,
@@ -1604,7 +1617,7 @@ class MainWindow(QMainWindow):
         self.status_adb.setStyleSheet("")
         self.status_root.setText("○ Root")
         self.status_root.setStyleSheet("")
-        self.status_network.setText("○ PCAP")
+        self.status_network.setText("○ Полная запись")
         self.status_network.setStyleSheet("")
 
         if self.controller.package_name:
