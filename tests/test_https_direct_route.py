@@ -102,7 +102,8 @@ def test_direct_route_limits_output_rule_to_target_uid_and_tcp443(
     ).read_text(encoding="utf-8")
     assert "CONNECTION_ROUTED" in saved
     restored = "\n".join(adb.shells)
-    assert "iptables -t nat -D OUTPUT -m owner --uid-owner 10156" in restored
+    assert "iptables -t nat -D OUTPUT \"$@\"" in restored
+    assert '-j $CHAIN' in restored
 
 
 def test_metadata_records_scope_and_route_usage(tmp_path):
