@@ -1,5 +1,12 @@
 # apk-research
 
+## v0.31.0 — ARM64 APK/XAPK
+
+При выборе APK/XAPK с нативными библиотеками только для ARM приложение автоматически подготавливает отдельный официальный образ Android 15 (Google APIs / x86_64). Этот образ поддерживает выполнение ARM64-кода средствами Android Native Bridge. Дополнительный образ загружается при первом использовании; это может потребовать значительного объёма сети и диска.
+
+Прежний эмулятор Android 15 (Default / x86_64) и его приложения остаются на месте. После успешного запуска выбранный профиль сохраняется. До установки программа проверяет структуру XAPK, совместимые ABI и реальный список архитектур Android. Внутренний экран gRPC/MMAP, сеть, Research ZIP и доказательная модель остаются под прежними требованиями.
+
+
 ## v0.30.0 — HTTPS Traffic Inspection
 
 v0.30.0 adds first-class display of decrypted HTTPS traffic in the managed Android research environment. During research apk-research starts its bundled interception worker, routes the managed emulator through it with `adb reverse`, temporarily places the research CA into the rooted Android 15 trust environment, and stores decrypted HTTP transactions when interception succeeds.
