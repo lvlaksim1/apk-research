@@ -57,8 +57,12 @@ class ResearchTransactionRecorder:
             self._direct_client_ids.add(str(flow.client_conn.id))
 
     def _route(self, flow: http.HTTPFlow) -> str:
+        client = getattr(flow, "client_conn", None)
+        identifier = getattr(client, "id", None)
         return (
-            "direct" if str(flow.client_conn.id) in self._direct_client_ids
+            "direct"
+            if identifier is not None
+            and str(identifier) in self._direct_client_ids
             else "system-or-undetermined"
         )
 
