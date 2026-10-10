@@ -164,6 +164,7 @@ class RawNetworkCollector:
 
     NAME = "raw_network"
     BACKEND = "adb-tcpdump"
+    CAPTURE_BUFFER_KIB = 16384
     RAW_ARTIFACT = "01_raw/network/traffic.pcap"
     STDERR_ARTIFACT = "01_raw/network/tcpdump.stderr.txt"
     METADATA_ARTIFACT = "02_normalized/network.json"
@@ -359,6 +360,8 @@ class RawNetworkCollector:
             "-p",
             "-s",
             "0",
+            "-B",
+            str(self.CAPTURE_BUFFER_KIB),
             "-U",
             "-w",
             "-",
@@ -703,6 +706,7 @@ class RawNetworkCollector:
             "remote_pid": self._remote_pid,
             "interface": "any",
             "snaplen": 0,
+            "capture_buffer_kib": self.CAPTURE_BUFFER_KIB,
             "packet_buffering": "immediate (-U)",
             "started_utc": self._started_utc,
             "stopped_utc": self._stopped_utc,
