@@ -1092,6 +1092,15 @@ class AndroidRuntime:
                     "-d", "package:" + package,
                 )
             return "Команда приложения выполнена"
+        if action == "shake":
+            command = [
+                str(self.paths.adb), "-s", self.SERIAL,
+                "emu", "sensor", "set", "acceleration",
+            ]
+            self._run(command + ["15:0:0"], timeout=20)
+            time.sleep(0.25)
+            self._run(command + ["0:9.8:0"], timeout=20)
+            return "Встряска устройства выполнена"
         if action == "location":
             if len(values) != 2:
                 raise AndroidRuntimeError("Нужны широта и долгота")
