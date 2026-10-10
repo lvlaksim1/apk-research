@@ -80,7 +80,7 @@ def main() -> int:
     abis = run([str(adb), "-s", "emulator-5554", "shell",
                 "getprop", "ro.product.cpu.abilist"])
     print("Guest ABI list:", abis.strip(), flush=True)
-    if "arm64-v8a" not in abis.split(","):
+    if "arm64-v8a" not in [abi.strip() for abi in abis.split(",")]:
         raise RuntimeError("Google APIs guest does not advertise arm64-v8a")
     uid = run([str(adb), "-s", "emulator-5554", "shell", "id", "-u"])
     if uid.strip() != "0":
