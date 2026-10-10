@@ -9,9 +9,7 @@ from PySide6.QtWidgets import QApplication
 from apk_research.desktop.android_runtime import (
     AndroidRuntime,
 )
-from apk_research.desktop.investigator_workspace_v026_window import (
-    InvestigatorWorkspaceV026MainWindow,
-)
+from apk_research.desktop.main_window import MainWindow
 
 
 def _application_icon() -> QIcon:
@@ -57,7 +55,7 @@ def main() -> int:
     icon = _application_icon()
     if not icon.isNull():
         app.setWindowIcon(icon)
-    window = InvestigatorWorkspaceV026MainWindow()
+    window = MainWindow()
     if not icon.isNull():
         window.setWindowIcon(icon)
     window.show()

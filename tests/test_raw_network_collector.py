@@ -235,7 +235,7 @@ def test_raw_network_graceful_stop(tmp_path: Path) -> None:
         "sh",
         "-c",
         (
-            "tcpdump -i any -p -s 0 -U -w - "
+            "tcpdump -i any -p -s 0 -B 16384 -U -w - "
             "2>/data/local/tmp/apk-research/"
             "network-session/tcpdump.stderr.txt"
         ),

@@ -9,24 +9,20 @@ def _gui_smoke_test() -> int:
 
     from PySide6.QtWidgets import QApplication
 
-    from apk_research.desktop.unified_evidence_v024 import (
-        UnifiedEvidenceV024MainWindow,
-    )
+    from apk_research.desktop.main_window import MainWindow
 
     app = QApplication.instance() or QApplication([])
-    window = UnifiedEvidenceV024MainWindow()
+    window = MainWindow()
     window.show()
     app.processEvents()
-    assert hasattr(window, "evidence_tab_index")
-    assert hasattr(window, "packet_tab_index")
-    assert hasattr(window, "unified_tab_index")
-    assert hasattr(window, "unified_table")
+    assert window.tabs.count() == 2
+    assert window.tabs.tabText(0) == "Исследование"
+    assert window.tabs.tabText(1) == "HTTPS • онлайн"
+    assert window.https_view is not None
+    assert hasattr(window, "install_package_button")
+    assert hasattr(window, "stop_button")
     assert hasattr(window, "check_updates_button")
     assert hasattr(window, "install_update_button")
-    assert hasattr(window, "update_status_label")
-    assert hasattr(window, "install_package_button")
-    assert hasattr(window, "launch_package_button")
-    assert hasattr(window, "results_http")
     window.close()
     app.processEvents()
     return 0
