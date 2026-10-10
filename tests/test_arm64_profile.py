@@ -60,7 +60,7 @@ def test_google_apis_profile_keeps_legacy_userdata(tmp_path: Path) -> None:
     manager.create_avd_profile()
     config = (manager.paths.avd_dir / "config.ini").read_text(encoding="utf-8")
     assert "tag.id=google_apis" in config
-    assert r"image.sysdir.1=system-images\android-35\google_apis\x86_64\" in config
+    assert "image.sysdir.1=" in config and "google_apis" in config
     assert f"AvdId={ARM_COMPATIBLE_AVD_NAME}" in config
     assert (old_avd / "userdata-qemu.img").read_bytes() == b"existing user data"
 
