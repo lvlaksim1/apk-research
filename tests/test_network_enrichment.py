@@ -21,7 +21,8 @@ def _ip_udp(payload: bytes, *, src_port: int = 50000, dst_port: int = 53) -> byt
 
 
 def _ip_tcp(payload: bytes) -> bytes:
-    tcp = struct.pack("!HHIIHHHH", 51000, 443, 0, 0, 5 << 12, 65535, 0, 0) + payload
+    # Device-side route uses a local port instead of the remote TCP/443.
+    tcp = struct.pack("!HHIIHHHH", 51000, 38888, 0, 0, 5 << 12, 65535, 0, 0) + payload
     ip = struct.pack("!BBHHHBBH4s4s",
         0x45, 0, 20 + len(tcp), 1, 0, 64, 6, 0,
         ipaddress.IPv4Address("10.0.2.15").packed,
