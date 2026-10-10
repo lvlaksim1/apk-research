@@ -594,8 +594,7 @@ class MainWindow(QMainWindow):
             self.showNormal() if self.isFullScreen() else self.showFullScreen()
             return
         if action == "install":
-            self._choose_apk()
-            if self._selected_package_path:
+            if self._choose_apk():
                 self._install_selected_package()
             return
         if action == "screenshot":
@@ -1336,7 +1335,7 @@ class MainWindow(QMainWindow):
             )
         )
 
-    def _choose_apk(self) -> None:
+    def _choose_apk(self) -> bool:
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Выберите APK или XAPK",
@@ -1344,7 +1343,7 @@ class MainWindow(QMainWindow):
             "Пакеты Android (*.apk *.xapk)",
         )
         if not path:
-            return
+            return False
         self._selected_package_path = path
         self.apk_path.setText(path)
         self.package_label.setText(
@@ -1360,6 +1359,7 @@ class MainWindow(QMainWindow):
             "○ Пакет выбран — не установлен"
         )
         self.status_package.setStyleSheet("")
+        return True
 
     def _install_selected_package(self) -> None:
         path = self._selected_package_path
