@@ -176,6 +176,7 @@ import android.widget.TextView;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.URL;
+import java.net.Proxy;
 import javax.net.ssl.HttpsURLConnection;
 
 public final class MainActivity extends Activity {{
@@ -187,39 +188,38 @@ public final class MainActivity extends Activity {{
         setContentView(view);
         new Thread(() -> {{
             try {{
-                URL url = new URL("{TARGET_URL}");
-                HttpsURLConnection connection =
-                    (HttpsURLConnection) url.openConnection();
-                connection.setConnectTimeout(15000);
-                connection.setReadTimeout(15000);
-                connection.setRequestProperty(
-                    "X-Apk-Research-Acceptance",
-                    "v0.30"
-                );
-                int code = connection.getResponseCode();
-                InputStream stream =
-                    code >= 400
-                    ? connection.getErrorStream()
-                    : connection.getInputStream();
-                ByteArrayOutputStream out =
-                    new ByteArrayOutputStream();
-                if (stream != null) {{
-                    byte[] buffer = new byte[4096];
-                    int count;
-                    while ((count = stream.read(buffer)) >= 0) {{
-                        out.write(buffer, 0, count);
+                StringBuilder report = new StringBuilder();
+                for (int attempt = 0; attempt < 2; attempt++) {{
+                    String route = attempt == 0 ? "system" : "direct";
+                    URL url = new URL("{TARGET_URL}");
+                    HttpsURLConnection connection = (HttpsURLConnection)
+                        (attempt == 0
+                            ? url.openConnection()
+                            : url.openConnection(Proxy.NO_PROXY));
+                    connection.setConnectTimeout(15000);
+                    connection.setReadTimeout(15000);
+                    connection.setRequestProperty("X-Apk-Research-Mode", route);
+                    int code = connection.getResponseCode();
+                    InputStream stream = code >= 400
+                        ? connection.getErrorStream()
+                        : connection.getInputStream();
+                    ByteArrayOutputStream out = new ByteArrayOutputStream();
+                    if (stream != null) {{
+                        byte[] buffer = new byte[4096];
+                        int count;
+                        while ((count = stream.read(buffer)) >= 0) {{
+                            out.write(buffer, 0, count);
+                        }}
+                        stream.close();
                     }}
-                    stream.close();
+                    report.append(route).append(":").append(code)
+                        .append(" bytes=").append(out.size()).append(" ");
+                    connection.disconnect();
                 }}
-                String result =
-                    "HTTPS " + code + " bytes=" + out.size();
-                runOnUiThread(() -> view.setText(result));
-                connection.disconnect();
+                runOnUiThread(() -> view.setText(report.toString()));
             }} catch (Exception error) {{
                 runOnUiThread(
-                    () -> view.setText(
-                        "HTTPS ERROR " + error.toString()
-                    )
+                    () -> view.setText("HTTPS ERROR " + error.toString())
                 );
             }}
         }}).start();
@@ -416,7 +416,7 @@ def main() -> int:
                 )
             )
 
-            deadline = time.monotonic() + 25.0
+            deadline = time.monotonic() + 60.0
             session = orchestrator.session
             if session is None:
                 raise RuntimeError(
@@ -435,7 +435,11 @@ def main() -> int:
                         encoding="utf-8",
                         errors="replace",
                     )
-                    if TARGET_URL in text:
+                    if (
+                        TARGET_URL in text
+                        and '"X-Apk-Research-Mode"' in text
+                        and '"direct"' in text
+                    ):
                         break
                 time.sleep(0.5)
 
@@ -468,40 +472,56 @@ def main() -> int:
                     "No decrypted HTTPS transaction was captured "
                     f"for {TARGET_URL}"
                 )
-            transaction = matches[-1]
-            interception = (
-                transaction.get("interception")
-                or {}
-            )
-            response = (
-                transaction.get("response")
-                or {}
-            )
-            body = response.get("body") or {}
-            if not interception.get(
-                "tls_decrypted"
-            ):
-                raise RuntimeError(
-                    "HTTPS transaction was not marked decrypted"
+            modes = set()
+            response_sizes = {}
+            for transaction in matches:
+                headers = (
+                    transaction.get("request") or {}
+                ).get("headers") or []
+                mode = next(
+                    (
+                        str(value)
+                        for name, value in headers
+                        if str(name).lower() == "x-apk-research-mode"
+                    ),
+                    None,
                 )
-            if int(
-                response.get(
-                    "status_code"
-                )
-                or 0
-            ) != 200:
-                raise RuntimeError(
-                    "Unexpected HTTPS status: "
-                    + str(
-                        response.get(
-                            "status_code"
-                        )
+                if mode not in {"system", "direct"}:
+                    continue
+                modes.add(mode)
+                response = transaction.get("response") or {}
+                body = response.get("body") or {}
+                if not (transaction.get("interception") or {}).get(
+                    "tls_decrypted"
+                ):
+                    raise RuntimeError(
+                        f"HTTPS analyzer did not read the {mode} TLS flow"
                     )
-                )
-            if int(body.get("size") or 0) <= 0:
+                if int(response.get("status_code") or 0) != 200:
+                    raise RuntimeError(
+                        f"HTTPS {mode} status was not 200: {response}"
+                    )
+                if int(body.get("size") or 0) <= 0:
+                    raise RuntimeError(
+                        f"HTTPS {mode} response body is empty"
+                    )
+                response_sizes[mode] = int(body["size"])
+            if modes != {"system", "direct"}:
                 raise RuntimeError(
-                    "HTTPS response body is empty"
+                    "Expected both system and direct HTTPS transactions, "
+                    + f"observed={sorted(modes)}"
                 )
+            transaction = matches[-1]
+            response = transaction.get("response") or {}
+            body = response.get("body") or {}
+            with zipfile.ZipFile(Path(result.archive)) as evidence:
+                route_log = evidence.read(
+                    "01_raw/network/https-direct-route.log"
+                ).decode("utf-8", errors="replace")
+                if "CONNECTION_ROUTED destination=" not in route_log:
+                    raise RuntimeError(
+                        "Android routing log does not confirm direct TCP/443"
+                    )
 
             print(
                 json.dumps(
@@ -518,6 +538,8 @@ def main() -> int:
                         "response_bytes": body.get(
                             "size"
                         ),
+                        "verified_routes": sorted(modes),
+                        "route_response_sizes": response_sizes,
                         "archive": result.archive,
                     },
                     ensure_ascii=False,
