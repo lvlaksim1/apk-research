@@ -199,6 +199,7 @@ class HttpsInterceptionCollector:
         self._ca_injection_succeeded = False
         self._route_attempted = False
         self._route_active = False
+        self._route_ever_active = False
         self._route_uid: int | None = None
         self._route_binary_sha256 = ""
 
@@ -622,7 +623,7 @@ test -s "$SYSTEM/{self._ca_subject_hash}.0"
         )
         pattern = re.compile(
             r"^package:" + re.escape(self.package_name)
-            + r"\\s+uid:(\\d+)\\s*$",
+            + r"\s+uid:(\d+)\s*$"
             re.MULTILINE,
         )
         match = pattern.search(listing)
@@ -690,6 +691,7 @@ printf '%s\\n' ROUTE_ACTIVE
                 "Android не подтвердил направление прямых HTTPS-соединений"
             )
         self._route_active = True
+        self._route_ever_active = True
 
     def _stop_direct_route(self) -> None:
         if not self._route_attempted:
@@ -877,6 +879,7 @@ rm -rf /data/local/tmp/apk-research/https-ca /data/local/tmp/apk-research/https
                 "system_ca_injected": self._ca_injected,
                 "target_uid": self._route_uid,
                 "direct_tcp443_route_configured": self._route_active,
+                "direct_tcp443_route_used": self._route_ever_active,
                 "direct_route_port": self.DEVICE_ROUTE_PORT,
                 "direct_route_binary_sha256": self._route_binary_sha256 or None,
                 "system_ca_injection_succeeded": self._ca_injection_succeeded,
