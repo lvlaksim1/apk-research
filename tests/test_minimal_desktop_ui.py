@@ -129,10 +129,13 @@ def test_emulator_panel_actions_are_connected(app, monkeypatch):
         )
         window._android_ready = True
         window._research_active = True
+        window._busy = True
         window._refresh_emulator_tools()
         assert not window.emulator_tools.buttons["clear_data"].isEnabled()
         assert not window.emulator_tools.buttons["restart"].isEnabled()
         assert window.emulator_tools.buttons["home"].isEnabled()
+        assert window.emulator_tools.buttons["screenshot"].isEnabled()
+        assert window.emulator_tools.buttons["rotate"].isEnabled()
         assert window.tabs.count() == 2
     finally:
         window.https_view.timer.stop()
