@@ -155,7 +155,7 @@ static void *handle_connection(void *opaque) {
     }
     char request[256];
     int n = snprintf(request, sizeof(request),
-        "CONNECT %s:%u HTTP/1.1\r\nHost: %s:%u\r\n\r\n",
+        "CONNECT %s:%u HTTP/1.1\r\nHost: %s:%u\r\nX-Apk-Research-Route: direct\r\n\r\n",
         address, port, address, port);
     if (n <= 0 || (size_t)n >= sizeof(request) ||
         write_all(upstream, request, (size_t)n) != 0 ||
