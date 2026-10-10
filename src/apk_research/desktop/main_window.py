@@ -1442,8 +1442,7 @@ class MainWindow(QMainWindow):
                 str(session_path), str(data.get("package") or "")
             )
         self.session_label.setText(
-            "ACTIVE\n"
-            f"{data.get('session_id', '')}\n"
+            "● Запись идёт\n"
             f"{data.get('package', '')}"
         )
         self.global_status.setText(
@@ -1472,15 +1471,15 @@ class MainWindow(QMainWindow):
             data.get("healthy")
         )
         base = self.session_label.text().split(
-            "\nCollectors:"
+            "\nСостояние записи:"
         )[0]
         self.session_label.setText(
             base
-            + "\nCollectors: "
+            + "\nСостояние записи: "
             + (
-                "OK"
+                "нормально"
                 if healthy
-                else "DEGRADED"
+                else "есть замечания"
             )
         )
 
@@ -1501,9 +1500,10 @@ class MainWindow(QMainWindow):
             "validation_issues"
         )
         self.session_label.setText(
-            f"Завершено: {status}\n"
-            f"Validation issues: {issues}\n"
-            f"{self._last_archive}"
+            ("● ZIP сохранён" if status == "complete"
+             else f"● Запись завершена: {status}")
+            + (" · есть замечания" if issues else "")
+            + f"\n{self._last_archive}"
         )
         self.global_status.setText(
             "Исследование завершено: "
