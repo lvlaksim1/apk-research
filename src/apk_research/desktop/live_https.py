@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget,
@@ -27,6 +27,8 @@ from apk_research.desktop.http_window import (
 MAX_PREVIEW_BYTES = 128 * 1024
 class LiveHttpsView(QWidget):
     """Read-only live display of requests and responses for current session."""
+
+    countChanged = Signal(int)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -120,6 +122,7 @@ class LiveHttpsView(QWidget):
         ):
             field.clear()
         self.count.setText("0 запросов")
+        self.countChanged.emit(0)
 
     def begin_session(self, root: str | Path, package: str) -> None:
         self.timer.stop()
@@ -141,6 +144,7 @@ class LiveHttpsView(QWidget):
         if records:
             self.transactions.extend(records)
             self._apply_filter()
+            self.countChanged.emit(len(self.transactions))
         invalid = self._reader.invalid_records
         self.count.setText(
             f"{len(self.transactions)} запросов"
@@ -184,6 +188,7 @@ class LiveHttpsView(QWidget):
         self.title.setText("HTTPS • " + path.name)
         self._apply_filter()
         self.count.setText(f"{len(self.transactions)} запросов")
+        self.countChanged.emit(len(self.transactions))
 
     def _choose_archive(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
