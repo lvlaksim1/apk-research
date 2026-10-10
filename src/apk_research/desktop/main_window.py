@@ -1463,9 +1463,9 @@ class MainWindow(QMainWindow):
     def _on_environment_ready(
         self,
         data: dict,
-    ) -> None
+    ) -> None:
         self._android_ready = True
-        self._refresh_emulator_tools():
+        self._refresh_emulator_tools()
         self._refresh_component_state()
         if data.get("device_online"):
             transport = (
