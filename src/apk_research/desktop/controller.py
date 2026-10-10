@@ -513,6 +513,10 @@ class DesktopController(QObject):
             self.apk_path = path
             self.package_name = None
             self._input_error_reported = False
+            self.runtime.prepare_package_environment(
+                path,
+                self._progress_callback,
+            )
             self.runtime.ensure_ready(
                 self._progress_callback,
                 self._display_ready_callback,
