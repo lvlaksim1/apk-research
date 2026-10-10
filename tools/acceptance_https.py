@@ -526,6 +526,30 @@ def main() -> int:
                     raise RuntimeError(
                         "Android routing log does not confirm direct TCP/443"
                     )
+                for required in (
+                    "02_normalized/dns.jsonl",
+                    "02_normalized/tls-sessions.jsonl",
+                    "02_normalized/action-network-links.jsonl",
+                    "02_normalized/screen-timing.jsonl",
+                    "02_normalized/network-enrichment.json",
+                ):
+                    if required not in evidence.namelist():
+                        raise RuntimeError(
+                            "Missing required derived evidence file: " + required
+                        )
+                enrichment = json.loads(evidence.read(
+                    "02_normalized/network-enrichment.json"
+                ))
+                if enrichment.get("status") != "complete":
+                    raise RuntimeError(
+                        "Network enrichment incomplete: " + str(enrichment)
+                    )
+                if int(
+                    (enrichment.get("counts") or {}).get("http_transactions") or 0
+                ) < 2:
+                    raise RuntimeError(
+                        "Network enrichment omitted actual HTTP transactions"
+                    )
 
             print(
                 json.dumps(
