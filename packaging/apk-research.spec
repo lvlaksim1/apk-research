@@ -17,6 +17,9 @@ app_icon_ico = (
     / "app-icon"
     / "apk-research.ico"
 )
+route_executable = (
+    project_root / "build" / "android-route" / "apk-research-https-route"
+)
 app_icon_png = (
     project_root
     / "build"
@@ -28,6 +31,8 @@ if not agent_jar.is_file():
         "Android sidecar agent was not built: "
         + str(agent_jar)
     )
+if not route_executable.is_file():
+    raise RuntimeError("Android HTTPS route executable was not built")
 if not app_icon_ico.is_file() or not app_icon_png.is_file():
     raise RuntimeError(
         "Application icon was not built: "
@@ -39,6 +44,10 @@ a = Analysis(
     pathex=[str(source_root)],
     binaries=[],
     datas=[
+        (
+            str(route_executable),
+            "apk_research/resources",
+        ),
         (
             str(agent_jar),
             "apk_research/resources",

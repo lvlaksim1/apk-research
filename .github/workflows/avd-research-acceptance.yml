@@ -18,6 +18,8 @@ on:
       - "src/apk_research/targets/adb.py"
       - "tools/acceptance_avd.py"
       - "tools/build_android_sidecar.py"
+      - "tools/build_android_https_route.py"
+      - "android_route/**"
       - "tools/acceptance_sidecar.py"
       - "tools/acceptance_xapk.py"
       - ".github/workflows/avd-research-acceptance.yml"
@@ -58,9 +60,12 @@ jobs:
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n 1)"
           test -n "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-35" "build-tools;35.0.0" "system-images;android-35;default;x86_64"
+          "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "system-images;android-35;default;x86_64"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           echo "$ANDROID_HOME/emulator" >> "$GITHUB_PATH"
+
+      - name: Build Android HTTPS route executable
+        run: python tools/build_android_https_route.py
 
       - name: Build Android sidecar
         run: python tools/build_android_sidecar.py

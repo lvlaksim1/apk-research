@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.32.0] - 2026-10-10
+
+### Added
+- Application-UID-scoped routing of direct Android IPv4 TCP/443 connections to the existing HTTPS analyzer when the selected application ignores the Android system proxy.
+- Small Android-local forwarding executable compiled from C source with the official Android NDK in both Linux AVD and Windows packaging pipelines.
+- Original destination preservation via `SO_ORIGINAL_DST` and an HTTP CONNECT channel through the existing device-to-host `adb reverse` connection.
+- Independent raw routing diagnostics at `01_raw/network/https-direct-route.log` plus routing scope and provenance in existing HTTPS metadata.
+- Automatic removal of the routing rule on normal session shutdown or failed startup.
+- Real Android 15 test that executes HTTPS requests with both the system proxy and an explicit `Proxy.NO_PROXY` path; both must appear with nonempty response bodies.
+
+### Boundaries
+- Only the selected app's IPv4 TCP/443 connections are routed; other applications, other TCP ports and UDP/QUIC are unchanged.
+- Existing TLS trust limitations remain. Routing does not automatically make all encrypted application data readable.
+- Independently archived RAW PCAP and research provenance remain unchanged.
+- v0.31.0 ARM64 profile handling and separate Setup/Update installer architecture are preserved.
+
+
 ## [0.31.0] - 2026-10-10
 
 ### Added

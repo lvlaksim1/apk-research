@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -147,20 +148,23 @@ def _worker_command(arguments: list[str]) -> list[str]:
 
 
 class HttpsInterceptionCollector:
-    """Managed active HTTP(S) interception for the research AVD.
+    """Manage HTTP(S) traffic analysis in the dedicated research AVD.
 
-    Passive PCAP remains independent and authoritative. This collector routes
-    Android's explicit HTTP proxy through adb reverse to an isolated mitmproxy
-    worker and temporarily injects its CA into the rooted research emulator.
+    The Android system proxy and an application-scoped TCP/443 route share
+    the same existing HTTPS analyzer. Passive PCAP remains independent.
     """
 
     NAME = "https_interception"
-    BACKEND = "mitmproxy-regular-adb-reverse"
+    BACKEND = "mitmproxy-regular-adb-reverse+app-uid-tcp443-route"
     TRANSACTIONS_ARTIFACT = "02_normalized/http-transactions.jsonl"
     BODIES_DIR = "02_normalized/http-bodies"
     METADATA_ARTIFACT = "02_normalized/http-interception.json"
     STDERR_ARTIFACT = "01_raw/network/https-proxy.stderr.txt"
     DEVICE_PROXY_PORT = 38887
+    DEVICE_ROUTE_PORT = 38888
+    ROUTE_CHAIN = "APKRS_HTTPS32"
+    ROUTE_ROOT = "/data/local/tmp/apk-research/https-route32"
+    ROUTE_LOG_ARTIFACT = "01_raw/network/https-direct-route.log"
 
     def __init__(
         self,
@@ -193,6 +197,12 @@ class HttpsInterceptionCollector:
         self._reverse_configured = False
         self._ca_injected = False
         self._ca_injection_succeeded = False
+        self._route_attempted = False
+        self._route_active = False
+        self._route_ever_active = False
+        self._route_cleanup_confirmed: bool | None = None
+        self._route_uid: int | None = None
+        self._route_binary_sha256 = ""
 
     @property
     def running(self) -> bool:
@@ -267,6 +277,7 @@ class HttpsInterceptionCollector:
             ("http_transactions", self.TRANSACTIONS_ARTIFACT, False),
             ("http_interception_metadata", self.METADATA_ARTIFACT, False),
             ("http_proxy_stderr", self.STDERR_ARTIFACT, True),
+            ("https_route_diagnostics", self.ROUTE_LOG_ARTIFACT, True),
         ):
             self.session.register_artifact(
                 kind=kind,
@@ -288,6 +299,10 @@ class HttpsInterceptionCollector:
         transactions_path.parent.mkdir(parents=True, exist_ok=True)
         bodies_dir.mkdir(parents=True, exist_ok=True)
         stderr_path.parent.mkdir(parents=True, exist_ok=True)
+        (self.session.paths.root / self.ROUTE_LOG_ARTIFACT).parent.mkdir(
+            parents=True, exist_ok=True,
+        )
+        (self.session.paths.root / self.ROUTE_LOG_ARTIFACT).touch(exist_ok=True)
         transactions_path.touch(exist_ok=True)
         self._stderr = stderr_path.open("wb")
 
@@ -332,6 +347,7 @@ class HttpsInterceptionCollector:
             self._ca_subject_hash = _subject_hash_old(ca_cert)
             self._inject_ca(ca_cert)
             self._configure_proxy()
+            self._configure_direct_route()
         except Exception as exc:
             self._cleanup_best_effort()
             message = str(exc) or exc.__class__.__name__
@@ -378,6 +394,9 @@ class HttpsInterceptionCollector:
         if grace_period <= 0:
             raise ValueError("grace_period must be positive")
 
+        # Remove the application-scoped Android route first, then stop its
+        # host analyzer. This avoids leaving the selected app without HTTPS.
+        self._stop_direct_route()
         process = self._process
         returncode: int | None = None
         if process is not None and process.poll() is None:
@@ -398,14 +417,19 @@ class HttpsInterceptionCollector:
         self._finished = True
 
         count = self._transaction_count()
-        status = "completed"
+        cleanup_error = (
+            "Не удалось подтвердить удаление сетевого правила Android"
+            if self._route_cleanup_confirmed is False else None
+        )
+        status = "failed" if cleanup_error else "completed"
         self.session.update_collector(
             self.NAME,
             status,
+            error=cleanup_error,
         )
         self._write_metadata(
             status,
-            error=None,
+            error=cleanup_error,
             proxy_returncode=returncode,
             transaction_count=count,
         )
@@ -576,7 +600,166 @@ test -s "$SYSTEM/{self._ca_subject_hash}.0"
             )
         self._proxy_configured = True
 
+    @staticmethod
+    def _route_executable() -> Path:
+        """Find the platform-specific packaged Android route executable."""
+        if getattr(sys, "frozen", False):
+            root = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+            path = (
+                root / "apk_research" / "resources"
+                / "apk-research-https-route"
+            )
+        else:
+            root = Path(__file__).resolve().parents[3]
+            path = root / "build" / "android-route" / "apk-research-https-route"
+        if not path.is_file() or path.stat().st_size <= 0:
+            raise HttpsInterceptionCollectorError(
+                "Служебный модуль направления HTTPS не найден: "
+                + str(path)
+            )
+        return path
+
+    def _target_uid(self) -> int:
+        """Obtain the installed target's actual Android application UID."""
+        # Android package manager reports the UID; never infer it from names.
+        listing = self.adb.shell_output(
+            self._serial, "cmd", "package", "list", "packages",
+            "-U", "--user", "0", self.package_name,
+            timeout=15.0,
+        )
+        pattern = re.compile(
+            r"^package:" + re.escape(self.package_name)
+            + r"\s+uid:(\d+)\s*$",
+            re.MULTILINE,
+        )
+        match = pattern.search(listing)
+        if not match:
+            raise HttpsInterceptionCollectorError(
+                "Android не сообщил UID выбранного приложения: "
+                + self.package_name
+            )
+        return int(match.group(1))
+
+    def _configure_direct_route(self) -> None:
+        """Add only the selected app's IPv4 TCP/443 to the analyzer route."""
+        self._route_uid = self._target_uid()
+        binary = self._route_executable()
+        self._route_binary_sha256 = hashlib.sha256(binary.read_bytes()).hexdigest()
+        remote_binary = self.ROUTE_ROOT + "/apk-research-https-route"
+        self._route_attempted = True
+        self._route_cleanup_confirmed = False
+        self.adb.make_remote_directory(self._serial, self.ROUTE_ROOT)
+        self.adb.push_file(self._serial, binary, remote_binary)
+        chain = self.ROUTE_CHAIN
+        pid = self.ROUTE_ROOT + "/route.pid"
+        log = self.ROUTE_ROOT + "/route.log"
+        err = self.ROUTE_ROOT + "/route.stderr.txt"
+        script = f"""
+set -eu
+BIN={remote_binary}
+PID={pid}
+LOG={log}
+ERR={err}
+CHAIN={chain}
+chmod 700 "$BIN"
+# Restore the route from a prior interrupted research session, if present.
+iptables -t nat -S OUTPUT 2>/dev/null | grep -F -- "-j $CHAIN" | while read -r TYPE TABLE REST; do
+  if [ "$TYPE" = "-A" ] && [ "$TABLE" = "OUTPUT" ]; then
+    set -- $REST
+    iptables -t nat -D OUTPUT "$@" 2>/dev/null || true
+  fi
+done
+iptables -t nat -F "$CHAIN" 2>/dev/null || true
+iptables -t nat -X "$CHAIN" 2>/dev/null || true
+if [ -f "$PID" ]; then
+  PREVIOUS=$(cat "$PID" 2>/dev/null || true)
+  case "$PREVIOUS" in
+    ''|*[!0-9]*) ;;
+    *) kill "$PREVIOUS" 2>/dev/null || true ;;
+  esac
+fi
+rm -f "$LOG" "$ERR" "$PID"
+"$BIN" {self.DEVICE_ROUTE_PORT} {self.DEVICE_PROXY_PORT} "$LOG" > /dev/null 2> "$ERR" &
+echo $! > "$PID"
+READY=0
+for ATTEMPT in 1 2 3 4 5 6 7 8 9 10; do
+  if grep -q ROUTE_READY "$LOG" 2>/dev/null; then READY=1; break; fi
+  sleep 1
+done
+if [ "$READY" != 1 ]; then
+  cat "$ERR" 2>/dev/null || true
+  exit 24
+fi
+iptables -t nat -N "$CHAIN"
+iptables -t nat -A "$CHAIN" -d 127.0.0.0/8 -j RETURN
+iptables -t nat -A "$CHAIN" -p tcp --dport 443 -j REDIRECT --to-ports {self.DEVICE_ROUTE_PORT}
+iptables -t nat -I OUTPUT 1 -m owner --uid-owner {self._route_uid} -j "$CHAIN"
+iptables -t nat -C OUTPUT -m owner --uid-owner {self._route_uid} -j "$CHAIN"
+printf '%s\\n' ROUTE_ACTIVE
+"""
+        result = self._shell_script(script, timeout=35.0)
+        if "ROUTE_ACTIVE" not in result:
+            raise HttpsInterceptionCollectorError(
+                "Android не подтвердил направление прямых HTTPS-соединений"
+            )
+        self._route_active = True
+        self._route_ever_active = True
+
+    def _stop_direct_route(self) -> None:
+        if not self._route_attempted:
+            return
+        chain = self.ROUTE_CHAIN
+        uid = self._route_uid
+        script = f"""
+CHAIN={chain}
+iptables -t nat -S OUTPUT 2>/dev/null | grep -F -- "-j $CHAIN" | while read -r TYPE TABLE REST; do
+  if [ "$TYPE" = "-A" ] && [ "$TABLE" = "OUTPUT" ]; then
+    set -- $REST
+    iptables -t nat -D OUTPUT "$@" 2>/dev/null || true
+  fi
+done
+iptables -t nat -F "$CHAIN" 2>/dev/null || true
+iptables -t nat -X {chain} 2>/dev/null || true
+PID={self.ROUTE_ROOT}/route.pid
+if [ -f "$PID" ]; then
+  VALUE=$(cat "$PID" 2>/dev/null || true)
+  case "$VALUE" in
+    ''|*[!0-9]*) ;;
+    *) kill "$VALUE" 2>/dev/null || true ;;
+  esac
+fi
+if iptables -t nat -S OUTPUT 2>/dev/null | grep -F -- "-j $CHAIN" >/dev/null; then
+  echo ROUTE_PRESENT
+else
+  echo ROUTE_REMOVED
+fi
+"""
+        try:
+            report = self._shell_script(script, timeout=15.0)
+            self._route_cleanup_confirmed = "ROUTE_REMOVED" in report
+        except Exception:
+            self._route_cleanup_confirmed = False
+        try:
+            self.adb.pull_file(
+                self._serial,
+                self.ROUTE_ROOT + "/route.log",
+                self.session.paths.root / self.ROUTE_LOG_ARTIFACT,
+                timeout=20.0,
+            )
+        except Exception:
+            pass
+        try:
+            self._shell_script(
+                f"rm -rf {self.ROUTE_ROOT}",
+                timeout=15.0,
+            )
+        except Exception:
+            pass
+        self._route_active = not bool(self._route_cleanup_confirmed)
+        self._route_attempted = not bool(self._route_cleanup_confirmed)
+
     def _cleanup_device_best_effort(self) -> None:
+        self._stop_direct_route()
         serial = self._serial
         if not serial:
             return
@@ -712,6 +895,12 @@ rm -rf /data/local/tmp/apk-research/https-ca /data/local/tmp/apk-research/https
                 ),
                 "previous_android_proxy": self._previous_proxy,
                 "system_ca_injected": self._ca_injected,
+                "target_uid": self._route_uid,
+                "direct_tcp443_route_configured": self._route_active,
+                "direct_tcp443_route_used": self._route_ever_active,
+                "direct_route_cleanup_confirmed": self._route_cleanup_confirmed,
+                "direct_route_port": self.DEVICE_ROUTE_PORT,
+                "direct_route_binary_sha256": self._route_binary_sha256 or None,
                 "system_ca_injection_succeeded": self._ca_injection_succeeded,
                 "ca_sha256": self._ca_sha256 or None,
                 "ca_subject_hash_old": self._ca_subject_hash or None,
@@ -721,6 +910,10 @@ rm -rf /data/local/tmp/apk-research/https-ca /data/local/tmp/apk-research/https
                 "transport_intervention": {
                     "android_explicit_proxy_enabled": True,
                     "device_to_proxy_via_adb_reverse": True,
+                    "app_uid_direct_tcp443_route": self._route_active,
+                    "other_android_apps_unmodified": True,
+                    "direct_route_restricted_to_ipv4_tcp443": True,
+                    "quic_udp443_not_handled": True,
                     "may_change_quic_or_http3_behavior": True,
                     "raw_pcap_describes_the_intercepted_environment": True,
                 },
