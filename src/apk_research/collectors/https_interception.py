@@ -623,7 +623,7 @@ test -s "$SYSTEM/{self._ca_subject_hash}.0"
         )
         pattern = re.compile(
             r"^package:" + re.escape(self.package_name)
-            + r"\s+uid:(\d+)\s*$"
+            + r"\s+uid:(\d+)\s*$",
             re.MULTILINE,
         )
         match = pattern.search(listing)
