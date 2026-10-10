@@ -78,3 +78,7 @@ tcpdump reported 615 kernel-dropped packets out of a session with 22,525 capture
 ## Completed — simplified Research + live HTTPS user interface (v0.33.0)
 
 Owner requested to remove the other complicated result/analysis tabs and focus on maximum Research ZIP completeness plus live HTTPS requests for the studied application. Implemented only two visible tabs via actual Windows entrypoint, one-click HTTPS access and counter, automatic JSONL updating every 500 ms and completed ZIP viewing; removed technical UI navigation but retained all collectors and data, updater and maintenance in Program menu. Full-length RAW PCAP capture buffer raised to 16 MiB, with no unsupported guarantee of zero packet drops. PR #31, main `3f3f1144e0ea8944a065e7d5950fd07fd1e17abf`, pipeline #146 attempt 1 SUCCESS; versioned standalone setup and update installers released.
+
+## ACTIVE — deliver tested v0.34.0 panel + network ZIP extensions
+
+Source implemented in draft PR #32; v0.34.0 is not yet published. Required remaining steps: latest exact candidate SHA 8c1dbcc full Windows GUI/build/setup/update, Android AVD ZIP verification, full CI. Only then merge to main and wait for main release pipeline to publish two verified installers. Record user-requested UI shape and neutral HTTPS terminology.

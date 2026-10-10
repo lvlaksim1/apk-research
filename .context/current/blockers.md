@@ -44,3 +44,7 @@ Quality observations, not blockers to the v0.32.0 publication: 615 kernel packet
 ## Follow-up limitations after v0.33.0
 
 The 16-MiB kernel tcpdump buffer is a preventative improvement; zero packet drops are not proven and must be measured in a future owner ZIP. Live HTTPS rows represent completed request/response transaction records as written by the analyzer; they are not evidence that all encrypted transport data became readable. Default/Google APIs AVD and all prior known protocol/trust boundaries remain. Technical tabs were intentionally removed from main navigation by owner request, without deleting ZIP evidence.
+
+## v0.34.0 release gate pending
+
+New code not yet in main; no v0.34.0 installer link to offer. Final PR SHA 8c1dbcc acceptance pending; earlier Android runner had intermittent ADB 255 on starting Settings, then later identical base AVD acceptance passed without changing startup code. This is a release gate, not demonstrated regression of new network parser. Historic observed com.evrasia direct HTTPS on v0.32 remains proven. Keep v0.33.0 as last stable release until v0.34 acceptance.

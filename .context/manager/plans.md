@@ -59,3 +59,7 @@ Next possible investigation: packet loss (615 kernel drops), unassigned ownershi
 ## v0.33.0 field usability and completeness follow-up
 
 The simplification is complete and published. Request the owner's field confirmation that precisely two tabs appear, the current HTTPS list updates while interacting with the Android screen, ZIP is created, and existing studies remain accessible. If a new archive is supplied, measure actual packet drops after the new 16-MiB kernel buffer instead of asserting the issue is fixed. Technical workspace tabs remain out of the main window by explicit owner decision; do not restore them without permission.
+
+## v0.34.0 delivery plan
+
+All source in PR #32, branch feature/v0.34-emulator-controls-network-evidence. Await required latest commit tests. Optional six derived ZIP artifacts cannot replace RAW PCAP or HTTP bodies. Avoid false claims from null TLS/DNS fields and temporal correlation. Full update installer must update from published v0.33.0 without deleting app data. Publish only through main pipeline; then user should validate panel controls and target real APK and provide new ZIP to assess DNS/TLS and packet drop results.

@@ -92,3 +92,9 @@ Uploaded private evidence: 20261010T021552.574206Z-3e8e2043.research.zip, produc
 - Mandatory RAW network, screen, actions, logcat, HTTPS, attribution, other evidence collection and integrity workflow remain enabled automatically.
 - Capture buffer enlarged to 16 MiB, full packet snaplen retained; actual field packet drop reductions remain unverified until the next owner research ZIP.
 - Windows setup and v0.32.0 → v0.33.0 update, real AVD research and clean Windows provisioning all passed.
+
+## v0.34.0 work in progress (not released)
+
+Latest verified product is v0.33.0 at 3f3f1144e0ea8944a065e7d5950fd07fd1e17abf. Work branch feature/v0.34-emulator-controls-network-evidence, PR #32 draft, latest proposed SHA 8c1dbcc81fa3620ed96b30300211c90fb7872ec3. Right-hand Android control panel and derived DNS/TLS/HTTP timing/action correlation/screen timing evidence are implemented in source. Independent RAW PCAP, original HTTPS bodies, gRPC/MMAP, v0.31 ARM64 and old UI tabs remain intact.
+
+Windows and final Android acceptance are PENDING. Prior PR candidate 8afe5c1d passed all unit and real AVD acceptance, including six new ZIP files and 3660 scanned PCAP packets; latest TLS all-port tweak still needs exact-head proof. Previous AVD CI attempts for intermediate candidates hit intermittent ADB com.android.settings start exit 255 before derived ZIP checks. Do not mark release ready until final tests pass.
