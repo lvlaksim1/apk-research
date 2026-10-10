@@ -1052,6 +1052,80 @@ class AndroidRuntime:
             key,
         )
 
+    def system_keyevent(self, keycode: int) -> None:
+        """System keys that the gRPC keyboard interface does not expose."""
+        code = int(keycode)
+        if code not in {3, 4, 24, 25, 187}:
+            raise AndroidRuntimeError("Недопустимая системная кнопка Android")
+        self._adb_shell("input", "keyevent", str(code))
+
+    def rotate_display(self, landscape: bool) -> None:
+        """Use the Android display controls without replacing the AVD."""
+        self._adb_shell("settings", "put", "system", "accelerometer_rotation", "0")
+        self._adb_shell(
+            "settings", "put", "system", "user_rotation",
+            "1" if landscape else "0",
+        )
+
+    def set_geo_location(self, latitude: float, longitude: float) -> None:
+        if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+            raise AndroidRuntimeError("Геолокация вне допустимых координат")
+        self._run(
+            [str(self.paths.adb), "-s", self.SERIAL,
+             "emu", "geo", "fix", str(longitude), str(latitude)],
+            timeout=20.0,
+        )
+
+    def stop_target_package(self, package: str) -> None:
+        from apk_research.targets.adb import validate_package_name
+        self._adb_shell("am", "force-stop", validate_package_name(package))
+
+    def clear_target_data(self, package: str) -> None:
+        from apk_research.targets.adb import validate_package_name
+        self._adb_shell("pm", "clear", validate_package_name(package))
+
+    def open_target_settings(self, package: str) -> None:
+        from apk_research.targets.adb import validate_package_name
+        safe = validate_package_name(package)
+        self._adb_shell(
+            "am", "start", "-a",
+            "android.settings.APPLICATION_DETAILS_SETTINGS",
+            "-d", "package:" + safe,
+        )
+
+    def send_download(self, source: Path) -> str:
+        """Transfer an explicit local file into Android Download."""
+        import re
+        path = Path(source).expanduser().resolve(strict=True)
+        if not path.is_file() or not re.fullmatch(r"[a-zA-Z0-9_.-]+", path.name):
+            raise AndroidRuntimeError(
+                "Имя файла для Android должно содержать только латинские "
+                "буквы, цифры, точку, дефис или подчёркивание"
+            )
+        remote = "/sdcard/Download/" + path.name
+        self._run(
+            [str(self.paths.adb), "-s", self.SERIAL, "push",
+             str(path), remote],
+            timeout=120.0,
+        )
+        return remote
+
+    def receive_download(self, name: str, destination: Path) -> Path:
+        import re
+        if not re.fullmatch(r"[a-zA-Z0-9_.-]+", name) or name in {".", ".."}:
+            raise AndroidRuntimeError("Недопустимое имя файла Android")
+        target = Path(destination).expanduser().resolve()
+        if target.exists() and not target.is_file():
+            raise AndroidRuntimeError("Путь получения не является файлом")
+        self._run(
+            [str(self.paths.adb), "-s", self.SERIAL, "pull",
+             "/sdcard/Download/" + name, str(target)],
+            timeout=120.0,
+        )
+        if not target.is_file():
+            raise AndroidRuntimeError("Android не передал запрошенный файл")
+        return target
+
     def text(self, value: str) -> None:
         self._run_required_input(
             "send_text",
