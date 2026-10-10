@@ -1,0 +1,106 @@
+name: ARM64 Google APIs Acceptance
+
+on:
+  pull_request:
+    paths:
+      - "src/apk_research/desktop/components.py"
+      - "src/apk_research/desktop/android_runtime.py"
+      - "src/apk_research/desktop/controller.py"
+      - "src/apk_research/desktop/package_input.py"
+      - "tools/acceptance_arm64.py"
+      - ".github/workflows/avd-arm64-acceptance.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  arm64-native-bridge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      ANDROID_AVD_HOME: ${{ github.workspace }}/.android/avd
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Python package
+        run: python -m pip install -e ".[dev,transport]"
+
+      - name: Install official Android SDK image and NDK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -n 1)"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "emulator" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "system-images;android-35;google_apis;x86_64"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/emulator" >> "$GITHUB_PATH"
+
+      - name: Check KVM and create dedicated Google APIs AVD
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+          "$ANDROID_HOME/emulator/emulator" -accel-check
+          mkdir -p "$ANDROID_AVD_HOME"
+          AVDMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name avdmanager | sort | tail -n 1)"
+          echo no | "$AVDMANAGER" create avd --force --name arm64_acceptance_api35 --package "system-images;android-35;google_apis;x86_64"
+          "$ANDROID_HOME/emulator/emulator" -list-avds
+
+      - name: Start Google APIs Android 15 and verify rooted environment
+        shell: bash
+        run: |
+          set -euxo pipefail
+          nohup "$ANDROID_HOME/emulator/emulator" \
+            @arm64_acceptance_api35 \
+            -port 5554 -no-window -gpu auto -grpc 8554 \
+            -no-snapshot -noaudio -no-boot-anim -wipe-data \
+            > emulator-arm64.log 2>&1 &
+          echo $! > emulator-arm64.pid
+          timeout 180 adb wait-for-device
+          timeout 300 bash -c 'until [ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
+          for i in 1 2 3 4 5; do
+            if [ "$(adb -s emulator-5554 shell id -u | tr -d "\r")" = "0" ]; then break; fi
+            adb -s emulator-5554 root || true
+            sleep 3
+            timeout 30 adb wait-for-device || true
+          done
+          test "$(adb -s emulator-5554 shell id -u | tr -d "\r")" = "0"
+          adb -s emulator-5554 shell getprop ro.product.cpu.abilist
+
+      - name: Verify ARM64 native library execution from XAPK
+        run: python tools/acceptance_arm64.py
+
+      - name: Stop emulator
+        if: always()
+        shell: bash
+        run: |
+          adb -s emulator-5554 emu kill || true
+          if [ -f emulator-arm64.pid ]; then
+            kill "$(cat emulator-arm64.pid)" || true
+          fi
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arm64-acceptance-failure
+          retention-days: 3
+          if-no-files-found: warn
+          path: |
+            emulator-arm64.log
