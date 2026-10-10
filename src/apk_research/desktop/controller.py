@@ -513,10 +513,22 @@ class DesktopController(QObject):
             self.apk_path = path
             self.package_name = None
             self._input_error_reported = False
-            self.runtime.prepare_package_environment(
+            switched = self.runtime.prepare_package_environment(
                 path,
                 self._progress_callback,
+                before_profile_switch=self._stop_screen.set,
             )
+            if switched and self._screen_thread is not None:
+                # Closing the old AVD invalidates the previous gRPC stream.
+                # Wait until its worker exits before clearing the stop event
+                # for the new AVD's screenshot stream.
+                self._screen_thread.join(timeout=10.0)
+                if self._screen_thread.is_alive():
+                    raise RuntimeError(
+                        "Предыдущий видеопоток Android не завершился "
+                        "перед переключением эмулятора"
+                    )
+                self._screen_thread = None
             self.runtime.ensure_ready(
                 self._progress_callback,
                 self._display_ready_callback,
