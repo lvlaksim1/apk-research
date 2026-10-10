@@ -245,6 +245,11 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_research_tab(), "Исследование")
         self.https_view = LiveHttpsView(self)
         self.tabs.addTab(self.https_view, "HTTPS • онлайн")
+        self.https_view.countChanged.connect(
+            lambda count: self.https_counter.setText(
+                f"HTTPS: {count} запросов"
+            )
+        )
         root.addWidget(self.tabs, 1)
         self.setCentralWidget(central)
 
@@ -473,6 +478,13 @@ class MainWindow(QMainWindow):
         )
         toolbar.addWidget(android_title)
         toolbar.addStretch(1)
+        self.https_counter = QLabel("HTTPS: 0 запросов")
+        toolbar.addWidget(self.https_counter)
+        self.open_live_button = QPushButton("Показать HTTPS")
+        self.open_live_button.clicked.connect(
+            lambda: self.tabs.setCurrentIndex(1)
+        )
+        toolbar.addWidget(self.open_live_button)
         self.android_hint = QLabel(
             "Мышь = touch • Ctrl+drag = pinch/rotate • "
             "Shift+drag = tilt • колесо = swipe"
