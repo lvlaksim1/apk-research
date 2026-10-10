@@ -332,7 +332,10 @@ def derive_network_evidence(root: Path) -> dict:
             rec = _dns(body, when, src, dst, protocol)
             if rec is not None:
                 dns.append(rec)
-        if protocol == "tcp" and (src_port == 443 or dst_port == 443):
+        # A selected application's TLS traffic may be routed through a
+        # local Android port, not TCP/443. Recognize genuine TLS hello record
+        # structure on any TCP port; never label arbitrary TCP as TLS.
+        if protocol == "tcp":
             info = _tls_hello(body)
             if info is not None:
                 ident = (src, src_port, dst, dst_port, info["kind"])
