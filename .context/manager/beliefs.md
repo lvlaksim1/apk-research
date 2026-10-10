@@ -2,7 +2,7 @@
 
 ## Verified baseline
 
-Current product baseline is **apk-research v0.30.0** at `1d75ec32d80cdea2af172035d43d12d3284978fa`.
+Current product baseline is **apk-research v0.31.0** at `5aab54adc807aff401b59d4c1018795246303b89`. The previous verified baseline was v0.30.0.
 
 Live reconciliation on 2026-10-08 confirmed that `main` and the latest GitHub Release both point to that exact SHA. PR #26 delivered the HTTPS traffic analysis feature and was merged at `7f603fa95231d936039ed6dac222b11d5189ad2d`; the current main commit synchronizes release documentation and retriggered the standard release pipeline.
 
@@ -52,3 +52,11 @@ For owner-visible communications, use neutral accurate language such as "HTTPS t
 - authority: direct owner instruction in 2026-10-08 project chat;
 - technical evidence: prior-chat Research ZIP analysis, not yet rechecked in this reinstantiated runtime;
 - product confirmation: GitHub main and latest release checked 2026-10-10.
+
+## Verified v0.31 ARM64 APK/XAPK compatibility
+
+On 2026-10-10 PR #29 merged and main pipeline #144 attempt 2 succeeded, publishing v0.31.0 at `5aab54adc807aff401b59d4c1018795246303b89`. ARM64-only XAPK now selects a separate Android 15 Google APIs x86_64 AVD with native ARM64 execution. The default AVD and userdata remain intact. Actual Android 15 proof: device reports x86_64,arm64-v8a and loads JNI ARM64 native library from synthetic XAPK (`ARM64_NATIVE_LOADED: PASS`). Legacy AVD research, Windows installer/update and clean provisioning passed. First main attempt had an intermittent ADB Settings start failure; same main SHA passed rerun. Owner's exact XAPK was not furnished; universal app compatibility is not claimed.
+
+Setup: `apk-research-setup_v0.31.0.exe` SHA256 `8c253edf38759830fbe8e156282beaa1b2f0f9b98fd6ad3d880679d180176b83`; Update: `apk-research-update_v0.31.0.exe` SHA256 `cb41c928aa2fadeb92bf2c17026cc3863e4d094a0cc5fa92a279597d10baabc6`.
+
+The independent owner directive to route direct HTTPS connections of `com.evrasia` through the local analyzer remains ACTIVE and unimplemented by v0.31.

@@ -1,25 +1,24 @@
 # Latest Handoff
 
-Generation: 26
+Generation: 27
 Date: 2026-10-10
 Persistent manager: `apk-research-project-manager`
 Manager-state authority: `context`
 Product authority: `main`
 
-## Verified published baseline
+## Latest product baseline
 
-The latest checked product commit on `main` is `1d75ec32d80cdea2af172035d43d12d3284978fa`, with published v0.30.0. Main pipeline #143 completed release acceptance. Separate full and update assets were released:
-- Setup: `apk-research-setup_v0.30.0.exe`, SHA-256 `6f9f39c67a88344e7181316c6c6445660f2e1d066deaca09ba13f1ec20954e1a`.
-- Update: `apk-research-update_v0.30.0.exe`, SHA-256 `4189ff6af7c793bef0db99c673b5838d0a8e6a7ad039cb80b688012353484e1a`.
+**apk-research v0.31.0** released on 2026-10-10 at exact main/release SHA `5aab54adc807aff401b59d4c1018795246303b89`. PR #29 merged. Main pipeline #144 attempt 2 succeeded (initial attempt had an intermittent ADB Settings launch failure; subsequent AVD rerun passed without code changes), including CI, real AVD/HTTPS research, Windows setup/update, clean Windows Android provisioning and release publication.
 
-v0.30.0's generic HTTPS analysis, request/response viewer and real Android 15 HTTPS acceptance are verified. Protected RAW PCAP provenance and Android runtime invariants remain binding.
+Setup: `apk-research-setup_v0.31.0.exe` SHA-256 `8c253edf38759830fbe8e156282beaa1b2f0f9b98fd6ad3d880679d180176b83`.
+Update: `apk-research-update_v0.31.0.exe` SHA-256 `cb41c928aa2fadeb92bf2c17026cc3863e4d094a0cc5fa92a279597d10baabc6`.
 
-## Newer owner directive, not represented in generation 25
+## Completed ARM64 APK/XAPK work
 
-On 2026-10-08, after analyzing owner-supplied archive `20261008T020126.928669Z-e336ad57.research.zip`, the owner explicitly instructed the manager to implement automatic HTTPS routing to the local analyzer for applications that bypass Android system proxy configuration. Previously reported archive findings: `com.evrasia` used direct remote HTTPS connections, with 23 connections on TCP/443 (21 to `evrasia.spb.ru`) and no readable normalized HTTP transactions. The new runtime must verify these archive-specific details before asserting precise causal mechanisms.
+The owner required ARM64-only XAPK installation. The app now uses ABI preflight and a separate official Android 15 Google APIs x86_64 image with ARM native translation, preserving original default AVD/userdata. Device advertised `x86_64,arm64-v8a`; real Android 15 test XAPK loaded ARM64 JNI library (`ARM64_NATIVE_LOADED: PASS`); standard research mode passed. Owner-specific XAPK has not been supplied/tested: do not claim universal compatibility.
 
-**Status: ACTIVE, not implemented/verified in GitHub.** The former statement that no further development was authorized is superseded. Next step: inspect archived evidence and source, implement a constrained routing correction on a dedicated branch, verify a representative real APK and publish only through accepted release gates.
+## Still-active independent owner commitment
 
-## Other commitments
+Follow the 2026-10-08 direction to route direct HTTPS from `com.evrasia` applications bypassing system proxy into local analyzer. Earlier owner Research ZIP reportedly contained direct remote port 443 connections and no readable transactions. Revalidate actual ZIP before concrete diagnosis. v0.31 ARM compatibility does not implement this requirement.
 
-The Android home-screen shortcut requirement was expressly cancelled by the owner on 2026-10-08; do not reinstate. Application-defined trust/certificate pinning and QUIC/HTTP3 decryption are not claimed as implemented.
+The owner-cancelled Android home-screen shortcut task remains CANCELLED. Preserve all existing RAW PCAP and Android research invariants. Release only via verified commit-triggered pipeline.

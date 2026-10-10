@@ -48,3 +48,9 @@ Acceptance objective: in a controlled research session, applicable target HTTPS 
 Next action: re-read the supplied archive (if accessible) and relevant code, establish a narrow viable routing design, implement on a dedicated branch, verify on real Android 15 AVD and affected APK, then deliver via the accepted Setup/Update release process after required acceptance gates. Do not mark this commitment complete merely because the v0.30.0 generic HTTPS test passed.
 
 - source: Owner instruction following analysis of `20261008T020126.928669Z-e336ad57.research.zip`.
+
+## Completed — v0.31.0 ARM64-only APK/XAPK support
+
+Status: **completed and released 2026-10-10**. Owner required support for ARM64-only XAPK rejected by original x86_64-only AVD. Delivered automatic package ABI preflight, separate official Android 15 Google APIs x86_64 image with native ARM translation, original AVD/userdata isolation, root/gRPC/MMAP/ABI validation, and normal XAPK split/OBB handling. Acceptance proved actual ARM64 JNI library execution in an Android 15 test XAPK (`ARM64_NATIVE_LOADED: PASS`), legacy AVD and Windows acceptance, main pipeline #144 attempt 2 and published v0.31.0 assets tied to main `5aab54adc807aff401b59d4c1018795246303b89`.
+
+Owner's actual rejected XAPK still needs field validation. The separate owner HTTPS routing commitment remains ACTIVE.
