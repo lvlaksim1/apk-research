@@ -1010,6 +1010,7 @@ class MainWindow(QMainWindow):
             self._on_progress
         )
         c.log.connect(self._append_log)
+        c.emulatorActionFinished.connect(self._on_emulator_action_finished)
         c.error.connect(self._on_error)
         c.environmentReady.connect(
             self._on_environment_ready
@@ -1775,6 +1776,13 @@ class MainWindow(QMainWindow):
             self.status_adb.setStyleSheet(
                 "color: #238636;"
             )
+
+    def _on_emulator_action_finished(
+        self, action: str, detail: str,
+    ) -> None:
+        self.global_status.setText(detail)
+        if action in {"push_file", "pull_file", "clear_app", "restart"}:
+            QMessageBox.information(self, "Android", detail)
 
     def _on_error(
         self,
