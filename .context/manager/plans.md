@@ -49,3 +49,9 @@ Preserve the separate default and Google APIs Android 15 AVD userdata, verify re
 ## Follow-up plan after v0.32.0
 
 Obtain a real v0.32.0 session on the owner's target app, compare route log (actual direct target IP/port) with readable transactions, count HTTP responses and inspect TLS trust errors if any. Keep RAW PCAP independent. Do not infer decrypted HTTPS from TCP/443 connectivity alone; acknowledge custom certificate trust or QUIC/UDP443 limitations where supported by evidence. Develop further only from verified owner artifacts. Owner-visible terminology: neutral HTTPS routing and analysis terms.
+
+## v0.32.0 owner target field verification — closed
+
+The owner supplied a v0.32.0 session of com.evrasia. Its HTTP records, route journal, session status and 99/99 checksum verification establish that selected-app direct HTTPS analysis now works for the previously problematic target. Historic notes instructing a future field validation are superseded by this observation.
+
+Next possible investigation: packet loss (615 kernel drops), unassigned ownership (73 of 93 flow entries), and optional per-transaction route source labels. Do not assume these are equivalent to lost HTTP transactions. Do not change implementation without agreeing on scope. Never commit the private Research ZIP or any authentication contents.

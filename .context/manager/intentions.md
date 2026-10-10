@@ -62,3 +62,15 @@ Owner's 2026-10-10 request was implemented and published. PR #30, main `a2f0bbbc
 ## Active — owner-specific `com.evrasia` verification
 
 The original owner Research ZIP `20261008T020126.928669Z-e336ad57.research.zip` previously showed direct TLS connections and zero readable HTTP records under v0.30.0. User must test their actual APK using published v0.32.0; inspect newly generated `02_normalized/http-transactions.jsonl`, `01_raw/network/https-direct-route.log`, and `02_normalized/http-interception.json`. Do not claim success of this specific APK without real new evidence. App-specific TLS trust and QUIC restrictions remain.
+
+## Completed — com.evrasia field validation on v0.32.0
+
+Status: **completed and proven by the owner's uploaded v0.32.0 session archive on 2026-10-10**.
+
+The user's actual com.evrasia app produced 32 readable HTTP/HTTPS responses (23 on evrasia.spb.ru), with 21 direct target TCP/443 route entries and confirmed cleanup. Session complete with 99/99 archive checksum matches. The former zero-HTTP-transaction problem is solved for the tested session. Do not conflate this with universal TLS compatibility.
+
+Private evidence: owner Research ZIP 20261010T021552.574206Z-3e8e2043.research.zip, NOT to be stored publicly. Its JSON responses include authentication credential fields. No credential values should be entered into any project report, commit, issue or release.
+
+## Observation only — capture completeness and attribution
+
+tcpdump reported 615 kernel-dropped packets out of a session with 22,525 captured packets; flow inventory 93, of which 73 have UNKNOWN ownership attribution. The user has not separately authorized changes to these subsystems; first propose measurable, scoped improvements if requested.

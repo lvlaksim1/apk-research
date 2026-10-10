@@ -72,3 +72,17 @@ Real Android 15 acceptance tested Java system-proxy HTTPS and `Proxy.NO_PROXY` H
 Published Setup SHA-256 `226d8b4bf12ccab0b07620b8110107354b15873c1f1f93c925bc28d0f2c1c070`; Update SHA-256 `aed61edabbf81e865aa49c16743793886e2bbe5e9394f64b71e75fb7eeedd0cc`.
 
 The actual owner's `com.evrasia` app/Research ZIP has NOT been retested with v0.32.0. Continue that validation as an ACTIVE owner-target task, not a verified field success. IPv6, QUIC/UDP443, custom TLS stores/pinning remain explicit boundaries. Terminology in owner-visible reports must be neutral; avoid language owner prohibited.
+
+## Field-verification of owner app on v0.32.0 (2026-10-10)
+
+Owner uploaded a private Research ZIP from v0.32.0, session 20261010T021552.574206Z-3e8e2043, app com.evrasia. **Do not copy the archive to public GitHub**: it contains authentication credential fields in saved JSON bodies. Only non-sensitive aggregates are recorded here.
+
+Verified ZIP integrity: no ZIP errors; 99/99 listed SHA-256 entries match; session status complete, degraded false, errors empty, mandatory collectors completed.
+
+32 fully readable HTTP/HTTPS responses with all 32 tls_decrypted=true; 28 HTTP 200 and four HTTP 301. Target evrasia.spb.ru: 23 transactions (13 API, 10 image). One evrasia.rest media transaction and eight third-party service transactions. All response bodies nonempty, total 4,669,225 bytes; 14 JSON content-type responses decoded successfully.
+
+Direct-route log: 22 CONNECTION_ROUTED entries, including 21 to 217.197.238.66:443 (target server) and one to 213.180.193.135:443 (mapping service). Android UID 10210 is uniquely associated with com.evrasia; temporary rule cleanup confirmed true. 21 target direct TCP/443 flows appear in normalized inventory. Route counts and HTTP transaction counts are not one-to-one.
+
+Independent raw PCAP: 22,525 packets captured; tcpdump reported 615 packets dropped by kernel. Network inventory 93 flows, 20 attributed with EXACT/HIGH/MEDIUM confidence and 73 UNKNOWN. This limits packet completeness and socket-owner attribution but does not negate the 32 readable HTTPS responses. Android SSL/certificate warnings in logcat came from unrelated PIDs, so they cannot establish failures of app com.evrasia. No logged FATAL EXCEPTION or ANR for com.evrasia in this archive.
+
+The owner's previously unverified direct HTTPS target is NOW **field-verified functional** under v0.32.0. A future improvement to raw PCAP completeness/ownership accuracy is distinct and requires bounded scoping. Scope remains IPv4 TCP/443; no assertions about QUIC, IPv6 or arbitrary trust/pinning.

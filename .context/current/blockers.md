@@ -34,3 +34,9 @@ The official Android 15 Google APIs x86_64 image advertises ARM64 native transla
 ## v0.32.0 limits and target field verification
 
 The owner-specific `com.evrasia` deployment is not yet verified, although the general routing mechanism has passed a real `Proxy.NO_PROXY` Android 15 HTTPS test. No assumption about that app's TLS trust, certificate restrictions, IPv6 or UDP/QUIC behavior is warranted. The isolated rule only addresses IPv4 TCP/443 by installed package UID. The owner needs a new Research ZIP and route log for authoritative conclusion. This is not a blocker to published v0.32.0.
+
+## Findings after actual v0.32.0 com.evrasia validation
+
+The direct HTTPS routing capability is no longer awaiting target proof: the actual app produced 32 readable responses and 21 route journal entries to its server. This closes the prior field-verification blocker for the observed run.
+
+Quality observations, not blockers to the v0.32.0 publication: 615 kernel packet drops in tcpdump; 73 of 93 network flow entries UNKNOWN for ownership attribution. No evidence that these caused missing HTTP transactions. Scope remains IPv4 TCP/443 and certificate trust assumptions remain bounded. The owner ZIP contains authentication data, so it must not be copied to public project storage.

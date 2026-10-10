@@ -69,3 +69,17 @@ ABI preflight selects on-demand separate Google APIs Android 15 x86_64 image wit
 - New raw diagnostic artifact: `01_raw/network/https-direct-route.log`; metadata records target UID, route usage, route cleanup confirmation and routing limitations. RAW PCAP remains a separate source.
 - Real Android 15 acceptance proved system+direct `Proxy.NO_PROXY` HTTPS requests to `https://example.com/` both HTTP 200, 577 bytes. Main pipeline #145 succeeded including Windows Setup/Update and clean provisioning.
 - Field validation of `com.evrasia` remains outstanding. Specific application TLS trust or QUIC handling cannot be asserted without a fresh archive.
+
+## Actual owner app field result — verified 2026-10-10
+
+Uploaded private evidence: 20261010T021552.574206Z-3e8e2043.research.zip, produced by published apk-research v0.32.0 on installed com.evrasia.
+
+- Session complete, not degraded, no errors; all 99 enumerated SHA-256 checksums match.
+- 32 HTTP(S) transactions with tls_decrypted=true, 28 HTTP 200 / 4 HTTP 301, all with nonempty responses (4,669,225 bytes total); 14/14 JSON responses parse successfully.
+- 23 evrasia.spb.ru transactions, of which 13 API and 10 media; one additional evrasia.rest media response; eight third-party service responses.
+- Native direct route log: 21 entries to 217.197.238.66:443, one to 213.180.193.135:443. The device route cleanup succeeded. The selected package's unique UID was 10210.
+- RAW PCAP has 22,525 captured packets; tcpdump reported 615 kernel drops. 93 normalized flow entries, 20 attributed at EXACT/HIGH/MEDIUM and 73 UNKNOWN. These are accuracy findings distinct from successfully readable HTTPS.
+- No FATAL EXCEPTION or ANR for com.evrasia evident in this session.
+- Recorded auth JSON includes access/refresh token fields; these values and the private ZIP MUST NOT be posted to public GitHub.
+
+**The com.evrasia-specific previous HTTPS gap is verified resolved for this observed run.** Older paragraphs in this history calling for a future target test are superseded.

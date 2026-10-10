@@ -1,29 +1,27 @@
 # Latest Handoff
 
-Generation: 28
+Generation: 29
 Date: 2026-10-10
-Persistent manager: `apk-research-project-manager`
-Manager-state authority: `context`
-Product authority: `main`
+Persistent manager: apk-research-project-manager
+Product authority: main
+Manager-state authority: context
 
-## Latest verified publication
+## Published baseline
 
-**apk-research v0.32.0**, published 2026-10-10, exact main/release commit `a2f0bbbca364714d37f7697ffa5ccb8204bc94b1`. PR #30 merged. Main pipeline **#145 attempt 1 SUCCESS**: CI tests, real Android 15 AVD/HTTPS, standalone Windows build, in-place update v0.31.0 → v0.32.0, clean Windows provisioning and release publication.
+apk-research v0.32.0, exact main/release SHA a2f0bbbca364714d37f7697ffa5ccb8204bc94b1; pipeline #145 attempt 1 success. Separate Setup and Update assets are published. Preserve all prior Android and evidence invariants.
 
-Setup: `apk-research-setup_v0.32.0.exe`, SHA-256 `226d8b4bf12ccab0b07620b8110107354b15873c1f1f93c925bc28d0f2c1c070`.
-Update: `apk-research-update_v0.32.0.exe`, SHA-256 `aed61edabbf81e865aa49c16743793886e2bbe5e9394f64b71e75fb7eeedd0cc`.
-SHA256SUMS.txt published for both.
+## Owner target field verification — CONFIRMED
 
-## Completed generic direct HTTPS support
+Owner uploaded private archive 20261010T021552.574206Z-3e8e2043.research.zip from an actual com.evrasia research session using v0.32.0. ZIP integrity checks: 99/99 valid; status complete, no degraded collectors/errors. It contains 32 readable HTTP(S) transactions (28 HTTP 200, 4 HTTP 301) with 4,669,225 total response-body bytes. 23 transactions relate to evrasia.spb.ru (13 API, 10 images), plus one evrasia.rest response. Native route diagnostics contain 21 successful direct TCP/443 entries to 217.197.238.66 and one to a mapping-service IP. Temporary Android UID route cleanup confirmed, UID 10210 uniquely identified the target package. Hence the original owner issue of direct HTTPS without readable requests is **resolved in this measured session**.
 
-The owner instructed the manager to support direct HTTPS connections bypassing Android system proxy. The published implementation (1) reads the exact Android package UID, (2) directs only that UID's IPv4 TCP/443 via a root Android NAT rule to a small native service, (3) uses SO_ORIGINAL_DST to retain original destination and forwards to the existing local HTTPS analyzer via adb reverse, (4) archives `01_raw/network/https-direct-route.log` and detailed route metadata, (5) checks removal of network rule on normal shutdown and recovers stale rules on a new session. Original RAW PCAP remains independent.
+## Remaining measured quality issues
 
-**Verified live:** real Android 15 application made normal-system-proxy and `Proxy.NO_PROXY` requests to `https://example.com/`, each returned HTTP 200 with a 577-byte body. Research ZIP contained both HTTP transactions and the direct-route journal. Real baseline research, Windows packaging/upgrade and clean provisioning passed.
+Raw TCP dump reported 22,525 captured packets and 615 kernel drops. Of 93 normalized network flow entries, only 20 were attributed at EXACT/HIGH/MEDIUM; 73 UNKNOWN. These concern packet capture reliability and ownership correlation, not the demonstrated presence of HTTP responses. No new changes authorized for these yet. Per-transaction provenance of direct vs configured system proxy is not explicitly represented.
 
-## STILL ACTIVE — owner-specific field verification
+## Confidentiality
 
-The user's earlier `20261008T020126.928669Z-e336ad57.research.zip` from `com.evrasia` predated this feature and reportedly contained direct TCP/443 connections without readable HTTP transactions. **That same application has not yet been tested on v0.32.0.** Request its new Research ZIP; confirm destination records in the route journal and actual HTTP requests/responses in normalized transactions before marking the owner-specific case closed. App-defined TLS trust, IPv6 and QUIC/UDP443 remain explicit boundaries, with no universal claim.
+The ZIP has authenticated API responses with access_token and refresh_token fields. Treat the entire ZIP as private; no values or archive copies are to be put in a public GitHub repository. Only aggregate project conclusions are suitable for durable context.
 
-## Other constraints
+## Boundaries
 
-Owner confirms the prior ARM64/XAPK feature works. Preserve separate AVD user data, gRPC/MMAP, root, native ABI support and release integrity; Android home-screen shortcut task remains cancelled. Do not use owner-prohibited terminology in user-visible comments; use neutral Russian technical terms.
+No universal HTTPS claims: current routing covers selected-app IPv4 TCP/443; app-specific trust, IPv6 and UDP/QUIC need separate evidence. Preserve independent RAW PCAP, Android 15 ARM64 profiles, installer architecture and cancellation of home-screen shortcut. Use neutral owner-visible terminology.

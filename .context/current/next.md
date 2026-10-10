@@ -1,8 +1,9 @@
 # Next Actions
 
-1. v0.32.0 at `a2f0bbbca364714d37f7697ffa5ccb8204bc94b1` is the verified product baseline. Preserve separate Setup/Update assets, integrity checks and both Default/Google APIs Android 15 profiles.
-2. The owner has not yet tested direct HTTPS routing on the previously problematic `com.evrasia` application. Request/inspect a v0.32.0 Research ZIP produced by a real user session; do not assume success from the synthetic `Proxy.NO_PROXY` test.
-3. Examine `01_raw/network/https-direct-route.log` for `CONNECTION_ROUTED` entries, `02_normalized/http-transactions.jsonl` for actual readable HTTP(S) request/response data, and `02_normalized/http-interception.json` for verified route cleanup and Android UID. Keep independent RAW PCAP evidence.
-4. If the target still has zero readable transactions, use logged destination and specific proxy/TLS errors to determine whether additional application trust, IPv6, QUIC/UDP443 or other runtime conditions matter. Do not invent unsupported causes or change other apps' routes.
-5. Maintain v0.31 ARM64 APK/XAPK capability, native JNI proof gate, root and gRPC/MMAP, trustworthy session provenance, and normal in-place update architecture.
-6. The Android home-screen shortcut task remains cancelled. Use neutral terms for HTTPS routing/analysis in all owner-visible reporting.
+1. Keep v0.32.0 (main a2f0bbbca364714d37f7697ffa5ccb8204bc94b1) as the last verified published baseline.
+2. The owner's real com.evrasia session archive from 2026-10-10 **confirms direct HTTPS analysis works**: 32 readable transactions, 23 on the target domain, 21 direct route journal entries to its IP. The former field verification task is CLOSED.
+3. If further research is requested, assess raw packet completeness (615 kernel drops) and network flow ownership attribution (73 UNKNOWN of 93 total). Determine actual impact before proposing changes.
+4. Consider a clear distinction between explicit-proxy and direct-route origin per HTTP transaction, but do not claim that distinction is already encoded per transaction.
+5. Treat all Research ZIP files as potentially sensitive: the owner sample includes access/refresh token fields. Never publish unredacted traffic bodies or owner archives on GitHub.
+6. Preserve default/Google APIs AVD isolation, ARM64/XAPK capability, root/gRPC/MMAP display, independent RAW PCAP, current HTTPS analyzer, and dedicated Setup/Update pipeline.
+7. Android home-screen shortcut is cancelled. Use neutral HTTPS network analysis terms in all owner-visible communications.
