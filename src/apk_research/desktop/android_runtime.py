@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 from typing import Callable, Sequence
 
+from apk_research.targets import validate_package_name
 from apk_research.desktop.components import (
     ComponentManager,
 )
