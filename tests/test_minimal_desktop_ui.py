@@ -104,3 +104,37 @@ def test_live_https_updates_before_archive_and_reads_body(app, tmp_path: Path):
     finally:
         view.timer.stop()
         view.close()
+
+def test_emulator_panel_actions_are_connected(app, monkeypatch):
+    window = MainWindow()
+    try:
+        expected = {
+            "back", "home", "recent", "volume_up", "volume_down",
+            "rotate", "screenshot", "fullscreen", "restart", "install",
+            "send_file", "get_file", "location", "stop_app",
+            "app_settings", "clear_data",
+        }
+        assert set(window.emulator_tools.buttons) == expected
+        received = []
+        monkeypatch.setattr(
+            window.controller, "system_keyevent", received.append
+        )
+        button = window.emulator_tools.buttons["back"]
+        button.setEnabled(True)
+        button.click()
+        assert received == [4]
+        assert all(
+            bool(b.toolTip()) and bool(b.accessibleName())
+            for b in window.emulator_tools.buttons.values()
+        )
+        window._android_ready = True
+        window._research_active = True
+        window._refresh_emulator_tools()
+        assert not window.emulator_tools.buttons["clear_data"].isEnabled()
+        assert not window.emulator_tools.buttons["restart"].isEnabled()
+        assert window.emulator_tools.buttons["home"].isEnabled()
+        assert window.tabs.count() == 2
+    finally:
+        window.https_view.timer.stop()
+        window.controller.close()
+        window.close()
