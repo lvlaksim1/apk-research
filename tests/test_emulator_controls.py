@@ -14,8 +14,10 @@ from apk_research.desktop.android_runtime import (
 def _runtime(monkeypatch):
     runtime = object.__new__(AndroidRuntime)
     monkeypatch.setattr(runtime, "_device_online", lambda: True)
-    runtime.paths = SimpleNamespace(adb=Path("adb"))
-    runtime.components = SimpleNamespace(environment=lambda: {})
+    runtime.components = SimpleNamespace(
+        paths=SimpleNamespace(adb=Path("adb")),
+        environment=lambda: {},
+    )
     runtime.SERIAL = "emulator-5554"
     return runtime
 
