@@ -14,11 +14,13 @@ from PySide6.QtCore import (
     QUrl,
     Signal,
 )
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QShortcut, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
     QDialog,
+    QInputDialog,
+    QScrollArea,
     QFileDialog,
     QGridLayout,
     QGroupBox,
@@ -49,6 +51,7 @@ from apk_research.desktop.http_window import (
     HttpTransactionsWindow,
 )
 from apk_research.desktop.live_https import LiveHttpsView
+from apk_research.desktop.emulator_toolbar import EmulatorToolPanel
 from apk_research.desktop.updater import (
     DownloadedUpdate,
     ReleaseInfo,
@@ -139,6 +142,8 @@ class MainWindow(QMainWindow):
         )
         self.controller = DesktopController(self)
         self._research_active = False
+        self._android_ready = False
+        self._landscape = False
         self._busy = False
         self._last_archive: str | None = None
         self._selected_package_path: str | None = None
@@ -495,10 +500,20 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self.android_hint)
         android_layout.addLayout(toolbar)
         self.android_view = AndroidView()
-        android_layout.addWidget(
-            self.android_view,
-            1,
+        display_row = QHBoxLayout()
+        display_row.setSpacing(5)
+        display_row.addWidget(self.android_view, 1)
+        self.emulator_tools = EmulatorToolPanel(self)
+        tools_scroll = QScrollArea()
+        tools_scroll.setObjectName("AndroidSideToolbarScroll")
+        tools_scroll.setFixedWidth(60)
+        tools_scroll.setWidgetResizable(True)
+        tools_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
+        tools_scroll.setWidget(self.emulator_tools)
+        display_row.addWidget(tools_scroll)
+        android_layout.addLayout(display_row, 1)
 
         splitter.addWidget(left)
         splitter.addWidget(android_container)
@@ -820,6 +835,13 @@ class MainWindow(QMainWindow):
         self.android_view.keyRequested.connect(
             c.keyevent
         )
+        self.emulator_tools.invoked.connect(self._emulator_action)
+        self._fullscreen_shortcut = QShortcut(QKeySequence("F11"), self)
+        self._fullscreen_shortcut.activated.connect(self._toggle_fullscreen)
+        self._back_shortcut = QShortcut(QKeySequence("Alt+Left"), self)
+        self._back_shortcut.activated.connect(
+            lambda: self._emulator_action("back")
+        )
         self.android_view.textRequested.connect(
             c.text_input
         )
@@ -912,6 +934,120 @@ class MainWindow(QMainWindow):
         self.install_update_button.clicked.connect(
             self._install_latest_update
         )
+
+    def _toggle_fullscreen(self) -> None:
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
+
+    def _emulator_action(self, action: str) -> None:
+        if action == "fullscreen":
+            self._toggle_fullscreen()
+            return
+        if action == "install":
+            self._choose_apk()
+            return
+        if action == "screenshot":
+            image = self.android_view._source_image
+            if image is None or image.isNull():
+                QMessageBox.information(self, "Снимок", "Экран Android ещё не готов")
+                return
+            from datetime import datetime
+            initial = (
+                default_runtime_root() / "screenshots" /
+                ("Android_" + datetime.now().strftime("%Y%m%d_%H%M%S") + ".png")
+            )
+            initial.parent.mkdir(parents=True, exist_ok=True)
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Сохранить экран Android", str(initial),
+                "Изображение PNG (*.png)",
+            )
+            if path and not image.copy().save(path, "PNG"):
+                QMessageBox.warning(self, "Снимок", "Не удалось сохранить PNG")
+            return
+        if action in {"back", "home", "recent", "volume_up", "volume_down"}:
+            self.controller.system_keyevent({
+                "back": 4, "home": 3, "recent": 187,
+                "volume_up": 24, "volume_down": 25,
+            }[action])
+            return
+        if action == "rotate":
+            self._landscape = not self._landscape
+            self.controller.device_action("rotate", self._landscape)
+            return
+        if action == "restart":
+            answer = QMessageBox.question(
+                self, "Перезапуск Android",
+                "Перезапустить эмулятор? Установленные приложения и "
+                "их данные сохранятся.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            )
+            if answer == QMessageBox.StandardButton.Yes:
+                self.controller.device_action("restart")
+            return
+        if action in {"stop_app", "clear_data", "app_settings"}:
+            if action == "clear_data":
+                answer = QMessageBox.warning(
+                    self, "Очистка данных",
+                    "Удалить данные выбранного приложения Android? "
+                    "Авторизация и настройки этого приложения будут потеряны.",
+                    QMessageBox.StandardButton.Yes
+                    | QMessageBox.StandardButton.Cancel,
+                )
+                if answer != QMessageBox.StandardButton.Yes:
+                    return
+            self.controller.device_action(action)
+            return
+        if action == "send_file":
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Файл для Android", "", "Все файлы (*)"
+            )
+            if path:
+                self.controller.device_action("send_file", path)
+            return
+        if action == "get_file":
+            name, ok = QInputDialog.getText(
+                self, "Получить файл",
+                "Имя файла в папке Android Download (например, report.txt):",
+            )
+            if not ok or not name:
+                return
+            destination, _ = QFileDialog.getSaveFileName(
+                self, "Сохранить полученный файл", name, "Все файлы (*)"
+            )
+            if destination:
+                self.controller.device_action("get_file", name, destination)
+            return
+        if action == "location":
+            lat, ok = QInputDialog.getDouble(
+                self, "Геолокация", "Широта:", 59.93, -90, 90, 6,
+            )
+            if not ok:
+                return
+            lon, ok = QInputDialog.getDouble(
+                self, "Геолокация", "Долгота:", 30.31, -180, 180, 6,
+            )
+            if ok:
+                self.controller.device_action("location", lat, lon)
+
+    def _refresh_emulator_tools(self) -> None:
+        if not hasattr(self, "emulator_tools"):
+            return
+        self.emulator_tools.set_ready(
+            self._android_ready,
+            recording=self._research_active,
+            busy=self._busy,
+        )
+        self.emulator_tools.buttons["fullscreen"].setEnabled(True)
+        self.emulator_tools.buttons["install"].setEnabled(
+            not self._busy and not self._research_active
+        )
+        for key in ("stop_app", "clear_data", "app_settings"):
+            self.emulator_tools.buttons[key].setEnabled(
+                self.emulator_tools.buttons[key].isEnabled()
+                and bool(self.controller.package_name)
+            )
 
     def _check_for_updates(self) -> None:
         if self._update_busy:
@@ -1322,11 +1458,14 @@ class MainWindow(QMainWindow):
             settings_enabled
         )
         self._refresh_update_controls()
+        self._refresh_emulator_tools()
 
     def _on_environment_ready(
         self,
         data: dict,
-    ) -> None:
+    ) -> None
+        self._android_ready = True
+        self._refresh_emulator_tools():
         self._refresh_component_state()
         if data.get("device_online"):
             transport = (
@@ -1436,6 +1575,7 @@ class MainWindow(QMainWindow):
         data: dict,
     ) -> None:
         self._research_active = True
+        self._refresh_emulator_tools()
         session_path = data.get("session_root")
         if session_path:
             self.https_view.begin_session(
@@ -1488,6 +1628,7 @@ class MainWindow(QMainWindow):
         data: dict,
     ) -> None:
         self._research_active = False
+        self._refresh_emulator_tools()
         self._last_archive = str(
             data.get("archive")
             or ""
