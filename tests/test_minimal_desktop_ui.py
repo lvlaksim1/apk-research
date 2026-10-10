@@ -138,6 +138,9 @@ def test_emulator_panel_actions_are_connected(app, monkeypatch):
         assert window.emulator_tools.buttons["rotate"].isEnabled()
         assert window.tabs.count() == 2
     finally:
+        # The simulated capture flag is a UI test state, not a running
+        # recorder. Restore it before MainWindow.closeEvent runs.
+        window._research_active = False
         window.https_view.timer.stop()
         window.controller.close()
         window.close()
