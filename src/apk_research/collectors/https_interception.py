@@ -200,6 +200,7 @@ class HttpsInterceptionCollector:
         self._route_attempted = False
         self._route_active = False
         self._route_ever_active = False
+        self._route_cleanup_confirmed: bool | None = None
         self._route_uid: int | None = None
         self._route_binary_sha256 = ""
 
@@ -416,14 +417,19 @@ class HttpsInterceptionCollector:
         self._finished = True
 
         count = self._transaction_count()
-        status = "completed"
+        cleanup_error = (
+            "Не удалось подтвердить удаление сетевого правила Android"
+            if self._route_cleanup_confirmed is False else None
+        )
+        status = "failed" if cleanup_error else "completed"
         self.session.update_collector(
             self.NAME,
             status,
+            error=cleanup_error,
         )
         self._write_metadata(
             status,
-            error=None,
+            error=cleanup_error,
             proxy_returncode=returncode,
             transaction_count=count,
         )
@@ -641,6 +647,7 @@ test -s "$SYSTEM/{self._ca_subject_hash}.0"
         self._route_binary_sha256 = hashlib.sha256(binary.read_bytes()).hexdigest()
         remote_binary = self.ROUTE_ROOT + "/apk-research-https-route"
         self._route_attempted = True
+        self._route_cleanup_confirmed = False
         self.adb.make_remote_directory(self._serial, self.ROUTE_ROOT)
         self.adb.push_file(self._serial, binary, remote_binary)
         chain = self.ROUTE_CHAIN
@@ -656,7 +663,12 @@ ERR={err}
 CHAIN={chain}
 chmod 700 "$BIN"
 # Restore the route from a prior interrupted research session, if present.
-iptables -t nat -D OUTPUT -m owner --uid-owner {self._route_uid} -j "$CHAIN" 2>/dev/null || true
+iptables -t nat -S OUTPUT 2>/dev/null | grep -F -- "-j $CHAIN" | while read -r TYPE TABLE REST; do
+  if [ "$TYPE" = "-A" ] && [ "$TABLE" = "OUTPUT" ]; then
+    set -- $REST
+    iptables -t nat -D OUTPUT "$@" 2>/dev/null || true
+  fi
+done
 iptables -t nat -F "$CHAIN" 2>/dev/null || true
 iptables -t nat -X "$CHAIN" 2>/dev/null || true
 if [ -f "$PID" ]; then
@@ -698,14 +710,15 @@ printf '%s\\n' ROUTE_ACTIVE
             return
         chain = self.ROUTE_CHAIN
         uid = self._route_uid
-        route_rule = (
-            f"iptables -t nat -D OUTPUT -m owner --uid-owner {uid} "
-            f"-j {chain} 2>/dev/null || true"
-            if uid is not None else ":"
-        )
         script = f"""
-{route_rule}
-iptables -t nat -F {chain} 2>/dev/null || true
+CHAIN={chain}
+iptables -t nat -S OUTPUT 2>/dev/null | grep -F -- "-j $CHAIN" | while read -r TYPE TABLE REST; do
+  if [ "$TYPE" = "-A" ] && [ "$TABLE" = "OUTPUT" ]; then
+    set -- $REST
+    iptables -t nat -D OUTPUT "$@" 2>/dev/null || true
+  fi
+done
+iptables -t nat -F "$CHAIN" 2>/dev/null || true
 iptables -t nat -X {chain} 2>/dev/null || true
 PID={self.ROUTE_ROOT}/route.pid
 if [ -f "$PID" ]; then
@@ -715,12 +728,17 @@ if [ -f "$PID" ]; then
     *) kill "$VALUE" 2>/dev/null || true ;;
   esac
 fi
+if iptables -t nat -S OUTPUT 2>/dev/null | grep -F -- "-j $CHAIN" >/dev/null; then
+  echo ROUTE_PRESENT
+else
+  echo ROUTE_REMOVED
+fi
 """
         try:
-            self._shell_script(script, timeout=15.0)
+            report = self._shell_script(script, timeout=15.0)
+            self._route_cleanup_confirmed = "ROUTE_REMOVED" in report
         except Exception:
-            # The diagnostic file remains available when Android responds.
-            pass
+            self._route_cleanup_confirmed = False
         try:
             self.adb.pull_file(
                 self._serial,
@@ -737,8 +755,8 @@ fi
             )
         except Exception:
             pass
-        self._route_active = False
-        self._route_attempted = False
+        self._route_active = not bool(self._route_cleanup_confirmed)
+        self._route_attempted = not bool(self._route_cleanup_confirmed)
 
     def _cleanup_device_best_effort(self) -> None:
         self._stop_direct_route()
@@ -880,6 +898,7 @@ rm -rf /data/local/tmp/apk-research/https-ca /data/local/tmp/apk-research/https
                 "target_uid": self._route_uid,
                 "direct_tcp443_route_configured": self._route_active,
                 "direct_tcp443_route_used": self._route_ever_active,
+                "direct_route_cleanup_confirmed": self._route_cleanup_confirmed,
                 "direct_route_port": self.DEVICE_ROUTE_PORT,
                 "direct_route_binary_sha256": self._route_binary_sha256 or None,
                 "system_ca_injection_succeeded": self._ca_injection_succeeded,
