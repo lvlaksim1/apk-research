@@ -1,5 +1,14 @@
 # Refactoring and Architecture Log
 
+## v0.34.0 — Android toolbar and offline derived network evidence
+
+The side toolbar resides beside the original gRPC/MMAP framebuffer; all actions use structured ADB arguments or existing gRPC input and execute asynchronously. Changes to app data require explicit confirmation. The raw Android frame can be saved directly as PNG. The original two-tab navigation is unchanged.
+
+`network_enrichment.py` parses bounded classic PCAP with Ethernet/SLL/SLL2/raw-IP framing; port-53 DNS packets, complete on-packet TLS hello records, previous HTTP durations and user-action timestamps are analyzed after collectors finish. Results are registered as optional, reproducible ZIP artifacts. No source PCAP, HTTP bodies or original evidence are altered. Fragmented packets, encrypted DNS/TLS metadata, QUIC and TCP stream reassembly are explicitly not treated as known fields. Correlations are temporal candidates only, and screen PTS metadata is not falsely represented as visual-change latency.
+
+The stage must not block a usable Research ZIP if optional parsing fails. Android 15 and Windows release gates remain mandatory.
+
+
 ## v0.33.0 — Отделение пользовательского окна от механизмов сбора
 
 Главный запуск использует базовый `MainWindow`, а не многоуровневую надстройку исторических технических вкладок. Видимы только Research и Live HTTPS. При этом обязательные компоненты `ResearchOrchestrator` и исходные форматы Research ZIP неизменны; операции обслуживания остаются доступны в отдельном диалоге меню «Программа».
