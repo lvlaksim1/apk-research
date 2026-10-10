@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.33.0] - 2026-10-10
+
+- Simplified actual Windows entrypoint to a two-tab Research / Live HTTPS main window; removed technical UI navigation while preserving all evidence collectors.
+- Moved updater and Android maintenance to the Program menu, and added a direct button to the Research ZIP directory.
+- Added a live HTTPS journal viewer refreshing every 500 ms, with search, response details, bounded body previews, and completed ZIP support.
+- Added Android-screen HTTPS count and a one-click link to the live table.
+- Increased tcpdump capture buffer to 16 MiB while retaining full packet length and independent RAW PCAP.
+- Added incremental journal reader tests, two-tab GUI checks and Windows standalone smoke coverage.
+- Preserved v0.32 direct HTTPS routing, v0.31 ARM64/XAPK, Android screen, all collection artifacts and full/update installer design.
+
+
 ## [0.32.0] - 2026-10-10
 
 ### Added
