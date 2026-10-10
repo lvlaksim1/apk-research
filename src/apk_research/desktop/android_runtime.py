@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Callable, Sequence
 
 from apk_research.desktop.components import (
-    AVD_NAME,
     ComponentManager,
 )
 from apk_research.desktop.emulator_grpc import (
@@ -241,7 +240,7 @@ class AndroidRuntime:
         if not self._is_windows():
             return []
 
-        avd = AVD_NAME.replace("'", "''")
+        avd = self.components.avd_name.replace("'", "''")
         emulator_root = str(
             self.paths.sdk_root / "emulator"
         ).replace("'", "''")
@@ -471,6 +470,15 @@ class AndroidRuntime:
         self._ensure_root(progress)
         self._normalize_initial_orientation(progress)
         self._ensure_live_transport(progress)
+        if self.components.profile == "google_apis":
+            available = self.device_abis()
+            if "arm64-v8a" not in available:
+                raise AndroidRuntimeError(
+                    "Образ Android с Google APIs не сообщил поддержку ARM64. "
+                    "Доступные архитектуры: "
+                    + (", ".join(available) or "не определены")
+                )
+        self.components.persist_selected_profile()
 
     def _required_display_mode(self) -> str:
         if (
@@ -679,6 +687,54 @@ class AndroidRuntime:
             if fallback:
                 values = [fallback]
         return tuple(dict.fromkeys(values))
+
+    def prepare_package_environment(
+        self,
+        package_path: str | os.PathLike[str],
+        progress: RuntimeProgress | None = None,
+    ) -> None:
+        """Select an official ARM-compatible private AVD before starting video."""
+        self.components.ensure_host_tools(progress)
+        source = Path(package_path).expanduser().resolve()
+        try:
+            with materialize_android_package(source) as bundle:
+                badgings = [
+                    self._apk_badging(path)
+                    for path in bundle.apk_files
+                ]
+
+            validate_apk_set(badgings)
+            if self.components.profile == "google_apis":
+                return
+            try:
+                validate_apk_set(
+                    badgings, device_abis=("x86_64", "x86"),
+                )
+                return
+            except PackageInputError as original_mismatch:
+                try:
+                    validate_apk_set(
+                        badgings,
+                        device_abis=(
+                            "x86_64", "x86", "arm64-v8a", "armeabi-v7a",
+                        ),
+                    )
+                except PackageInputError:
+                    raise original_mismatch
+
+            self._emit(
+                progress,
+                "Обнаружены библиотеки ARM. Подготовка отдельного "
+                "эмулятора Android 15 (Google APIs) с поддержкой ARM64. "
+                "Предыдущий эмулятор и его данные будут сохранены.",
+                None,
+                None,
+            )
+            if self._device_online() or self.process is not None:
+                self.stop()
+            self.components.select_profile("google_apis")
+        except PackageInputError as exc:
+            raise AndroidRuntimeError(str(exc)) from exc
 
     def install_package(
         self,
@@ -1234,7 +1290,7 @@ class AndroidRuntime:
     def _emulator_command(self) -> list[str]:
         command = [
             str(self.paths.emulator),
-            f"@{AVD_NAME}",
+            f"@{self.components.avd_name}",
             "-port",
             str(self.PORT),
             "-gpu",
