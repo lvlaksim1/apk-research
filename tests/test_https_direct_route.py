@@ -25,6 +25,8 @@ class FakeAdb:
         self.shells.append(" ".join(str(a) for a in arguments))
         if arguments[0] == "cmd":
             return self.listed
+        if any("ROUTE_REMOVED" in str(a) for a in arguments):
+            return "ROUTE_REMOVED\n"
         if any("ROUTE_ACTIVE" in str(a) for a in arguments):
             return "ROUTE_ACTIVE\n"
         return ""
@@ -91,6 +93,7 @@ def test_direct_route_limits_output_rule_to_target_uid_and_tcp443(
     collector._stop_direct_route()
     assert collector._route_active is False
     assert collector._route_attempted is False
+    assert collector._route_cleanup_confirmed is True
     assert adb.downloads == [
         "/data/local/tmp/apk-research/https-route32/route.log"
     ]
