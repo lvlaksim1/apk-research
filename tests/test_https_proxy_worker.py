@@ -135,3 +135,31 @@ def test_recorder_writes_error_transaction(
     assert value["response"] is None
     assert "TLS client disconnected" in value["error"]
     assert value["interception"]["tls_decrypted"] is False
+
+def test_direct_route_marker_is_preserved_per_https_transaction(tmp_path):
+    from types import SimpleNamespace
+
+    transactions = tmp_path / "http.jsonl"
+    recorder = ResearchTransactionRecorder(
+        transactions, tmp_path / "bodies",
+        tmp_path / "ready.json", tmp_path / "error.txt",
+    )
+    connection = SimpleNamespace(id="device-tunnel-001")
+    tunnel = _Flow()
+    tunnel.client_conn = connection
+    tunnel.request.headers = _Headers(
+        [("X-Apk-Research-Route", "direct")]
+    )
+    recorder.http_connect(tunnel)
+
+    flow = _Flow()
+    flow.client_conn = connection
+    recorder.response(flow)
+    data = json.loads(transactions.read_text(encoding="utf-8"))
+    assert data["interception"]["route"] == "direct"
+
+    other = _Flow()
+    other.client_conn = SimpleNamespace(id="system-tunnel")
+    recorder.response(other)
+    records = [json.loads(line) for line in transactions.read_text().splitlines()]
+    assert records[1]["interception"]["route"] == "system-or-undetermined"
