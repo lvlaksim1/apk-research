@@ -62,11 +62,12 @@ def _epoch(value: Any) -> float | None:
             return float(value)
         if not value:
             return None
-        return datetime.fromisoformat(
+        parsed = datetime.fromisoformat(
             str(value).replace("Z", "+00:00")
-        ).replace(tzinfo=timezone.utc) .timestamp() if False else datetime.fromisoformat(
-            str(value).replace("Z", "+00:00")
-        ).timestamp()
+        )
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.timestamp()
     except (ValueError, TypeError, OverflowError):
         return None
 
@@ -162,7 +163,7 @@ def _action_network_links(root: Path, output) -> int:
 
 
 def _screen_timing(root: Path, output) -> int:
-    path = root / "02_normalized/screen-recording.json"
+    path = root / "02_normalized/screen.json"
     if not path.is_file():
         return 0
     try:
