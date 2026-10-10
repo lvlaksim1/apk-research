@@ -42,6 +42,7 @@ class DesktopController(QObject):
     timelineReady = Signal(dict)
     networkReady = Signal(dict)
     diagnosticsReady = Signal(dict)
+    emulatorActionFinished = Signal(str, str)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -508,6 +509,7 @@ class DesktopController(QObject):
             else:
                 detail = self.runtime.emulator_action(action, *values)
             self.log.emit(detail or "Команда Android выполнена")
+            self.emulatorActionFinished.emit(action, detail or "Готово")
         except Exception as exc:
             self.error.emit(
                 "Действие Android не выполнено: "
