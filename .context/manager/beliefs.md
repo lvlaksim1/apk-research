@@ -2,9 +2,9 @@
 
 ## Verified baseline
 
-Current product baseline is **apk-research v0.31.0** at `5aab54adc807aff401b59d4c1018795246303b89`. The previous verified baseline was v0.30.0.
+Current product baseline is **apk-research v0.32.0** at `a2f0bbbca364714d37f7697ffa5ccb8204bc94b1`. The previous verified baseline was v0.31.0.
 
-Live reconciliation on 2026-10-08 confirmed that `main` and the latest GitHub Release both point to that exact SHA. PR #26 delivered the HTTPS traffic analysis feature and was merged at `7f603fa95231d936039ed6dac222b11d5189ad2d`; the current main commit synchronizes release documentation and retriggered the standard release pipeline.
+Historical 2026-10-08 reconciliation confirmed the then-current v0.30.0 release. PR #26 delivered the HTTPS traffic analysis feature and was merged at `7f603fa95231d936039ed6dac222b11d5189ad2d`; the current main commit synchronizes release documentation and retriggered the standard release pipeline.
 
 Published assets:
 - `apk-research-setup_v0.30.0.exe` — 47,454,995 bytes — SHA-256 `6f9f39c67a88344e7181316c6c6445660f2e1d066deaca09ba13f1ec20954e1a`;
@@ -60,3 +60,15 @@ On 2026-10-10 PR #29 merged and main pipeline #144 attempt 2 succeeded, publishi
 Setup: `apk-research-setup_v0.31.0.exe` SHA256 `8c253edf38759830fbe8e156282beaa1b2f0f9b98fd6ad3d880679d180176b83`; Update: `apk-research-update_v0.31.0.exe` SHA256 `cb41c928aa2fadeb92bf2c17026cc3863e4d094a0cc5fa92a279597d10baabc6`.
 
 The independent owner directive to route direct HTTPS connections of `com.evrasia` through the local analyzer remains ACTIVE and unimplemented by v0.31.
+
+## Verified v0.32.0 direct HTTPS application routing (2026-10-10)
+
+The owner's 2026-10-10 directive extended HTTP/HTTPS analysis to direct TCP/443 connections bypassing Android's system proxy. PR #30 merged to main `a2f0bbbca364714d37f7697ffa5ccb8204bc94b1`; pipeline #145 attempt 1 SUCCESS, GitHub Release v0.32.0 targets that exact SHA.
+
+Implemented: per-target Android UID rule in NAT OUTPUT for IPv4 TCP/443, separate small native Android route module built from source with official NDK, preservation of destination using SO_ORIGINAL_DST and HTTPS data transfer to the existing local analyzer over adb reverse. During normal teardown, routing rules are removed and their removal verified; the RAW network log `01_raw/network/https-direct-route.log` is archived, with UID/scope/routing fields in existing HTTPS metadata.
+
+Real Android 15 acceptance tested Java system-proxy HTTPS and `Proxy.NO_PROXY` HTTPS independently, both HTTP 200, 577-byte response bodies, `verified_routes: ["direct","system"]`. Default real AVD research, Windows build/full+update, actual v0.31.0 to v0.32.0 update and clean Windows provisioning all passed before merge and again in main pipeline #145.
+
+Published Setup SHA-256 `226d8b4bf12ccab0b07620b8110107354b15873c1f1f93c925bc28d0f2c1c070`; Update SHA-256 `aed61edabbf81e865aa49c16743793886e2bbe5e9394f64b71e75fb7eeedd0cc`.
+
+The actual owner's `com.evrasia` app/Research ZIP has NOT been retested with v0.32.0. Continue that validation as an ACTIVE owner-target task, not a verified field success. IPv6, QUIC/UDP443, custom TLS stores/pinning remain explicit boundaries. Terminology in owner-visible reports must be neutral; avoid language owner prohibited.

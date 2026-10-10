@@ -4,7 +4,7 @@ Last reconciled: 2026-10-10.
 
 ## Release blockers
 
-None for the published v0.31.0 baseline. Main pipeline #144 succeeded after retrying intermittent ADB Settings start failure.
+None for published v0.32.0. Main pipeline #145 attempt 1 passed all mandatory gates.
 
 ## HTTPS traffic analysis boundaries
 
@@ -25,8 +25,12 @@ WHPX remains advisory/non-publication-gating.
 
 ## Active owner-target gap after v0.30.0
 
-The prior-chat `com.evrasia` archive reportedly contains direct remote HTTPS connections but no readable HTTP transaction evidence. The generic system-proxy implementation does not cover an application that bypasses that proxy. Root cause at the precise socket/routing level and a robust automatic routing solution have not been validated in this reinstantiated runtime. Certificate-specific causes must not be asserted for this case without packet/proxy evidence. This is an active owner-target requirement, not a retroactive blocker to the already published v0.30.0.
+The prior-chat `com.evrasia` archive reportedly contains direct remote HTTPS connections but no readable HTTP transaction evidence. The v0.32.0 selected-app direct IPv4 TCP/443 routing solution has passed live Android 15 acceptance; however, the original owner `com.evrasia` case has NOT been re-tested under v0.32.0. A new Research ZIP is needed for target-specific validation. Certificate-specific causes must not be asserted for this case without packet/proxy evidence. This is an active owner-target requirement, not a retroactive blocker to the already published v0.30.0.
 
 ## ARM64 XAPK boundaries
 
 The official Android 15 Google APIs x86_64 image advertises ARM64 native translation and has executed an actual ARM64 JNI library from synthetic XAPK. No owner-specific original XAPK was provided for field testing. App-specific services/device checks may still limit launch; additional Android image download is expected on first use. Not a release blocker.
+
+## v0.32.0 limits and target field verification
+
+The owner-specific `com.evrasia` deployment is not yet verified, although the general routing mechanism has passed a real `Proxy.NO_PROXY` Android 15 HTTPS test. No assumption about that app's TLS trust, certificate restrictions, IPv6 or UDP/QUIC behavior is warranted. The isolated rule only addresses IPv4 TCP/443 by installed package UID. The owner needs a new Research ZIP and route log for authoritative conclusion. This is not a blocker to published v0.32.0.

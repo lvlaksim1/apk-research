@@ -39,7 +39,7 @@ Reconcile live product/release/CI before consequential changes and preserve all 
 
 ## Active — HTTPS traffic of applications that bypass the Android system proxy
 
-Status: **active / implementation not verified**.
+Status: **generic routing implemented/released in v0.32.0; owner-specific application verification pending**.
 
 Following the owner archive analysis on 2026-10-08, the owner directed the manager to implement automatic handling/routing of HTTPS traffic emitted by target Android applications that do not use the system proxy, beginning with `com.evrasia`.
 
@@ -54,3 +54,11 @@ Next action: re-read the supplied archive (if accessible) and relevant code, est
 Status: **completed and released 2026-10-10**. Owner required support for ARM64-only XAPK rejected by original x86_64-only AVD. Delivered automatic package ABI preflight, separate official Android 15 Google APIs x86_64 image with native ARM translation, original AVD/userdata isolation, root/gRPC/MMAP/ABI validation, and normal XAPK split/OBB handling. Acceptance proved actual ARM64 JNI library execution in an Android 15 test XAPK (`ARM64_NATIVE_LOADED: PASS`), legacy AVD and Windows acceptance, main pipeline #144 attempt 2 and published v0.31.0 assets tied to main `5aab54adc807aff401b59d4c1018795246303b89`.
 
 Owner's actual rejected XAPK still needs field validation. The separate owner HTTPS routing commitment remains ACTIVE.
+
+## Completed — v0.32.0 direct TCP/443 routing to HTTPS analyzer
+
+Owner's 2026-10-10 request was implemented and published. PR #30, main `a2f0bbbca364714d37f7697ffa5ccb8204bc94b1`, pipeline #145 attempt 1 success. A separate Android-local module uses Android's true package UID and original destination to direct only selected-app IPv4 TCP/443 data to the existing HTTPS analyzer; archived route diagnostics and verified cleanup are part of the session. Android 15 live acceptance required both system-proxy and `Proxy.NO_PROXY` HTTPS with nonempty HTTP 200 response bodies (577 bytes each). Windows build, prior-release update and clean provisioning passed. Published Setup and Update assets are available for v0.32.0.
+
+## Active — owner-specific `com.evrasia` verification
+
+The original owner Research ZIP `20261008T020126.928669Z-e336ad57.research.zip` previously showed direct TLS connections and zero readable HTTP records under v0.30.0. User must test their actual APK using published v0.32.0; inspect newly generated `02_normalized/http-transactions.jsonl`, `01_raw/network/https-direct-route.log`, and `02_normalized/http-interception.json`. Do not claim success of this specific APK without real new evidence. App-specific TLS trust and QUIC restrictions remain.

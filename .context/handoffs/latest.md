@@ -1,24 +1,29 @@
 # Latest Handoff
 
-Generation: 27
+Generation: 28
 Date: 2026-10-10
 Persistent manager: `apk-research-project-manager`
 Manager-state authority: `context`
 Product authority: `main`
 
-## Latest product baseline
+## Latest verified publication
 
-**apk-research v0.31.0** released on 2026-10-10 at exact main/release SHA `5aab54adc807aff401b59d4c1018795246303b89`. PR #29 merged. Main pipeline #144 attempt 2 succeeded (initial attempt had an intermittent ADB Settings launch failure; subsequent AVD rerun passed without code changes), including CI, real AVD/HTTPS research, Windows setup/update, clean Windows Android provisioning and release publication.
+**apk-research v0.32.0**, published 2026-10-10, exact main/release commit `a2f0bbbca364714d37f7697ffa5ccb8204bc94b1`. PR #30 merged. Main pipeline **#145 attempt 1 SUCCESS**: CI tests, real Android 15 AVD/HTTPS, standalone Windows build, in-place update v0.31.0 → v0.32.0, clean Windows provisioning and release publication.
 
-Setup: `apk-research-setup_v0.31.0.exe` SHA-256 `8c253edf38759830fbe8e156282beaa1b2f0f9b98fd6ad3d880679d180176b83`.
-Update: `apk-research-update_v0.31.0.exe` SHA-256 `cb41c928aa2fadeb92bf2c17026cc3863e4d094a0cc5fa92a279597d10baabc6`.
+Setup: `apk-research-setup_v0.32.0.exe`, SHA-256 `226d8b4bf12ccab0b07620b8110107354b15873c1f1f93c925bc28d0f2c1c070`.
+Update: `apk-research-update_v0.32.0.exe`, SHA-256 `aed61edabbf81e865aa49c16743793886e2bbe5e9394f64b71e75fb7eeedd0cc`.
+SHA256SUMS.txt published for both.
 
-## Completed ARM64 APK/XAPK work
+## Completed generic direct HTTPS support
 
-The owner required ARM64-only XAPK installation. The app now uses ABI preflight and a separate official Android 15 Google APIs x86_64 image with ARM native translation, preserving original default AVD/userdata. Device advertised `x86_64,arm64-v8a`; real Android 15 test XAPK loaded ARM64 JNI library (`ARM64_NATIVE_LOADED: PASS`); standard research mode passed. Owner-specific XAPK has not been supplied/tested: do not claim universal compatibility.
+The owner instructed the manager to support direct HTTPS connections bypassing Android system proxy. The published implementation (1) reads the exact Android package UID, (2) directs only that UID's IPv4 TCP/443 via a root Android NAT rule to a small native service, (3) uses SO_ORIGINAL_DST to retain original destination and forwards to the existing local HTTPS analyzer via adb reverse, (4) archives `01_raw/network/https-direct-route.log` and detailed route metadata, (5) checks removal of network rule on normal shutdown and recovers stale rules on a new session. Original RAW PCAP remains independent.
 
-## Still-active independent owner commitment
+**Verified live:** real Android 15 application made normal-system-proxy and `Proxy.NO_PROXY` requests to `https://example.com/`, each returned HTTP 200 with a 577-byte body. Research ZIP contained both HTTP transactions and the direct-route journal. Real baseline research, Windows packaging/upgrade and clean provisioning passed.
 
-Follow the 2026-10-08 direction to route direct HTTPS from `com.evrasia` applications bypassing system proxy into local analyzer. Earlier owner Research ZIP reportedly contained direct remote port 443 connections and no readable transactions. Revalidate actual ZIP before concrete diagnosis. v0.31 ARM compatibility does not implement this requirement.
+## STILL ACTIVE — owner-specific field verification
 
-The owner-cancelled Android home-screen shortcut task remains CANCELLED. Preserve all existing RAW PCAP and Android research invariants. Release only via verified commit-triggered pipeline.
+The user's earlier `20261008T020126.928669Z-e336ad57.research.zip` from `com.evrasia` predated this feature and reportedly contained direct TCP/443 connections without readable HTTP transactions. **That same application has not yet been tested on v0.32.0.** Request its new Research ZIP; confirm destination records in the route journal and actual HTTP requests/responses in normalized transactions before marking the owner-specific case closed. App-defined TLS trust, IPv6 and QUIC/UDP443 remain explicit boundaries, with no universal claim.
+
+## Other constraints
+
+Owner confirms the prior ARM64/XAPK feature works. Preserve separate AVD user data, gRPC/MMAP, root, native ABI support and release integrity; Android home-screen shortcut task remains cancelled. Do not use owner-prohibited terminology in user-visible comments; use neutral Russian technical terms.

@@ -4,11 +4,11 @@ Last reconciled: 2026-10-10.
 
 ## Product
 
-- Current release/main commit: `5aab54adc807aff401b59d4c1018795246303b89`.
-- Latest release: `v0.31.0`.
-- Full installer: `apk-research-setup_v0.31.0.exe` (SHA256 `8c253edf38759830fbe8e156282beaa1b2f0f9b98fd6ad3d880679d180176b83`).
-- Update installer: `apk-research-update_v0.31.0.exe` (SHA256 `cb41c928aa2fadeb92bf2c17026cc3863e4d094a0cc5fa92a279597d10baabc6`).
-- Main pipeline #144 attempt 2 SUCCESS (2026-10-10); GitHub Release targets exact main SHA.
+- Current release/main commit: `a2f0bbbca364714d37f7697ffa5ccb8204bc94b1`.
+- Latest release: `v0.32.0`.
+- Full installer: `apk-research-setup_v0.32.0.exe` (SHA256 `226d8b4bf12ccab0b07620b8110107354b15873c1f1f93c925bc28d0f2c1c070`).
+- Update installer: `apk-research-update_v0.32.0.exe` (SHA256 `aed61edabbf81e865aa49c16743793886e2bbe5e9394f64b71e75fb7eeedd0cc`).
+- Main pipeline #145 attempt 1 SUCCESS (2026-10-10); GitHub Release targets exact main SHA.
 
 ## v0.30.0
 
@@ -61,3 +61,11 @@ v0.30.0 was the earlier HTTPS baseline; new v0.31.0 ARM-only APK support is inde
 ## Verified v0.31.0 ARM64 XAPK addition
 
 ABI preflight selects on-demand separate Google APIs Android 15 x86_64 image with system ARM64 translation for ARM-only APK/XAPK. Legacy default AVD/userdata are preserved. Live Android 15 acceptance confirmed x86_64,arm64-v8a and successfully loaded real ARM64 JNI from test XAPK (`ARM64_NATIVE_LOADED: PASS`). Real standard AVD acceptance and Windows Setup/Update/clean-provisioning acceptance passed before PR #29 merge and in main pipeline #144 attempt 2. The owner's exact application was not provided for testing.
+
+## v0.32.0 — directly connected HTTPS from selected application
+
+- Android application UID read from package manager. Scoped NAT OUTPUT rule routes only the selected package's IPv4 TCP/443 data to a small Android-local module; all other apps are outside this new rule.
+- Native module obtains original destination with `SO_ORIGINAL_DST`, sends traffic to existing HTTPS analyzer via `adb reverse`; readable request/response records appear in existing HTTP/HTTPS viewer when TLS trust permits.
+- New raw diagnostic artifact: `01_raw/network/https-direct-route.log`; metadata records target UID, route usage, route cleanup confirmation and routing limitations. RAW PCAP remains a separate source.
+- Real Android 15 acceptance proved system+direct `Proxy.NO_PROXY` HTTPS requests to `https://example.com/` both HTTP 200, 577 bytes. Main pipeline #145 succeeded including Windows Setup/Update and clean provisioning.
+- Field validation of `com.evrasia` remains outstanding. Specific application TLS trust or QUIC handling cannot be asserted without a fresh archive.

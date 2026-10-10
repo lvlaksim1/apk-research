@@ -44,4 +44,8 @@ The Android home-screen shortcut requirement remains cancelled.
 
 ## ARM64 compatibility maintenance
 
-Preserve the separate default and Google APIs Android 15 AVD userdata, verify real ARM64 execution (not just installation) and use target-specific diagnosis for owner-supplied APK/XAPK. Avoid breaking the proven root/gRPC-MMAP research runtime. The next distinct development stage remains direct HTTPS routing for applications ignoring Android proxy settings.
+Preserve the separate default and Google APIs Android 15 AVD userdata, verify real ARM64 execution (not just installation) and use target-specific diagnosis for owner-supplied APK/XAPK. Avoid breaking the proven root/gRPC-MMAP research runtime. Direct TCP/443 routing is now delivered in v0.32.0; next action is field validation on the owner's `com.evrasia` APK.
+
+## Follow-up plan after v0.32.0
+
+Obtain a real v0.32.0 session on the owner's target app, compare route log (actual direct target IP/port) with readable transactions, count HTTP responses and inspect TLS trust errors if any. Keep RAW PCAP independent. Do not infer decrypted HTTPS from TCP/443 connectivity alone; acknowledge custom certificate trust or QUIC/UDP443 limitations where supported by evidence. Develop further only from verified owner artifacts. Owner-visible terminology: neutral HTTPS routing and analysis terms.
