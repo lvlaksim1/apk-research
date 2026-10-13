@@ -289,6 +289,7 @@ class ResearchOrchestrator:
         exporter: Exporter = export_research_zip,
         launch_mode: str = "continue",
         event_observer: EventObserver | None = None,
+        android_ui_insets: str = "unmodified",
     ) -> None:
         self.adb = adb
         self.serial = serial.strip()
@@ -318,6 +319,7 @@ class ResearchOrchestrator:
             )
         self.launch_mode = launch_mode
         self.event_observer = event_observer
+        self.android_ui_insets = str(android_ui_insets)
 
         self.session: SessionManager | None = None
         self.metadata: MetadataCollectorLike | None = None
@@ -364,6 +366,7 @@ class ResearchOrchestrator:
                 target_utc=self._target_time_best_effort(),
                 details={
                     "launch_mode": self.launch_mode,
+                    "android_ui_insets": self.android_ui_insets,
                 },
             )
 

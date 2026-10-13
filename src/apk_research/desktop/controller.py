@@ -620,6 +620,10 @@ class DesktopController(QObject):
             client = AdbClient(
                 self.runtime.paths.adb
             )
+            appearance = self.runtime.configure_android_status_insets(package)
+            self.log.emit(
+                "Верхняя полоса Android: " + appearance
+            )
             client.launch_package(
                 self.runtime.SERIAL,
                 package,
@@ -643,10 +647,15 @@ class DesktopController(QObject):
             client = AdbClient(
                 self.runtime.paths.adb
             )
+            appearance = self.runtime.configure_android_status_insets(
+                self.package_name
+            )
+            self.log.emit("Верхняя полоса Android: " + appearance)
             orchestrator = ResearchOrchestrator(
                 client,
                 self.runtime.SERIAL,
                 self.package_name,
+                android_ui_insets=appearance,
                 launch_mode=(
                     "clean"
                     if self._clean_launch

@@ -105,3 +105,34 @@ def test_file_receive_only_from_public_android_storage(monkeypatch, tmp_path):
         str(tmp_path / "report.txt"),
     )
     assert calls[0][-3] == "pull"
+
+
+def test_android_15_status_inset_compatibility_is_target_scoped(monkeypatch):
+    runtime = _runtime(monkeypatch)
+    calls = []
+    def adb(*args, **kwargs):
+        calls.append(args)
+        if args[:2] == ("getprop", "ro.build.version.sdk"):
+            return subprocess.CompletedProcess(args, 0, stdout="35\n", stderr="")
+        return subprocess.CompletedProcess(args, 0, stdout="Success", stderr="")
+    monkeypatch.setattr(runtime, "_adb_shell", adb)
+    status = runtime.configure_android_status_insets("com.example.app")
+    assert status == "edge-to-edge-opt-out-requested"
+    assert calls[-1] == (
+        "am", "compat", "disable", "309578419", "com.example.app",
+    )
+    with pytest.raises(Exception):
+        runtime.configure_android_status_insets("bad; shell")
+
+
+def test_unsupported_status_inset_override_does_not_break_research(monkeypatch):
+    runtime = _runtime(monkeypatch)
+    calls = []
+    def adb(*args, **kwargs):
+        calls.append(args)
+        if args[0] == "getprop":
+            return subprocess.CompletedProcess(args, 0, stdout="35", stderr="")
+        return subprocess.CompletedProcess(args, 1, stdout="", stderr="unknown")
+    monkeypatch.setattr(runtime, "_adb_shell", adb)
+    assert runtime.configure_android_status_insets("com.example.app") == "compat-command-rejected"
+    assert calls[-1][0:3] == ("am", "compat", "disable")
