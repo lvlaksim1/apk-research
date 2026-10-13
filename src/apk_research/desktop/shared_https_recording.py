@@ -85,7 +85,7 @@ class SharedHttpsRecording:
                 with journal.open("rb") as handle:
                     handle.seek(self._begin_offset)
                     for line in handle:
-                        if not line.endswith(b"\\n"):
+                        if not line.endswith(b"\n"):
                             break
                         try:
                             item = json.loads(line)
@@ -151,7 +151,7 @@ class SharedHttpsRecording:
             "transaction_count": count,
         })
         (output_root / self.analyzer.METADATA_ARTIFACT).write_text(
-            json.dumps(metadata, ensure_ascii=False, indent=2) + "\\n",
+            json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
         self.session.update_collector(self.NAME, "completed")

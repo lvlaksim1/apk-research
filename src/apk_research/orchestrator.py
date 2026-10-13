@@ -504,7 +504,7 @@ class ResearchOrchestrator:
                     self.package_name,
                 )
             else:
-                launch_output = "LaunchMode: observe\\nActivity launch: not requested"
+                launch_output = "LaunchMode: observe\nActivity launch: not requested"
             self._write_launch_output(launch_output)
             if self.launch_mode == "clean":
                 if _launch_reused_existing_instance(

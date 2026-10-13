@@ -1566,7 +1566,7 @@ class MainWindow(QMainWindow):
         self._recording_starting = False
         self._research_active = True
         self.session_label.setText(
-            "● Запись ZIP идёт\\n" + str(data.get("package") or "")
+            "● Запись ZIP идёт\n" + str(data.get("package") or "")
         )
         self.global_status.setText("● ЗАПИСЬ ZIP")
         self.global_status.setStyleSheet(
@@ -1606,7 +1606,7 @@ class MainWindow(QMainWindow):
             ("● ZIP сохранён" if status == "complete"
              else "● Запись завершена: " + status)
             + (" · есть замечания" if issues else "")
-            + "\\n" + self._last_archive
+            + "\n" + self._last_archive
         )
         self.global_status.setText(
             "ZIP сохранён · HTTPS-анализ продолжается"
