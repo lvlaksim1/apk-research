@@ -162,6 +162,9 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:  # noqa: N802
         if self._applying_update:
+            self.settings.setValue(
+                "research_splitter", self.research_splitter.saveState()
+            )
             self.controller.close()
             event.accept()
             return
