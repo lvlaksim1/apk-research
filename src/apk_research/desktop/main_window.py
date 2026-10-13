@@ -293,179 +293,93 @@ class MainWindow(QMainWindow):
         self.research_splitter = splitter
 
         left = QWidget()
+        left.setMinimumWidth(235)
         left.setMaximumWidth(420)
         left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(
-            0,
-            0,
-            8,
-            0,
-        )
+        left_layout.setContentsMargins(0, 0, 8, 0)
+        left_layout.setSpacing(9)
 
-        apk_group = QGroupBox("1. Приложение")
-        apk_layout = QVBoxLayout(apk_group)
-        self.apk_path = QLineEdit()
-        self.apk_path.setReadOnly(True)
-        self.apk_path.setPlaceholderText(
-            "APK/XAPK ещё не выбран"
-        )
-        self.choose_apk_button = QPushButton(
-            "Выбрать APK/XAPK…"
-        )
-        self.choose_apk_button.setMinimumHeight(
-            38
-        )
-        self.package_label = QLabel(
-            "Package: —"
-        )
-        self.package_label.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
-        )
-        apk_layout.addWidget(self.apk_path)
-        apk_layout.addWidget(
-            self.choose_apk_button
-        )
-        install_buttons = QHBoxLayout()
-        self.install_package_button = QPushButton(
-            "Установить в эмулятор"
-        )
-        self.install_package_button.setEnabled(False)
-        self.launch_package_button = QPushButton(
-            "Запустить приложение"
-        )
-        self.launch_package_button.setEnabled(False)
-        install_buttons.addWidget(
-            self.install_package_button
-        )
-        install_buttons.addWidget(
-            self.launch_package_button
-        )
-        apk_layout.addLayout(install_buttons)
-        apk_layout.addWidget(
-            self.package_label
-        )
-        left_layout.addWidget(apk_group)
+        self.prepare_button = QPushButton("1. Подготовить Android")
+        self.prepare_button.setMinimumHeight(38)
+        left_layout.addWidget(self.prepare_button)
 
-        status_group = QGroupBox("2. Готовность к записи")
-        status_layout = QGridLayout(
-            status_group
-        )
-        self.status_android = QLabel(
-            "○ Android"
-        )
+        self.status_android = QLabel("○ Android не подготовлен")
+        self.status_android.setWordWrap(True)
+        left_layout.addWidget(self.status_android)
         self.status_adb = QLabel("○ ADB")
         self.status_root = QLabel("○ Root")
-        self.status_network = QLabel("○ Полная запись")
-        self.status_package = QLabel("○ APK/XAPK")
-        statuses = [
-            self.status_android,
-            self.status_adb,
-            self.status_root,
-            self.status_network,
-            self.status_package,
-        ]
-        for row, widget in enumerate(statuses):
-            status_layout.addWidget(widget, row, 0)
         self.status_adb.hide()
         self.status_root.hide()
-        self.prepare_button = QPushButton(
-            "Подготовить Android"
-        )
-        status_layout.addWidget(
-            self.prepare_button,
-            5,
-            0,
-        )
-        left_layout.addWidget(status_group)
 
-        progress_group = QGroupBox(
-            "Текущая операция"
+        self.choose_apk_button = QPushButton("2. Выбрать приложение (APK/XAPK)")
+        self.choose_apk_button.setMinimumHeight(38)
+        left_layout.addWidget(self.choose_apk_button)
+        self.apk_path = QLineEdit()
+        self.apk_path.setReadOnly(True)
+        self.apk_path.setPlaceholderText("Файл APK/XAPK не выбран")
+        left_layout.addWidget(self.apk_path)
+        self.install_package_button = QPushButton("3. Установить выбранное приложение")
+        self.install_package_button.setMinimumHeight(38)
+        self.install_package_button.setEnabled(False)
+        left_layout.addWidget(self.install_package_button)
+        self.package_label = QLabel("Выбранное приложение: —")
+        self.package_label.setWordWrap(True)
+        self.status_package = QLabel("○ Приложение не выбрано")
+        self.status_package.setWordWrap(True)
+        left_layout.addWidget(self.package_label)
+
+        app_label = QLabel("4. Установленные приложения")
+        app_label.setStyleSheet("font-weight: 600;")
+        left_layout.addWidget(app_label)
+        choice_row = QHBoxLayout()
+        choice_row.setSpacing(5)
+        self.installed_apps = QComboBox()
+        self.installed_apps.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
-        progress_layout = QVBoxLayout(
-            progress_group
+        self.installed_apps.setToolTip("Приложение, запросы которого будут анализироваться")
+        choice_row.addWidget(self.installed_apps, 1)
+        self.refresh_apps_button = QPushButton("⟳")
+        self.refresh_apps_button.setToolTip("Обновить список установленных приложений")
+        self.refresh_apps_button.setFixedWidth(32)
+        choice_row.addWidget(self.refresh_apps_button)
+        left_layout.addLayout(choice_row)
+        self.start_button = QPushButton("Начать анализ HTTPS")
+        self.start_button.setMinimumHeight(43)
+        self.start_button.setEnabled(False)
+        self.start_button.setStyleSheet("font-weight: 600;")
+        left_layout.addWidget(self.start_button)
+
+        self.stop_button = QPushButton("5. Начать запись ZIP")
+        self.stop_button.setMinimumHeight(44)
+        self.stop_button.setEnabled(False)
+        left_layout.addWidget(self.stop_button)
+        self.session_label = QLabel("Анализ выключен · запись ZIP выключена")
+        self.session_label.setWordWrap(True)
+        left_layout.addWidget(self.session_label)
+        self.status_network = QLabel("○ Запись ZIP выключена")
+        self.status_network.setWordWrap(True)
+        left_layout.addWidget(self.status_network)
+
+        self.zip_folder_button = QPushButton("6. Открыть папку с ZIP")
+        self.zip_folder_button.setMinimumHeight(38)
+        self.zip_folder_button.clicked.connect(
+            lambda: self._open_folder(default_runtime_root())
         )
+        left_layout.addWidget(self.zip_folder_button)
+
         self.progress_label = QLabel("Готово")
         self.progress_label.setWordWrap(True)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 1)
         self.progress_bar.setValue(1)
-        progress_layout.addWidget(
-            self.progress_label
-        )
-        progress_layout.addWidget(
-            self.progress_bar
-        )
-        left_layout.addWidget(progress_group)
-
-        run_group = QGroupBox(
-            "3. Исследование"
-        )
-        run_layout = QVBoxLayout(run_group)
-        launch_label = QLabel("Запуск приложения")
-        self.launch_mode = QComboBox()
-        self.launch_mode.addItem(
-            "Чистый запуск (рекомендуется)",
-            "clean",
-        )
-        self.launch_mode.addItem(
-            "Продолжить текущее состояние",
-            "continue",
-        )
-        saved_launch_mode = self.settings.value(
-            "research/launch_mode",
-            "clean",
-        )
-        launch_index = self.launch_mode.findData(
-            saved_launch_mode
-        )
-        if launch_index >= 0:
-            self.launch_mode.setCurrentIndex(
-                launch_index
-            )
-        run_layout.addWidget(launch_label)
-        run_layout.addWidget(self.launch_mode)
-
-        self.start_button = QPushButton(
-            "НАЧАТЬ ИССЛЕДОВАНИЕ"
-        )
-        self.start_button.setMinimumHeight(54)
-        self.start_button.setEnabled(False)
-        self.start_button.setStyleSheet(
-            "font-size: 15px; font-weight: 700;"
-        )
-        self.stop_button = QPushButton(
-            "ЗАВЕРШИТЬ И СОХРАНИТЬ"
-        )
-        self.stop_button.setMinimumHeight(46)
-        self.stop_button.setEnabled(False)
-        self.session_label = QLabel(
-            "Сессия не запущена"
-        )
-        self.session_label.setWordWrap(True)
-        run_layout.addWidget(
-            self.start_button
-        )
-        run_layout.addWidget(
-            self.stop_button
-        )
-        run_layout.addWidget(
-            self.session_label
-        )
-        left_layout.addWidget(run_group)
-        archive_note = QLabel(
-            "В ZIP автоматически сохраняются сетевые пакеты, "
-            "HTTPS-запросы и ответы, экран, действия и диагностика. "
-            "Отдельно включать запись не требуется."
-        )
-        archive_note.setWordWrap(True)
-        archive_note.setStyleSheet("color: #7b838c;")
-        left_layout.addWidget(archive_note)
-        self.zip_folder_button = QPushButton("Открыть папку с ZIP")
-        self.zip_folder_button.clicked.connect(
-            lambda: self._open_folder(default_runtime_root())
-        )
-        left_layout.addWidget(self.zip_folder_button)
+        left_layout.addWidget(self.progress_label)
+        left_layout.addWidget(self.progress_bar)
         left_layout.addStretch(1)
+
+        # Compatibility with older event handlers: launch is now automatic.
+        self.launch_package_button = QPushButton(left)
+        self.launch_package_button.hide()
 
         android_container = QWidget()
         android_layout = QVBoxLayout(
@@ -510,74 +424,72 @@ class MainWindow(QMainWindow):
         return page
 
     def _build_emulator_toolbar(self) -> QWidget:
-        panel = QWidget()
-        panel.setFixedWidth(48)
+        from PySide6.QtWidgets import QScrollArea
+
+        panel = QScrollArea()
+        panel.setFixedWidth(53)
+        panel.setWidgetResizable(True)
+        panel.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        panel.setFrameShape(QFrame.Shape.NoFrame)
         panel.setObjectName("emulatorControls")
         panel.setStyleSheet(
-            "QWidget#emulatorControls {background:#242630;"
-            " border:1px solid #363945; border-radius:6px;}"
+            "QScrollArea#emulatorControls {background:#242630; border:0;}"
+            "QWidget#emulatorButtons {background:#242630;}"
             "QToolButton {background:transparent; color:#e4e7ee;"
-            " font-size:20px; border:0px; padding:2px;}"
+            " font-size:17px; border:0; padding:1px;}"
             "QToolButton:hover {background:#3b4153; border-radius:5px;}"
         )
-        layout = QVBoxLayout(panel)
-        layout.setContentsMargins(5, 5, 5, 5)
-        layout.setSpacing(3)
+        inner = QWidget()
+        inner.setObjectName("emulatorButtons")
+        layout = QVBoxLayout(inner)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(1)
         self.emulator_buttons = {}
 
         def add_button(action: str, symbol: str, hint: str):
-            button = QToolButton(panel)
+            button = QToolButton(inner)
             button.setText(symbol)
             button.setToolTip(hint)
             button.setAccessibleName(hint)
-            button.setFixedSize(36, 36)
+            button.setFixedSize(35, 28)
             button.clicked.connect(
                 lambda checked=False, name=action:
                 self._emulator_button_action(name)
             )
-            layout.addWidget(button)
+            layout.addWidget(button, alignment=Qt.AlignmentFlag.AlignHCenter)
             self.emulator_buttons[action] = button
 
-        for action, symbol, hint in (
-            ("back", "‹", "Назад"),
-            ("home", "⌂", "Главный экран Android"),
-            ("recent", "▣", "Последние приложения"),
-            ("volume_up", "＋", "Громкость выше"),
-            ("volume_down", "－", "Громкость ниже"),
-            ("rotate", "⟳", "Повернуть экран"),
-            ("screenshot", "▧", "Снимок экрана в PNG"),
-            ("fullscreen", "⛶", "Полноэкранный режим"),
-            ("install", "APK", "Выбрать и установить APK/XAPK"),
-            ("restart", "↻", "Перезагрузить Android"),
-        ):
-            add_button(action, symbol, hint)
+        groups = (
+            (
+                ("back", "‹", "Назад"),
+                ("home", "⌂", "Главный экран Android"),
+                ("recent", "▣", "Последние приложения"),
+                ("volume_up", "＋", "Громкость выше"),
+                ("volume_down", "－", "Громкость ниже"),
+                ("rotate", "⟳", "Повернуть экран"),
+                ("screenshot", "▧", "Снимок экрана в PNG"),
+                ("fullscreen", "⛶", "Полноэкранный режим"),
+                ("install", "APK", "Выбрать и установить APK/XAPK"),
+                ("restart", "↻", "Перезагрузить Android"),
+            ),
+            (
+                ("push_file", "⇧", "Передать файл в Android"),
+                ("pull_file", "⇩", "Получить файл из Android"),
+                ("stop_app", "■", "Остановить приложение"),
+                ("clear_app", "⌫", "Очистить данные приложения"),
+                ("settings_app", "⚙", "Настройки приложения"),
+                ("location", "⌖", "Задать геолокацию"),
+                ("shake", "≈", "Встряхнуть устройство"),
+                ("paste_text", "T", "Ввести текст из буфера ПК"),
+            ),
+        )
+        for i, group in enumerate(groups):
+            if i:
+                layout.addSpacing(8)
+            for entry in group:
+                add_button(*entry)
         layout.addStretch(1)
-
-        extra = QToolButton(panel)
-        extra.setText("⋯")
-        extra.setToolTip("Дополнительные действия")
-        extra.setAccessibleName("Дополнительные действия")
-        extra.setFixedSize(36, 36)
-        extra.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        menu = QMenu(extra)
-        for action, label in (
-            ("push_file", "Передать файл в Android…"),
-            ("pull_file", "Получить файл из Android…"),
-            ("stop_app", "Остановить приложение"),
-            ("clear_app", "Очистить данные приложения…"),
-            ("settings_app", "Настройки приложения"),
-            ("location", "Задать геолокацию…"),
-            ("shake", "Встряхнуть устройство"),
-            ("paste_text", "Ввести текст из буфера ПК"),
-        ):
-            menu.addAction(
-                label,
-                lambda checked=False, name=action:
-                self._emulator_button_action(name)
-            )
-        extra.setMenu(menu)
-        layout.addWidget(extra)
-        self.emulator_buttons["more"] = extra
+        panel.setWidget(inner)
         return panel
 
     def _emulator_button_action(self, action: str) -> None:
