@@ -313,9 +313,10 @@ class ResearchOrchestrator:
         if launch_mode not in {
             "clean",
             "continue",
+            "observe",
         }:
             raise ValueError(
-                "launch_mode must be 'clean' or 'continue'"
+                "launch_mode must be 'clean', 'continue' or 'observe'"
             )
         self.launch_mode = launch_mode
         self.event_observer = event_observer
@@ -497,11 +498,13 @@ class ResearchOrchestrator:
                     self.serial,
                     self.package_name,
                 )
-            else:
+            elif self.launch_mode == "continue":
                 launch_output = self.adb.launch_package(
                     self.serial,
                     self.package_name,
                 )
+            else:
+                launch_output = "LaunchMode: observe\\nActivity launch: not requested"
             self._write_launch_output(launch_output)
             if self.launch_mode == "clean":
                 if _launch_reused_existing_instance(
@@ -518,7 +521,8 @@ class ResearchOrchestrator:
                         f"report a COLD launch (LaunchState={launch_state!r})"
                     )
             self._event(
-                "package_launched",
+                ("package_observation_started" if self.launch_mode == "observe"
+                 else "package_launched"),
                 target_utc=self._target_time_best_effort(),
             )
             self._user_actions_enabled = True
