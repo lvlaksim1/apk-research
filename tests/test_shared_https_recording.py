@@ -29,7 +29,7 @@ class RunningAnalyzer:
         self._serial = "emulator-5554"
         self.stop_calls = 0
         self.adb = SimpleNamespace(
-            shell_output=lambda *args, **kwargs: "ROUTE_ACTIVE\\n"
+            shell_output=lambda *args, **kwargs: "ROUTE_ACTIVE\n"
         )
 
     def stop(self):
@@ -68,7 +68,7 @@ def test_shared_https_snapshot_keeps_analyzer_running_and_bounds_zip(tmp_path):
     journal.parent.mkdir(parents=True)
     (journal.parent / "http-bodies").mkdir()
     before = _transaction(time.time() - 300, "before")
-    journal.write_text(json.dumps(before) + "\\n", encoding="utf-8")
+    journal.write_text(json.dumps(before) + "\n", encoding="utf-8")
     source_collector = RunningAnalyzer(source)
     session = make_session(tmp_path)
     recorder = SharedHttpsRecording(source_collector, session, "com.example.app")
@@ -79,7 +79,7 @@ def test_shared_https_snapshot_keeps_analyzer_running_and_bounds_zip(tmp_path):
     body = source / "02_normalized/http-bodies/during.response.body"
     body.write_text('{"done":true}', encoding="utf-8")
     with journal.open("a", encoding="utf-8") as stream:
-        stream.write(json.dumps(current) + "\\n")
+        stream.write(json.dumps(current) + "\n")
     session.begin_stop()
     recorder.stop()
     session.finish()

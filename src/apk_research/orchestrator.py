@@ -489,7 +489,8 @@ class ResearchOrchestrator:
                 )
 
             self._event(
-                "package_launch_requested",
+                ("package_observation_requested" if self.launch_mode == "observe"
+                 else "package_launch_requested"),
                 target_utc=self._target_time_best_effort(),
                 details={"launch_mode": self.launch_mode},
             )

@@ -336,25 +336,30 @@ class MainWindow(QMainWindow):
 
         app_label = QLabel("4. Установленные приложения")
         app_label.setStyleSheet("font-weight: 600;")
-        left_layout.addWidget(app_label)
+        app_header = QHBoxLayout()
+        app_header.addWidget(app_label)
+        app_header.addStretch(1)
+        self.refresh_apps_button = QPushButton("⟳")
+        self.refresh_apps_button.setToolTip("Обновить список установленных приложений")
+        self.refresh_apps_button.setFixedWidth(32)
+        app_header.addWidget(self.refresh_apps_button)
+        left_layout.addLayout(app_header)
         choice_row = QHBoxLayout()
         choice_row.setSpacing(5)
         self.installed_apps = QComboBox()
         self.installed_apps.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
-        self.installed_apps.setToolTip("Приложение, запросы которого будут анализироваться")
+        self.installed_apps.setMinimumHeight(38)
+        self.installed_apps.setToolTip("Выберите приложение для анализа")
         choice_row.addWidget(self.installed_apps, 1)
-        self.refresh_apps_button = QPushButton("⟳")
-        self.refresh_apps_button.setToolTip("Обновить список установленных приложений")
-        self.refresh_apps_button.setFixedWidth(32)
-        choice_row.addWidget(self.refresh_apps_button)
-        left_layout.addLayout(choice_row)
-        self.start_button = QPushButton("Начать анализ HTTPS")
-        self.start_button.setMinimumHeight(43)
+        self.start_button = QPushButton("Начать анализ")
+        self.start_button.setToolTip("Включить HTTPS и запустить выбранное приложение")
+        self.start_button.setMinimumHeight(38)
         self.start_button.setEnabled(False)
         self.start_button.setStyleSheet("font-weight: 600;")
-        left_layout.addWidget(self.start_button)
+        choice_row.addWidget(self.start_button)
+        left_layout.addLayout(choice_row)
 
         self.stop_button = QPushButton("5. Начать запись ZIP")
         self.stop_button.setMinimumHeight(44)
@@ -509,6 +514,12 @@ class MainWindow(QMainWindow):
             self.showNormal() if self.isFullScreen() else self.showFullScreen()
             return
         if action == "install":
+            if self._analysis_active or self._research_active:
+                QMessageBox.information(
+                    self, "Анализ выполняется",
+                    "Остановите анализ перед установкой другого приложения.",
+                )
+                return
             if self._choose_apk():
                 self._install_selected_package()
             return
@@ -535,7 +546,7 @@ class MainWindow(QMainWindow):
             if value:
                 self.controller.text_input(value)
             return
-        active = self._research_active
+        active = self._research_active or self._analysis_active
         if action in {
             "restart", "push_file", "pull_file", "stop_app",
             "clear_app", "settings_app", "shake",
@@ -1273,8 +1284,8 @@ class MainWindow(QMainWindow):
         self.installed_apps.setEnabled(editable)
         self.refresh_apps_button.setEnabled(editable)
         self.start_button.setText(
-            "Остановить анализ HTTPS"
-            if self._analysis_active else "Начать анализ HTTPS"
+            "Остановить"
+            if self._analysis_active else "Начать анализ"
         )
         self.start_button.setEnabled(
             (self._analysis_active and not self._research_active)
@@ -1336,6 +1347,9 @@ class MainWindow(QMainWindow):
         self._analysis_starting = False
         self._analysis_active = False
         self.https_view.finish_session(None)
+        self.https_view.note.setText(
+            "HTTPS-анализ остановлен. Запросы текущего сеанса доступны для просмотра."
+        )
         self.session_label.setText(
             "Анализ HTTPS остановлен · ZIP не записывается"
         )
