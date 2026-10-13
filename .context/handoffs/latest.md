@@ -1,23 +1,35 @@
 # Latest Handoff
 
-Generation: 31
-Date: 2026-10-10
-Persistent manager: apk-research-project-manager
-Product: main
-Manager state: context
+Generation: 32
+Date: 2026-10-13
+Manager: apk-research-project-manager
+Product authority: main
+Manager-state authority: context
 
-## Last PUBLISHED version
+## LIVE RECONCILIATION — VERIFIED
 
-v0.33.0, main 3f3f1144e0ea8944a065e7d5950fd07fd1e17abf. Do not present v0.34.0 as already released.
+- Current published release: **v0.34.0**, exact main/release commit `2efec386cff0b204ee56d8bee365f3c52caefcb5`.
+- Published release: https://github.com/lvlaksim1/apk-research/releases/tag/v0.34.0, 2026-10-13.
+- Successful final release workflow **#38375309755**: CI, real Android 15 AVD research, standalone Windows build/test, upgrade using dedicated Update installer, clean Windows Android provisioning, release publication and cleanup all SUCCESS.
+- Prior initial main workflow #38023468111 FAILED the Windows update gate. The publication required an additional release-gating fix and a successful full rerun. Do not erase that history or treat the earlier failed run as final.
+- Full installer: `apk-research-setup_v0.34.0.exe`, SHA256 `7ba45c3d5fb4a91d5df8bc3d8431928b135b76251470c0b41f458e778711d233`.
+- Update installer: `apk-research-update_v0.34.0.exe`, SHA256 `1df62f8a39c1efbabe201eafaeaaa93e8dd2b4e597bce7364249fafff252e779`.
+- `SHA256SUMS.txt` also published.
 
-## ACTIVE v0.34.0 development
+## FEATURE DELIVERY
 
-Draft PR #32, branch feature/v0.34-emulator-controls-network-evidence, latest branch commit 8c1dbcc81fa3620ed96b30300211c90fb7872ec3. Adds right-hand Android emulator toolbar: Back/Home/Recent, volume, rotation, PNG screenshot, fullscreen, APK/XAPK, reboot; more menu: shared storage file send/receive, selected app stop/data clear/system settings, simulated position and movement, typing from PC clipboard. UI destructive actions are confirm-gated and mostly disallowed during research. No extra main tabs.
+Owner approved development of a standard Android emulator side toolbar and richer Research ZIP. **PR #32 merged** in `e9240f05e620b1cee4f2d1d4ee0c14f1d36a111d`, shipping right-side emulator controls (navigation, volume, rotation, screenshot, fullscreen, install/reboot, file transfer, application operations, simulated location/motion, clipboard text input), while preserving only two principal Research and HTTPS Online tabs.
 
-Research ZIP derivation includes six registered normalized files: dns.jsonl, tls-sessions.jsonl, network-timings.jsonl, action-network-links.jsonl, screen-timing.jsonl, network-enrichment.json. Uses available ordinary DNS packets, visible TLS Hello (including local routed TCP ports), HTTP times, temporal action candidate links and true video PTS values. Original PCAP, full HTTP bodies, video and integrity remain separate. Do not invent causal relationships or visual latency.
+Six additional Research ZIP artifacts: `02_normalized/dns.jsonl`, `tls-sessions.jsonl`, `network-timings.jsonl`, `action-network-links.jsonl`, `screen-timing.jsonl`, `network-enrichment.json`. Their contents derive only from actually observed packets, HTTPS requests/responses, actions, and video timing. No false completeness, causal claims or invented TLS/DNS values. Original RAW PCAP, full HTTP(S) bodies, logs, screen video and manifest integrity are preserved.
 
-Earlier real AVD acceptance passed and verified 3660 packets plus 6 ZIP artifacts, and unit tests passed at SHA 8afe5c1d. Latest exact candidate still needs mandatory final CI, AVD and Windows tests. Some intermediate AVD runs had recurring transient Android Settings ADB 255; do not conceal or bypass a failed gate.
+**Different draft PR #33** (`feature/v0.34-emulator-controls-evidence`, head `18a0e6fa1b30da9eef8b8ed32ffec0ddca48035d`) was CLOSED WITHOUT MERGE. Older assistant claims about this branch being the final release source are obsolete. Do not resume it as active work or merge its unverified implementation into main.
 
-After full PR checks, merge, verify main pipeline, and release separate Setup/Update v0.34.0 installers. Only then mark complete.
+## USER INCIDENT / RISK
 
-Owner-specific previous com.evrasia direct HTTPS gap remains previously resolved, prior user's ZIP contains credentials and must not be posted publicly. Neutral terms only; preserve cancellation of launcher icon request.
+The owner experienced a transient v0.33.0 failure to load com.evrasia data, which resolved following emulator restart. Cause unproven. Proposed separate Android network-recovery changes were deferred, NOT merged or shipped. Avoid speculative resets. Earlier verified direct HTTPS on com.evrasia applies to the tested v0.32 session, not universal guarantees.
+
+Private Research ZIP files can expose session tokens and authentication content; never place them in public repo.
+
+## NEXT CHAT
+
+Restore this capsule generation 32 from `context`, reconcile live main/releases, then await owner field-test feedback or explicit task. Start from v0.34.0 stable. Use neutral Russian terms and conservative status. Preserve owner's cancelled launcher-icon request.

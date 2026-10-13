@@ -63,3 +63,11 @@ The simplification is complete and published. Request the owner's field confirma
 ## v0.34.0 delivery plan
 
 All source in PR #32, branch feature/v0.34-emulator-controls-network-evidence. Await required latest commit tests. Optional six derived ZIP artifacts cannot replace RAW PCAP or HTTP bodies. Avoid false claims from null TLS/DNS fields and temporal correlation. Full update installer must update from published v0.33.0 without deleting app data. Publish only through main pipeline; then user should validate panel controls and target real APK and provide new ZIP to assess DNS/TLS and packet drop results.
+
+## Plan after published v0.34.0 (generation 32)
+
+1. Resume from release v0.34.0 at `2efec386cff0b204ee56d8bee365f3c52caefcb5` and the sealed manager `context` generation 32. PR #32 is merged and PR #33 is closed without merge; no current v0.34.0 implementation work remains pending in those branches.
+2. Obtain owner's first practical feedback on the sidebar's buttons, direct HTTPS view and Research ZIP data from the installed release. Check the actual target APK rather than drawing conclusions from synthetic acceptance.
+3. If owner supplies a Research ZIP, measure source-data completeness, tcpdump drops, attribution ambiguity, DNS/TLS availability and temporal-action matches without inventing data; handle authentication and personal content privately, never commit the archive.
+4. Retain release policy: dedicated code branch, tests, Android 15 AVD, Windows GUI/install/update/clean-provisioning, merge, main pipeline, verified published Setup/Update assets and re-sealed context.
+5. Keep postponed network-recovery concept unmerged unless the loading issue recurs with diagnostics or the owner explicitly reauthorizes implementation. No automatic modification of emulator data on speculation.

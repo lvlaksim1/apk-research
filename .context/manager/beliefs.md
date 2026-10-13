@@ -2,7 +2,7 @@
 
 ## Verified baseline
 
-Current product baseline is **apk-research v0.33.0** at `3f3f1144e0ea8944a065e7d5950fd07fd1e17abf`. The previous verified baseline was v0.32.0.
+Current product baseline is **apk-research v0.34.0** at `2efec386cff0b204ee56d8bee365f3c52caefcb5`. The previous verified baseline was v0.32.0.
 
 Historical 2026-10-08 reconciliation confirmed the then-current v0.30.0 release. PR #26 delivered the HTTPS traffic analysis feature and was merged at `7f603fa95231d936039ed6dac222b11d5189ad2d`; the current main commit synchronizes release documentation and retriggered the standard release pipeline.
 
@@ -102,3 +102,15 @@ Main gate #146 includes unit tests, actual Android 15 AVD research/HTTPS ZIP, st
 Owner requested an LDPlayer-style vertical Android emulator control strip and additional useful research metadata in ZIP. Source implemented on PR #32 `feature/v0.34-emulator-controls-network-evidence`, latest candidate SHA `8c1dbcc81fa3620ed96b30300211c90fb7872ec3`. Published main remains v0.33.0 until acceptance passes and GitHub Release is issued. GUI controls include Back/Home/Recents, volume, orientation, screenshots, fullscreen, APK selection/installation and restart. More-menu supports shared-storage file transfer, selected-app stop/clear/settings, geo, shake and typing PC clipboard text. Destructive commands ask confirmation / stop when research active. No claim of full bidirectional clipboard or standalone manual screen recording; existing screen video remains automatic during research.
 
 Derived Research ZIP files: dns.jsonl, tls-sessions.jsonl, network-timings.jsonl, action-network-links.jsonl, screen-timing.jsonl, network-enrichment.json. All are optional derived summaries from existing RAW PCAP, HTTPS, user action and media timestamps, preserving independent original records. TLS hello detection supports local Android transport ports. No invented cause/action or visual reaction latency. First exact Android acceptance candidate (8afe5c1d) passed and verified these artifacts, 3660 PCAP packets scanned. Latest 8c1 candidate has pending CI, AVD, Windows acceptance. Earlier intermediate AVD runs intermittently failed on Android Settings ADB start exit 255, unrelated to parsing; retry the exact final candidate, do not bypass required gates.
+
+## v0.34.0 reconciliation after release (2026-10-13; generation 32)
+
+Current verified product and GitHub Release **v0.34.0** at exact `main` commit `2efec386cff0b204ee56d8bee365f3c52caefcb5` (pipeline #38375309755: full successful mandatory code, Android 15 AVD, standalone Windows, existing-version Update, clean Windows Android provisioning, publication). The prior v0.33.0 baseline and the generation-31 "v0.34 pending" statements are superseded.
+
+PR #32, `feature/v0.34-emulator-controls-network-evidence`, merged as `e9240f05e620b1cee4f2d1d4ee0c14f1d36a111d`. Distinct draft PR #33 (`feature/v0.34-emulator-controls-evidence`, head `18a0e6fa1b30da9eef8b8ed32ffec0ddca48035d`) was CLOSED WITHOUT MERGE; it is NOT the source for the released v0.34.0. Do not resume or merge PR #33 unless explicitly requested.
+
+v0.34.0 adds right-side Android emulator controls; safe app/file/navigation, location and motion-related functions; and six registered normalized Research ZIP files: `dns.jsonl`, `tls-sessions.jsonl`, `network-timings.jsonl`, `action-network-links.jsonl`, `screen-timing.jsonl`, `network-enrichment.json`. All are derived from observed packet, HTTPS, action and screen materials, with original PCAP, HTTPS bodies, screen evidence, provenance, integrity and two-tab UI preserved. Timing associations are not proof of causality and unavailable encrypted protocol details must not be invented.
+
+Release assets: `apk-research-setup_v0.34.0.exe` SHA256 `7ba45c3d5fb4a91d5df8bc3d8431928b135b76251470c0b41f458e778711d233`, `apk-research-update_v0.34.0.exe` SHA256 `1df62f8a39c1efbabe201eafaeaaa93e8dd2b4e597bce7364249fafff252e779`, plus `SHA256SUMS.txt`; https://github.com/lvlaksim1/apk-research/releases/tag/v0.34.0. The prior 2026-10-10 main pipeline #38023468111 had a failed updater stage, and later pipeline #38375309755 passed every mandatory gate after the release-workflow fix. Preserve this distinction in technical reports.
+
+Previously observed com.evrasia v0.32.0 direct HTTPS field success remains valid for that run. A separate v0.33.0 incident in which com.evrasia temporarily stalled during loading cleared after an emulator restart. No established code-level root cause or shipped fix; do not assert a cause. The separate network-recovery experiment remains unmerged and was explicitly deferred by the owner.

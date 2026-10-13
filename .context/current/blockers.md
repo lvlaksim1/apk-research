@@ -48,3 +48,11 @@ The 16-MiB kernel tcpdump buffer is a preventative improvement; zero packet drop
 ## v0.34.0 release gate pending
 
 New code not yet in main; no v0.34.0 installer link to offer. Final PR SHA 8c1dbcc acceptance pending; earlier Android runner had intermittent ADB 255 on starting Settings, then later identical base AVD acceptance passed without changing startup code. This is a release gate, not demonstrated regression of new network parser. Historic observed com.evrasia direct HTTPS on v0.32 remains proven. Keep v0.33.0 as last stable release until v0.34 acceptance.
+
+## Current release/blocker correction — 2026-10-13 (generation 32)
+
+The earlier `v0.34 release gate pending` entry is OBSOLETE. Verified latest release: v0.34.0, exact main `2efec386cff0b204ee56d8bee365f3c52caefcb5`, final pipeline #38375309755 fully SUCCESS. Prior failed update gate in #38023468111 was superseded by a later successful complete pipeline. There is no pending v0.34 publication blocker.
+
+Known bounded technical limitations, not newly discovered defects: protected TLS/custom trust and QUIC/DoH may obscure traffic; DNS/TLS metadata cannot always be extracted; packet drops and process attribution gaps must be measured per session; temporal correlations do not prove causality. Raw Research ZIP may contain credentials; do not publish.
+
+The earlier Android com.evrasia loading stall ceased after emulator restart. Root cause unconfirmed; no network-recovery patch shipped. Closed, unmerged PR #33 must not be treated as production work. Post-release v0.34 field feedback has not yet been received.

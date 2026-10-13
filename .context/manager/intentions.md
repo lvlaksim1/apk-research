@@ -82,3 +82,9 @@ Owner requested to remove the other complicated result/analysis tabs and focus o
 ## ACTIVE — deliver tested v0.34.0 panel + network ZIP extensions
 
 Source implemented in draft PR #32; v0.34.0 is not yet published. Required remaining steps: latest exact candidate SHA 8c1dbcc full Windows GUI/build/setup/update, Android AVD ZIP verification, full CI. Only then merge to main and wait for main release pipeline to publish two verified installers. Record user-requested UI shape and neutral HTTPS terminology.
+
+## Completed — v0.34.0 emulator controls and expanded ZIP (reconciled 2026-10-13)
+
+Status: **published and passed all required release checks**, exact main `2efec386cff0b204ee56d8bee365f3c52caefcb5`. Owner approved a conventional right-side emulator control strip and greater network/session evidence without restoring the technical navigation tabs. Implemented through PR #32, not unmerged/closed PR #33. Retain two user tabs, RAW PCAP, HTTPS request/response bodies, independent screen recording, ARM64 APK/XAPK, installed Android data and dedicated Windows Update installer. Six normalized JSON/JSONL evidence files are supplied; data provenance remains explicit.
+
+Owner has not yet provided post-release field acceptance. Next work is practical v0.34.0 usage validation; any new task or bug fix should be scoped from observed behavior. Owner explicitly chose not to release speculative Android network recovery because reboot resolved that transient issue.

@@ -4,8 +4,8 @@ Last reconciled: 2026-10-10.
 
 ## Product
 
-- Current release/main commit: `3f3f1144e0ea8944a065e7d5950fd07fd1e17abf`.
-- Latest release: `v0.33.0`.
+- Current release/main commit: `2efec386cff0b204ee56d8bee365f3c52caefcb5`.
+- Latest release: `v0.34.0`.
 - Full installer: `apk-research-setup_v0.33.0.exe` (SHA256 `70788ed8a2cf8885eea5beb77df1cd560ad41aaa67d49978ba9e972def114718`).
 - Update installer: `apk-research-update_v0.33.0.exe` (SHA256 `a6db937f410f03b49fbc8bff4791a93b367d905245a5b4554aaeab0adb12b38a`).
 - Main pipeline #146 attempt 1 SUCCESS (2026-10-10); GitHub Release targets exact main SHA.
@@ -98,3 +98,29 @@ Uploaded private evidence: 20261010T021552.574206Z-3e8e2043.research.zip, produc
 Latest verified product is v0.33.0 at 3f3f1144e0ea8944a065e7d5950fd07fd1e17abf. Work branch feature/v0.34-emulator-controls-network-evidence, PR #32 draft, latest proposed SHA 8c1dbcc81fa3620ed96b30300211c90fb7872ec3. Right-hand Android control panel and derived DNS/TLS/HTTP timing/action correlation/screen timing evidence are implemented in source. Independent RAW PCAP, original HTTPS bodies, gRPC/MMAP, v0.31 ARM64 and old UI tabs remain intact.
 
 Windows and final Android acceptance are PENDING. Prior PR candidate 8afe5c1d passed all unit and real AVD acceptance, including six new ZIP files and 3660 scanned PCAP packets; latest TLS all-port tweak still needs exact-head proof. Previous AVD CI attempts for intermediate candidates hit intermittent ADB com.android.settings start exit 255 before derived ZIP checks. Do not mark release ready until final tests pass.
+
+## Definitive release reconciliation — 2026-10-13 (generation 32)
+
+This section SUPERSEDES earlier historical v0.33 and v0.34-pending statements in this document.
+
+- Product authority: `main` at `2efec386cff0b204ee56d8bee365f3c52caefcb5`.
+- Published and verified: `v0.34.0`, GitHub Release target EXACTLY `2efec386cff0b204ee56d8bee365f3c52caefcb5`, published 2026-10-13.
+- PR #32 merged (commit `e9240f05e620b1cee4f2d1d4ee0c14f1d36a111d`); draft PR #33 separately closed **unmerged**. Do not mistake its changes for the product.
+- Successful final release run: GitHub Actions #38375309755; CI, Android 15 AVD, standalone Windows GUI/installer, previous-release update, clean Windows provisioning and Publish Release all SUCCESS.
+- Earlier main run #38023468111 failed the Windows update gate. Subsequent fix and full rerun succeeded; it is incorrect to treat the old failed run as the final release status.
+- Setup: `apk-research-setup_v0.34.0.exe`, SHA256 `7ba45c3d5fb4a91d5df8bc3d8431928b135b76251470c0b41f458e778711d233`.
+- Update: `apk-research-update_v0.34.0.exe`, SHA256 `1df62f8a39c1efbabe201eafaeaaa93e8dd2b4e597bce7364249fafff252e779`.
+- Release files also contain `SHA256SUMS.txt`.
+- Release URL: https://github.com/lvlaksim1/apk-research/releases/tag/v0.34.0
+
+### Delivered user-facing features
+
+Only two primary tabs: Research and HTTPS online. A conventional slim right-side Android control panel provides navigation, volume, rotation, screenshot, fullscreen, install, reboot, file transfer, app operations, simulated location/motion and clipboard-based input as covered by the published release. Potentially destructive actions are protected. Existing embedded gRPC/MMAP Android display and XAPK workflow preserved.
+
+### Additional research artifacts
+
+Six normalized files in Research ZIP: `dns.jsonl`, `tls-sessions.jsonl`, `network-timings.jsonl`, `action-network-links.jsonl`, `screen-timing.jsonl`, `network-enrichment.json`. Data derive from recorded observations; DNS-over-HTTPS and encrypted or absent TLS details may be inaccessible. User-action timing is temporal association, not proven causation. Original RAW PCAP, full HTTPS content, video, logs and hash integrity remain independent.
+
+### Field issue status
+
+The owner's earlier v0.33.0 transient com.evrasia loading stall resolved after restarting Android. Root cause was not demonstrated. Experimental network reset changes were NOT merged/released. No unresolved owner-reported failure is established for newly published v0.34.0; installation and field validation are awaiting user feedback.
