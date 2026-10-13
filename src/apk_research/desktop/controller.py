@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import queue
+import tempfile
 import threading
 import time
 import zipfile
@@ -14,6 +15,10 @@ from PySide6.QtCore import QObject, QTimer, Qt, Signal
 from apk_research.desktop.android_runtime import (
     AndroidRuntime,
 )
+from apk_research.desktop.shared_https_recording import SharedHttpsRecording
+from apk_research.collectors.https_interception import HttpsInterceptionCollector
+from apk_research.session import SessionManager, SessionStatus
+from apk_research.targets import validate_package_name
 from apk_research.export import (
     audit_complete_research_zip,
     verify_research_zip,
@@ -43,6 +48,9 @@ class DesktopController(QObject):
     networkReady = Signal(dict)
     diagnosticsReady = Signal(dict)
     emulatorActionFinished = Signal(str, str)
+    installedAppsReady = Signal(list)
+    analysisStarted = Signal(dict)
+    analysisStopped = Signal(str)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -53,6 +61,14 @@ class DesktopController(QObject):
             ResearchOrchestrator | None
         ) = None
         self._stop_research = threading.Event()
+        self._stop_analysis = threading.Event()
+        self._analysis_thread: threading.Thread | None = None
+        self._analysis_temp: tempfile.TemporaryDirectory | None = None
+        self._analysis_collector: HttpsInterceptionCollector | None = None
+        self._analysis_session: SessionManager | None = None
+        self._analysis_package: str | None = None
+        self._analysis_running = threading.Event()
+        self._analysis_appearance = "unmodified"
         self._stop_screen = threading.Event()
         self._screen_thread: (
             threading.Thread | None
@@ -123,29 +139,140 @@ class DesktopController(QObject):
             self._launch_installed_package_worker
         )
 
-    def start_research(
-        self,
-        clean_launch: bool = True,
-    ) -> None:
-        self._clean_launch = bool(clean_launch)
-        if (
-            self.apk_path is None
-            or not self.package_name
-        ):
-            self.error.emit(
-                "Сначала выберите и подготовьте APK/XAPK"
+    def refresh_installed_apps(self) -> None:
+        self._thread(self._refresh_installed_apps_worker)
+
+    def _publish_installed_apps(self, client: AdbClient | None = None) -> None:
+        client = client or AdbClient(self.runtime.paths.adb)
+        output = client.shell_output(
+            self.runtime.SERIAL, "pm", "list", "packages", "-3",
+            timeout=25,
+        )
+        apps = sorted({
+            validate_package_name(line[len("package:"):])
+            for line in output.splitlines()
+            if line.startswith("package:")
+        })
+        self.installedAppsReady.emit(apps)
+
+    def _refresh_installed_apps_worker(self) -> None:
+        try:
+            self.runtime.ensure_ready(
+                self._progress_callback, self._display_ready_callback,
             )
+            self._publish_installed_apps()
+        except Exception as exc:
+            self.error.emit("Не удалось получить приложения: " + str(exc))
+
+    def start_analysis(self, package: str) -> None:
+        try:
+            package = validate_package_name(package)
+        except ValueError as exc:
+            self.error.emit(str(exc))
             return
-        if (
-            self._research_thread is not None
-            and self._research_thread.is_alive()
+        if self._analysis_running.is_set() or (
+            self._analysis_thread is not None
+            and self._analysis_thread.is_alive()
         ):
+            self.error.emit("Анализ уже выполняется")
+            return
+        self.package_name = package
+        self._stop_analysis.clear()
+        self._analysis_thread = threading.Thread(
+            target=self._analysis_worker,
+            args=(package,),
+            daemon=True,
+            name="apk-research-live-https",
+        )
+        self._analysis_thread.start()
+
+    def stop_analysis(self) -> None:
+        if self._research_thread is not None and self._research_thread.is_alive():
+            self.error.emit("Сначала завершите запись ZIP")
+            return
+        self._stop_analysis.set()
+
+    def _analysis_worker(self, package: str) -> None:
+        collector: HttpsInterceptionCollector | None = None
+        session: SessionManager | None = None
+        try:
+            self._set_busy(True)
+            self.runtime.ensure_ready(
+                self._progress_callback, self._display_ready_callback,
+            )
+            self._start_screen_stream(wait_for_first_frame=True)
+            client = AdbClient(self.runtime.paths.adb)
+            if not client.is_package_installed(self.runtime.SERIAL, package):
+                raise RuntimeError("Выбранное приложение не установлено")
+            self._analysis_appearance = self.runtime.configure_android_status_insets(
+                package
+            )
+            self._analysis_temp = tempfile.TemporaryDirectory(
+                prefix="apk-research-https-",
+            )
+            session = SessionManager.create(
+                self._analysis_temp.name,
+                target=client.get_target_details(self.runtime.SERIAL).to_dict(),
+                package={"name": package},
+            )
+            session.begin_preflight()
+            collector = HttpsInterceptionCollector(
+                client, session, package_name=package,
+            )
+            collector.preflight()
+            session.mark_ready()
+            session.begin_start()
+            collector.start()
+            session.mark_active()
+            self._analysis_collector = collector
+            self._analysis_session = session
+            self._analysis_package = package
+            self._analysis_running.set()
+            self.log.emit("HTTPS-анализ включён, запись ZIP не ведётся")
+            # The analyzer and network routing are ready BEFORE app launch.
+            launch = client.launch_package(self.runtime.SERIAL, package)
+            self.log.emit("Приложение запущено: " + package)
+            self.analysisStarted.emit({
+                "package": package,
+                "session_root": str(session.paths.root),
+                "launch_result": launch,
+            })
+            self._set_busy(False)
+            while not self._stop_analysis.wait(0.5):
+                if not collector.running:
+                    raise RuntimeError("HTTPS-анализатор неожиданно остановился")
+        except Exception as exc:
+            self.error.emit("Анализ HTTPS: " + (str(exc) or exc.__class__.__name__))
+        finally:
+            self._analysis_running.clear()
+            if collector is not None:
+                try:
+                    if session is not None and session.status == SessionStatus.ACTIVE:
+                        session.begin_stop()
+                    if not collector._finished:
+                        collector.stop()
+                    if session is not None and session.status == SessionStatus.STOPPING:
+                        session.finish()
+                except Exception as exc:
+                    self.error.emit("Остановка HTTPS: " + str(exc))
+            self._analysis_collector = None
+            self._analysis_session = None
+            self._analysis_package = None
+            self.analysisStopped.emit(package)
+            self._set_busy(False)
+
+    def start_research(self, clean_launch: bool = True) -> None:
+        if not self._analysis_running.is_set() or not self._analysis_collector:
+            self.error.emit("Сначала включите HTTPS-анализ")
+            return
+        if self.package_name != self._analysis_package:
+            self.error.emit("Выбранное приложение не совпадает с анализируемым")
+            return
+        if self._research_thread is not None and self._research_thread.is_alive():
             return
         self._stop_research.clear()
         self._research_thread = threading.Thread(
-            target=self._research_worker,
-            daemon=True,
-            name="apk-research-session",
+            target=self._research_worker, daemon=True, name="apk-research-session",
         )
         self._research_thread.start()
 
@@ -518,9 +645,16 @@ class DesktopController(QObject):
 
     def close(self) -> None:
         self._stop_research.set()
+        self._stop_analysis.set()
         self._stop_screen.set()
         self._input_queue.put(None)
+        thread = self._analysis_thread
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=15)
         self.runtime.stop()
+        if self._analysis_temp is not None:
+            self._analysis_temp.cleanup()
+            self._analysis_temp = None
 
     def _prepare_environment_worker(self) -> None:
         try:
@@ -536,6 +670,7 @@ class DesktopController(QObject):
             self.environmentReady.emit(
                 self.runtime.diagnostics()
             )
+            self._publish_installed_apps()
             self.log.emit(
                 "Research Android готов к работе"
             )
@@ -588,6 +723,7 @@ class DesktopController(QObject):
                 str(path),
                 package,
             )
+            self._publish_installed_apps()
             self.environmentReady.emit(
                 self.runtime.diagnostics()
             )
@@ -647,19 +783,17 @@ class DesktopController(QObject):
             client = AdbClient(
                 self.runtime.paths.adb
             )
-            appearance = self.runtime.configure_android_status_insets(
-                self.package_name
-            )
-            self.log.emit("Верхняя полоса Android: " + appearance)
+            analyzer = self._analysis_collector
+            if analyzer is None or not analyzer.running:
+                raise RuntimeError("HTTPS-анализ больше не работает")
             orchestrator = ResearchOrchestrator(
                 client,
                 self.runtime.SERIAL,
                 self.package_name,
-                android_ui_insets=appearance,
-                launch_mode=(
-                    "clean"
-                    if self._clean_launch
-                    else "continue"
+                android_ui_insets=self._analysis_appearance,
+                launch_mode="observe",
+                https_factory=lambda _adb, session, package: SharedHttpsRecording(
+                    analyzer, session, package
                 ),
                 event_observer=self._on_orchestrator_event,
             )
