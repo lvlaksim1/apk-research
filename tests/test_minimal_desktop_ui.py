@@ -47,13 +47,14 @@ def _transaction() -> dict:
     }
 
 
-def test_main_window_exposes_only_research_and_https(app):
+def test_main_window_integrates_https_beside_android(app):
     window = MainWindow()
     try:
-        assert window.tabs.count() == 2
-        assert [window.tabs.tabText(i) for i in range(2)] == [
-            "Исследование", "HTTPS • онлайн"
-        ]
+        assert window.tabs.count() == 1
+        assert window.tabs.tabText(0) == "Исследование"
+        assert window.research_splitter.count() == 3
+        assert window.research_splitter.indexOf(window.https_view) == 2
+        assert window.research_splitter.indexOf(window.android_view.parentWidget()) == 1
         assert window.https_view is not None
         assert window.stop_button.text() == "ЗАВЕРШИТЬ И СОХРАНИТЬ"
         assert window.zip_folder_button.isVisible() is False or (
@@ -101,6 +102,46 @@ def test_live_https_updates_before_archive_and_reads_body(app, tmp_path: Path):
         assert view.table.rowCount() == 1
         assert view.archive_path == archive
         assert '"ok": true' in view.response_body.toPlainText()
+    finally:
+        view.timer.stop()
+        view.close()
+
+
+def test_https_sorting_preserves_details_after_new_records(app):
+    view = LiveHttpsView()
+    try:
+        a = _transaction()
+        a["timestamp_start"] = 100.0
+        a["url"] = "https://example.com/first"
+        a["response"]["status_code"] = 301
+        b = _transaction()
+        b["timestamp_start"] = 200.0
+        b["url"] = "https://example.com/second"
+        b["response"]["status_code"] = 200
+        view.transactions = [a, b]
+        view._apply_filter()
+        assert view.table.item(0, 3).text() == "/second"
+        view.table.horizontalHeader().sectionClicked.emit(4)
+        assert [view.table.item(i, 4).text() for i in range(2)] == ["200", "301"]
+        view._show_selected(0)
+        assert "/second" in view.info.toPlainText()
+        view.table.horizontalHeader().sectionClicked.emit(4)
+        assert [view.table.item(i, 4).text() for i in range(2)] == ["301", "200"]
+        view.table.selectRow(0)
+        view._show_selected(0)
+        assert "/first" in view.info.toPlainText()
+        c = _transaction()
+        c["timestamp_start"] = 300.0
+        c["url"] = "https://example.com/third"
+        c["response"]["status_code"] = 404
+        view.transactions.append(c)
+        view._apply_filter()
+        assert [view.table.item(i, 4).text() for i in range(3)] == ["404", "301", "200"]
+        assert "/first" in view.info.toPlainText()
+        view.search.setText("third")
+        assert view.table.rowCount() == 1
+        view._show_selected(0)
+        assert "/third" in view.info.toPlainText()
     finally:
         view.timer.stop()
         view.close()

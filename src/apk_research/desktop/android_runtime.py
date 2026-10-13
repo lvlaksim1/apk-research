@@ -1053,6 +1053,32 @@ class AndroidRuntime:
             key,
         )
 
+    def configure_android_status_insets(self, package_name: str) -> str:
+        """Ask Android 15 to opt this app out of forced edge-to-edge layout.
+
+        This is a scoped OS compatibility request, not a modification of APK
+        code. It may be unsupported or irrelevant for individual target apps;
+        callers must record that distinction in session evidence.
+        """
+        package = validate_package_name(package_name)
+        try:
+            version = self._adb_shell(
+                "getprop", "ro.build.version.sdk", check=False
+            )
+            if version.returncode:
+                return "android-version-unavailable"
+            if int(version.stdout.strip()) < 35:
+                return "not-applicable-before-android-15"
+            result = self._adb_shell(
+                "am", "compat", "disable", "309578419", package,
+                check=False,
+            )
+        except (AndroidRuntimeError, ValueError, OSError):
+            return "compat-command-unavailable"
+        if result.returncode:
+            return "compat-command-rejected"
+        return "edge-to-edge-opt-out-requested"
+
     def emulator_action(self, action: str, *values: str) -> str:
         """Control the managed Android 15 device using documented ADB actions.
 

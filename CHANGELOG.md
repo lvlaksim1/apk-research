@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.35.0] - 2026-10-13
+
+- Live HTTPS transactions and selected request/response details are embedded to the right of Android in the research window; the redundant HTTPS tab and jump button are removed.
+- Sorting by each HTTPS column with numeric timestamp/status semantics, stable selection across incremental updates, and restored detail views after archive reload.
+- Persist the main split layout across window restarts while retaining the right-hand emulator button strip.
+- Request scoped Android 15 `ENFORCE_EDGE_TO_EDGE` opt-out for the selected application and disclose the request outcome in session events. Actual in-app effect remains subject to field verification; a rejected command does not block research.
+- Preserve existing standalone Android runtime, raw/normalized Research ZIP and Setup/Update installer model.
+
+
 ## [0.34.0] - 2026-10-10
 
 ### Added

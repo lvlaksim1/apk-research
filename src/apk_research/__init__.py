@@ -1,6 +1,6 @@
 """apk-research core package."""
 
-__version__ = "0.34.0"
+__version__ = "0.35.0"
 
-# Emulator controls and derived DNS/TLS/temporal research data.
+# Unified live HTTPS workspace and Android 15 per-app status inset adjustment.
 __all__ = ["__version__"]
