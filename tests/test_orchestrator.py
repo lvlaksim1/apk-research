@@ -593,3 +593,18 @@ def test_clean_launch_rejects_reused_activity_instance(
         match="already-running activity instance",
     ):
         orchestrator.start()
+
+
+def test_observe_mode_records_without_relaunch(tmp_path: Path) -> None:
+    orchestrator, adb = make_orchestrator(tmp_path)
+    orchestrator.launch_mode = "observe"
+    started = orchestrator.start()
+    assert started.status == "active"
+    assert not adb.launched
+    assert not adb.clean_launched
+    assert orchestrator.session is not None
+    launch_file = orchestrator.session.paths.root / orchestrator.LAUNCH_ARTIFACT
+    assert "Activity launch: not requested" in launch_file.read_text()
+    result = orchestrator.stop_and_export()
+    assert result.session_status == "complete"
+    assert verify_research_zip(result.archive).valid

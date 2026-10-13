@@ -171,6 +171,11 @@ jobs:
       - name: Verify generated Research ZIP again
         run: python -m apk_research research-zip-verify acceptance-output/apk-research-acceptance.research.zip --json
 
+      # Keep the legacy baseline independent of the additional APK launches
+      # performed during the continuous HTTPS/ZIP lifecycle acceptance.
+      - name: Verify independent HTTPS analysis and ZIP recording
+        run: python tools/acceptance_independent_https.py
+
       - name: Stop emulator
         if: always()
         shell: bash

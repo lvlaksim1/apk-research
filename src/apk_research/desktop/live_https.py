@@ -12,10 +12,11 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, QTimer, Signal, QPoint
 from PySide6.QtWidgets import (
     QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit,
     QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget,
+    QMenu, QWidgetAction,
     QVBoxLayout, QWidget,
 )
 
@@ -39,6 +40,8 @@ class LiveHttpsView(QWidget):
         self.filtered_indices: list[int] = []
         self._sort_column = 0
         self._sort_ascending = False
+        self._method_filter: set[str] | None = None
+        self._domain_filter: set[str] | None = None
 
         outer = QVBoxLayout(self)
         header = QHBoxLayout()
@@ -63,7 +66,7 @@ class LiveHttpsView(QWidget):
         splitter = QSplitter(Qt.Orientation.Vertical)
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(
-            ["Время", "Метод", "Сервер", "Адрес запроса", "Ответ"]
+            ["Время", "Метод ▾", "Сервер", "Адрес запроса ▾", "Ответ"]
         )
         self.table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
@@ -110,8 +113,8 @@ class LiveHttpsView(QWidget):
         outer.addWidget(splitter, 1)
 
         self.note = QLabel(
-            "Начните исследование — запросы появятся автоматически. "
-            "Все данные сохраняются в Research ZIP."
+            "Начните анализ HTTPS — запросы появятся автоматически. "
+            "Запись ZIP включается отдельной кнопкой."
         )
         self.note.setWordWrap(True)
         outer.addWidget(self.note)
@@ -122,6 +125,9 @@ class LiveHttpsView(QWidget):
     def _clear(self) -> None:
         self.transactions.clear()
         self.filtered_indices.clear()
+        self._method_filter = None
+        self._domain_filter = None
+        self._update_filter_titles()
         self.table.setRowCount(0)
         for field in (
             self.info, self.request_headers, self.request_body,
@@ -140,7 +146,7 @@ class LiveHttpsView(QWidget):
             self.session_root / TRANSACTIONS_ARTIFACT
         )
         self.title.setText(f"HTTPS • {package}")
-        self.note.setText("● Исследование идёт — новые ответы появляются автоматически.")
+        self.note.setText("● Анализ HTTPS включён. Запись ZIP управляется отдельно.")
         self.timer.start()
         self.refresh()
 
@@ -210,7 +216,91 @@ class LiveHttpsView(QWidget):
         except (OSError, ValueError, KeyError, zipfile.BadZipFile) as exc:
             self.note.setText("Не удалось открыть архив: " + str(exc))
 
+    @staticmethod
+    def _domain(item: dict) -> str:
+        url = urlsplit(str(item.get("url") or ""))
+        return str(url.hostname or item.get("host") or "").casefold()
+
+    def _filter_options(self, column: int) -> list[str]:
+        if column == 1:
+            return sorted({
+                str(item.get("method") or "—").upper()
+                for item in self.transactions
+            })
+        return sorted({self._domain(item) for item in self.transactions if self._domain(item)})
+
+    def _update_filter_titles(self) -> None:
+        method = "Метод ▾" + (" •" if self._method_filter is not None else "")
+        domain = "Адрес запроса ▾" + (" •" if self._domain_filter is not None else "")
+        self.table.setHorizontalHeaderLabels(
+            ["Время", method, "Сервер", domain, "Ответ"]
+        )
+
+    def _set_column_filter(self, column: int, selected: set[str] | None) -> None:
+        if column == 1:
+            self._method_filter = None if selected is None else set(selected)
+        elif column == 3:
+            self._domain_filter = None if selected is None else set(selected)
+        else:
+            raise ValueError("Filtering is supported for Method and Address")
+        self._update_filter_titles()
+        self._apply_filter()
+
+    def _show_filter_menu(self, column: int) -> None:
+        options = self._filter_options(column)
+        current = self._method_filter if column == 1 else self._domain_filter
+        menu = QMenu(self)
+        search = QLineEdit(menu)
+        search.setPlaceholderText(
+            "Найти метод…" if column == 1 else "Найти домен…"
+        )
+        search_action = QWidgetAction(menu)
+        search_action.setDefaultWidget(search)
+        menu.addAction(search_action)
+        all_action = menu.addAction("Выбрать все")
+        all_action.triggered.connect(
+            lambda: self._set_column_filter(column, None)
+        )
+        none_action = menu.addAction("Снять все")
+        none_action.triggered.connect(
+            lambda: self._set_column_filter(column, set())
+        )
+        menu.addSeparator()
+        options_actions = []
+        for value in options:
+            action = menu.addAction(value)
+            action.setCheckable(True)
+            action.setChecked(current is None or value in current)
+            def selected(checked=False, key=value):
+                current_filter = (
+                    self._method_filter if column == 1
+                    else self._domain_filter
+                )
+                next_values = (
+                    set(options) if current_filter is None
+                    else set(current_filter)
+                )
+                if checked:
+                    next_values.add(key)
+                else:
+                    next_values.discard(key)
+                self._set_column_filter(column, next_values)
+            action.toggled.connect(selected)
+            options_actions.append(action)
+        search.textChanged.connect(
+            lambda query: [
+                action.setVisible(query.casefold() in action.text().casefold())
+                for action in options_actions
+            ]
+        )
+        header = self.table.horizontalHeader()
+        pos = QPoint(header.sectionViewportPosition(column), header.height())
+        menu.exec(header.mapToGlobal(pos))
+
     def _sort_by_column(self, column: int) -> None:
+        if column in (1, 3):
+            self._show_filter_menu(column)
+            return
         if column == self._sort_column:
             self._sort_ascending = not self._sort_ascending
         else:
@@ -246,11 +336,19 @@ class LiveHttpsView(QWidget):
         query = self.search.text().strip().casefold()
         indices = [
             i for i, item in enumerate(self.transactions)
-            if not query or query in (
-                str(item.get("url", "")) + " "
-                + str(item.get("method", "")) + " "
-                + str((item.get("response") or {}).get("status_code", ""))
-            ).casefold()
+            if (
+                (self._method_filter is None
+                 or str(item.get("method") or "—").upper() in self._method_filter)
+                and (self._domain_filter is None
+                     or self._domain(item) in self._domain_filter)
+                and (
+                    not query or query in (
+                        str(item.get("url", "")) + " "
+                        + str(item.get("method", "")) + " "
+                        + str((item.get("response") or {}).get("status_code", ""))
+                    ).casefold()
+                )
+            )
         ]
         indices.sort(
             key=lambda i: (self._sort_value(self.transactions[i], self._sort_column), i),

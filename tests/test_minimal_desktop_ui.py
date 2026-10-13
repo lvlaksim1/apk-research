@@ -56,7 +56,11 @@ def test_main_window_integrates_https_beside_android(app):
         assert window.research_splitter.indexOf(window.https_view) == 2
         assert window.research_splitter.indexOf(window.android_view.parentWidget()) == 1
         assert window.https_view is not None
-        assert window.stop_button.text() == "ЗАВЕРШИТЬ И СОХРАНИТЬ"
+        assert window.stop_button.text() == "5. Начать запись ZIP"
+        assert window.start_button.text() == "Начать анализ"
+        assert window.installed_apps.count() == 0
+        assert len(window.emulator_buttons) == 18
+        assert "more" not in window.emulator_buttons
         assert window.zip_folder_button.isVisible() is False or (
             window.zip_folder_button.text() == "Открыть папку с ZIP"
         )
@@ -145,3 +149,82 @@ def test_https_sorting_preserves_details_after_new_records(app):
     finally:
         view.timer.stop()
         view.close()
+
+
+def test_https_method_and_domain_headers_use_independent_filters(app):
+    view = LiveHttpsView()
+    try:
+        a = _transaction()
+        a["method"] = "GET"
+        a["url"] = "https://alpha.example/api"
+        a["host"] = "alpha.example"
+        b = _transaction()
+        b["method"] = "POST"
+        b["url"] = "https://beta.example/send"
+        b["host"] = "beta.example"
+        c = _transaction()
+        c["method"] = "GET"
+        c["url"] = "https://beta.example/other"
+        c["host"] = "beta.example"
+        view.transactions = [a, b, c]
+        view._apply_filter()
+        view._set_column_filter(1, {"GET"})
+        assert view.table.rowCount() == 2
+        view._set_column_filter(3, {"beta.example"})
+        assert view.table.rowCount() == 1
+        assert "/other" in view.info.toPlainText()
+        assert view._filter_options(1) == ["GET", "POST"]
+        assert view._filter_options(3) == ["alpha.example", "beta.example"]
+        assert view._sort_column == 0
+        view._set_column_filter(1, None)
+        assert view.table.rowCount() == 2
+        view._set_column_filter(3, None)
+        assert view.table.rowCount() == 3
+    finally:
+        view.timer.stop()
+        view.close()
+
+
+
+def test_https_analysis_and_zip_have_independent_window_states(app, tmp_path):
+    window = MainWindow()
+    try:
+        window._on_installed_apps(["com.example.alpha", "com.example.beta"])
+        assert window.installed_apps.count() == 2
+        assert window.controller.package_name == "com.example.alpha"
+        starts = []
+        zips = []
+        window.controller.start_analysis = lambda package: starts.append(package)
+        window.controller.start_research = lambda: zips.append("start")
+        window._toggle_analysis()
+        assert starts == ["com.example.alpha"]
+        assert not zips
+        assert window._analysis_starting
+        window._on_analysis_started({
+            "package": "com.example.alpha",
+            "session_root": str(tmp_path),
+        })
+        assert window._analysis_active
+        assert window.https_view.timer.isActive()
+        assert window.start_button.text() == "Остановить"
+        assert window.stop_button.isEnabled()
+        window._toggle_zip()
+        assert zips == ["start"]
+        window._on_research_started({"package": "com.example.alpha"})
+        assert window._research_active
+        assert window.https_view.timer.isActive()
+        window._on_research_finished({
+            "archive": str(tmp_path / "recording.research.zip"),
+            "session_status": "complete",
+            "validation_issues": 0,
+        })
+        assert not window._research_active
+        assert window._analysis_active
+        assert window.https_view.timer.isActive()
+        assert window.installed_apps.isEnabled() is False
+        window._on_analysis_stopped("com.example.alpha")
+        assert not window.https_view.timer.isActive()
+    finally:
+        window.https_view.timer.stop()
+        window.controller.close()
+        window.close()
