@@ -1,5 +1,13 @@
 # Refactoring and Architecture Log
 
+## v0.35.0 — Одна рабочая область и проверяемая сортировка HTTPS
+
+`MainWindow` включает существующий `LiveHttpsView` непосредственно в горизонтальный `QSplitter` справа от Android и панели его управления. Разделитель сохраняет состояние в `QSettings`. Отдельная вкладка HTTPS удалена, а события исследования продолжают поступать в ту же модель. Ранее скрытые служебные страницы остаются вне основных вкладок.
+
+`LiveHttpsView` сортирует строки по времени, методу, серверу, адресу и HTTP-коду, не теряя связь со входной транзакцией. Поля времени и HTTP-кода сравниваются численно. При поступлении новых записей, смене фильтра и загрузке архива сведения о выделенном запросе обновляются по исходному индексу, а не по прежней позиции строки.
+
+Для Android 15 `AndroidRuntime.configure_android_status_insets` запрашивает у системы отключение принудительного `ENFORCE_EDGE_TO_EDGE` только для выбранного пакета. Результат команды сохраняется как сведения об условиях исследования; наличие команды не является доказательством фактического расположения элементов приложения. Сбор исходных пакетов, HTTPS, видео, обновление Windows и поддержка ARM64/XAPK не меняются.
+
 ## v0.34.0 — Android toolbar and offline derived network evidence
 
 The side toolbar resides beside the original gRPC/MMAP framebuffer; all actions use structured ADB arguments or existing gRPC input and execute asynchronously. Changes to app data require explicit confirmation. The raw Android frame can be saved directly as PNG. The original two-tab navigation is unchanged.
