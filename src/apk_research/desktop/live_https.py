@@ -37,6 +37,8 @@ class LiveHttpsView(QWidget):
         self._reader: IncrementalHttpReader | None = None
         self.transactions: list[dict] = []
         self.filtered_indices: list[int] = []
+        self._sort_column = 0
+        self._sort_ascending = False
 
         outer = QVBoxLayout(self)
         header = QHBoxLayout()
@@ -74,6 +76,11 @@ class LiveHttpsView(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(
             3, self.table.horizontalHeader().ResizeMode.Stretch
         )
+        header = self.table.horizontalHeader()
+        header.setSectionsClickable(True)
+        header.setSortIndicatorShown(True)
+        header.setSortIndicator(0, Qt.SortOrder.DescendingOrder)
+        header.sectionClicked.connect(self._sort_by_column)
         self.table.currentCellChanged.connect(self._show_selected)
         splitter.addWidget(self.table)
 
@@ -203,6 +210,38 @@ class LiveHttpsView(QWidget):
         except (OSError, ValueError, KeyError, zipfile.BadZipFile) as exc:
             self.note.setText("Не удалось открыть архив: " + str(exc))
 
+    def _sort_by_column(self, column: int) -> None:
+        if column == self._sort_column:
+            self._sort_ascending = not self._sort_ascending
+        else:
+            self._sort_column = column
+            self._sort_ascending = True
+        self.table.horizontalHeader().setSortIndicator(
+            column,
+            (Qt.SortOrder.AscendingOrder if self._sort_ascending
+             else Qt.SortOrder.DescendingOrder),
+        )
+        self._apply_filter()
+
+    @staticmethod
+    def _sort_value(item: dict, column: int):
+        if column == 0:
+            try:
+                return float(item.get("timestamp_start") or 0)
+            except (TypeError, ValueError):
+                return 0.0
+        if column == 4:
+            try:
+                return int((item.get("response") or {}).get("status_code") or 0)
+            except (TypeError, ValueError):
+                return 0
+        if column == 1:
+            return str(item.get("method") or "").casefold()
+        url = urlsplit(str(item.get("url") or ""))
+        if column == 2:
+            return str(item.get("host") or url.hostname or "").casefold()
+        return (url.path + (("?" + url.query) if url.query else "")).casefold()
+
     def _apply_filter(self, *_args) -> None:
         query = self.search.text().strip().casefold()
         indices = [
@@ -213,6 +252,10 @@ class LiveHttpsView(QWidget):
                 + str((item.get("response") or {}).get("status_code", ""))
             ).casefold()
         ]
+        indices.sort(
+            key=lambda i: (self._sort_value(self.transactions[i], self._sort_column), i),
+            reverse=not self._sort_ascending,
+        )
         self.filtered_indices = indices
         selected = self.table.currentRow()
         selected_id = (
@@ -220,9 +263,10 @@ class LiveHttpsView(QWidget):
             if selected >= 0 and self.table.item(selected, 0) else None
         )
         self.table.setUpdatesEnabled(False)
+        previous_signals = self.table.blockSignals(True)
+        restore = -1
         try:
             self.table.setRowCount(len(indices))
-            restore = -1
             for row, index in enumerate(indices):
                 record = self.transactions[index]
                 try:
@@ -253,12 +297,27 @@ class LiveHttpsView(QWidget):
             elif indices and selected_id is None:
                 self.table.selectRow(0)
         finally:
+            self.table.blockSignals(previous_signals)
             self.table.setUpdatesEnabled(True)
+        if restore >= 0:
+            self._show_selected(restore)
+        elif not indices:
+            for field in (
+                self.info, self.request_headers, self.request_body,
+                self.response_headers, self.response_body,
+            ):
+                field.clear()
 
     def _show_selected(self, row: int, *_args) -> None:
-        if row < 0 or row >= len(self.filtered_indices):
+        if row < 0:
             return
-        record = self.transactions[self.filtered_indices[row]]
+        first = self.table.item(row, 0)
+        if first is None:
+            return
+        index = first.data(Qt.ItemDataRole.UserRole)
+        if not isinstance(index, int) or not (0 <= index < len(self.transactions)):
+            return
+        record = self.transactions[index]
         request = record.get("request") or {}
         response = record.get("response") or {}
         self.info.setPlainText(

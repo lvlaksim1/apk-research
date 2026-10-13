@@ -15,10 +15,11 @@ def _gui_smoke_test() -> int:
     window = MainWindow()
     window.show()
     app.processEvents()
-    assert window.tabs.count() == 2
+    assert window.tabs.count() == 1
     assert window.tabs.tabText(0) == "Исследование"
-    assert window.tabs.tabText(1) == "HTTPS • онлайн"
     assert window.https_view is not None
+    assert window.research_splitter.indexOf(window.https_view) == 2
+    assert window.research_splitter.indexOf(window.android_view.parentWidget()) == 1
     assert len(window.emulator_buttons) >= 11
     for action in (
         "back", "home", "recent", "volume_up", "volume_down",

@@ -207,6 +207,9 @@ class MainWindow(QMainWindow):
             )
             event.ignore()
             return
+        self.settings.setValue(
+            "research_splitter", self.research_splitter.saveState()
+        )
         self.controller.close()
         event.accept()
 
@@ -245,15 +248,9 @@ class MainWindow(QMainWindow):
         header.addWidget(self.global_status)
         root.addLayout(header)
 
+        self.https_view = LiveHttpsView(self)
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_research_tab(), "Исследование")
-        self.https_view = LiveHttpsView(self)
-        self.tabs.addTab(self.https_view, "HTTPS • онлайн")
-        self.https_view.countChanged.connect(
-            lambda count: self.https_counter.setText(
-                f"HTTPS: {count} запросов"
-            )
-        )
         root.addWidget(self.tabs, 1)
         self.setCentralWidget(central)
 
@@ -289,6 +286,8 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(
             Qt.Orientation.Horizontal
         )
+        splitter.setChildrenCollapsible(False)
+        self.research_splitter = splitter
 
         left = QWidget()
         left.setMaximumWidth(420)
@@ -480,23 +479,12 @@ class MainWindow(QMainWindow):
         android_title.setStyleSheet(
             "font-size: 16px; font-weight: 600;"
         )
+        android_title.setToolTip(
+            "Мышь: касание • Ctrl+перетаскивание: жест двумя пальцами • "
+            "Shift+перетаскивание: наклон • колесо: прокрутка"
+        )
         toolbar.addWidget(android_title)
         toolbar.addStretch(1)
-        self.https_counter = QLabel("HTTPS: 0 запросов")
-        toolbar.addWidget(self.https_counter)
-        self.open_live_button = QPushButton("Показать HTTPS")
-        self.open_live_button.clicked.connect(
-            lambda: self.tabs.setCurrentIndex(1)
-        )
-        toolbar.addWidget(self.open_live_button)
-        self.android_hint = QLabel(
-            "Мышь = touch • Ctrl+drag = pinch/rotate • "
-            "Shift+drag = tilt • колесо = swipe"
-        )
-        self.android_hint.setStyleSheet(
-            "color: #7b838c;"
-        )
-        toolbar.addWidget(self.android_hint)
         android_layout.addLayout(toolbar)
         self.android_view = AndroidView()
         screen_and_tools = QHBoxLayout()
@@ -507,8 +495,14 @@ class MainWindow(QMainWindow):
 
         splitter.addWidget(left)
         splitter.addWidget(android_container)
+        splitter.addWidget(self.https_view)
         splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(1, 3)
+        splitter.setStretchFactor(2, 4)
+        splitter.setSizes([255, 455, 510])
+        saved = self.settings.value("research_splitter")
+        if saved is not None:
+            splitter.restoreState(saved)
         layout.addWidget(splitter, 1)
         return page
 
@@ -1726,7 +1720,7 @@ class MainWindow(QMainWindow):
                 indent=2,
             )
         )
-        self.tabs.setCurrentIndex(1)
+        self.tabs.setCurrentIndex(0)
 
     def _on_timeline_ready(
         self,
@@ -1739,7 +1733,7 @@ class MainWindow(QMainWindow):
                 indent=2,
             )
         )
-        self.tabs.setCurrentIndex(1)
+        self.tabs.setCurrentIndex(0)
 
     def _on_diagnostics(
         self,
