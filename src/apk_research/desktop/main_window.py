@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QFileDialog,
+    QFrame,
+    QSizePolicy,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -143,6 +145,10 @@ class MainWindow(QMainWindow):
         )
         self.controller = DesktopController(self)
         self._research_active = False
+        self._analysis_active = False
+        self._analysis_starting = False
+        self._recording_starting = False
+        self._preferred_package: str | None = None
         self._busy = False
         self._last_archive: str | None = None
         self._selected_package_path: str | None = None
@@ -890,18 +896,13 @@ class MainWindow(QMainWindow):
         self.install_package_button.clicked.connect(
             self._install_selected_package
         )
-        self.launch_package_button.clicked.connect(
-            self.controller.launch_installed_package
+        self.prepare_button.clicked.connect(self._prepare_environment)
+        self.refresh_apps_button.clicked.connect(c.refresh_installed_apps)
+        self.installed_apps.currentIndexChanged.connect(
+            self._on_selected_app
         )
-        self.prepare_button.clicked.connect(
-            self._prepare_environment
-        )
-        self.start_button.clicked.connect(
-            self._start_research
-        )
-        self.stop_button.clicked.connect(
-            c.stop_research
-        )
+        self.start_button.clicked.connect(self._toggle_analysis)
+        self.stop_button.clicked.connect(self._toggle_zip)
         self.android_view.swipeRequested.connect(
             c.swipe
         )
@@ -926,6 +927,9 @@ class MainWindow(QMainWindow):
         c.apkReady.connect(
             self._on_apk_ready
         )
+        c.installedAppsReady.connect(self._on_installed_apps)
+        c.analysisStarted.connect(self._on_analysis_started)
+        c.analysisStopped.connect(self._on_analysis_stopped)
         c.researchStarted.connect(
             self._on_research_started
         )
@@ -1229,20 +1233,114 @@ class MainWindow(QMainWindow):
             and self._latest_release is not None
         )
 
-    def _start_research(self) -> None:
-        launch_mode = str(
-            self.launch_mode.currentData()
-            or "clean"
+    def _on_installed_apps(self, packages: list[str]) -> None:
+        preferred = (
+            self._preferred_package
+            or self.installed_apps.currentData()
+            or self.controller.package_name
         )
-        self.settings.setValue(
-            "research/launch_mode",
-            launch_mode,
+        self.installed_apps.blockSignals(True)
+        self.installed_apps.clear()
+        for package in packages:
+            self.installed_apps.addItem(package, package)
+        index = self.installed_apps.findData(preferred)
+        if index >= 0:
+            self.installed_apps.setCurrentIndex(index)
+        self.installed_apps.blockSignals(False)
+        self._preferred_package = None
+        self._on_selected_app(self.installed_apps.currentIndex())
+
+    def _on_selected_app(self, index: int) -> None:
+        if self._analysis_active or self._research_active:
+            return
+        package = self.installed_apps.itemData(index) if index >= 0 else None
+        self.controller.package_name = str(package) if package else None
+        if package:
+            self.package_label.setText("Установлено: " + str(package))
+            self.status_package.setText("● Приложение установлено")
+        self._update_workflow_buttons()
+
+    def _update_workflow_buttons(self) -> None:
+        editable = (
+            not self._busy and not self._analysis_active
+            and not self._analysis_starting and not self._research_active
         )
-        self.controller.start_research(
-            clean_launch=(
-                launch_mode == "clean"
+        self.prepare_button.setEnabled(editable)
+        self.choose_apk_button.setEnabled(editable)
+        self.install_package_button.setEnabled(
+            editable and bool(self._selected_package_path)
+        )
+        self.installed_apps.setEnabled(editable)
+        self.refresh_apps_button.setEnabled(editable)
+        self.start_button.setText(
+            "Остановить анализ HTTPS"
+            if self._analysis_active else "Начать анализ HTTPS"
+        )
+        self.start_button.setEnabled(
+            (self._analysis_active and not self._research_active)
+            or (editable and bool(self.installed_apps.currentData()))
+        )
+        self.stop_button.setText(
+            "5. Завершить и сохранить ZIP"
+            if self._research_active else "5. Начать запись ZIP"
+        )
+        self.stop_button.setEnabled(
+            self._research_active
+            or (
+                self._analysis_active and not self._recording_starting
+                and not self._busy
             )
         )
+
+    def _toggle_analysis(self) -> None:
+        if self._analysis_active:
+            if not self._research_active:
+                self.controller.stop_analysis()
+            return
+        package = self.installed_apps.currentData()
+        if not package:
+            QMessageBox.information(
+                self, "Анализ HTTPS", "Выберите установленное приложение."
+            )
+            return
+        self._analysis_starting = True
+        self.session_label.setText("Подготовка анализа HTTPS…")
+        self._update_workflow_buttons()
+        self.controller.start_analysis(str(package))
+
+    def _toggle_zip(self) -> None:
+        if self._research_active:
+            self.stop_button.setEnabled(False)
+            self.controller.stop_research()
+            return
+        if not self._analysis_active:
+            return
+        self._recording_starting = True
+        self.session_label.setText("Подготовка записи ZIP…")
+        self._update_workflow_buttons()
+        self.controller.start_research()
+
+    def _on_analysis_started(self, data: dict) -> None:
+        self._analysis_starting = False
+        self._analysis_active = True
+        self.https_view.begin_session(
+            str(data["session_root"]), str(data["package"])
+        )
+        self.session_label.setText(
+            "● HTTPS-анализ выполняется · ZIP не записывается"
+        )
+        self.global_status.setText("● HTTPS-анализ включён")
+        self._update_workflow_buttons()
+
+    def _on_analysis_stopped(self, package: str) -> None:
+        self._analysis_starting = False
+        self._analysis_active = False
+        self.https_view.finish_session(None)
+        self.session_label.setText(
+            "Анализ HTTPS остановлен · ZIP не записывается"
+        )
+        self.global_status.setText("Анализ остановлен")
+        self._update_workflow_buttons()
 
     def _choose_apk(self) -> bool:
         path, _ = QFileDialog.getOpenFileName(
@@ -1258,12 +1356,7 @@ class MainWindow(QMainWindow):
         self.package_label.setText(
             "Package: файл выбран, нажмите «Установить в эмулятор»"
         )
-        self.start_button.setEnabled(False)
-        self.launch_package_button.setEnabled(False)
-        self.install_package_button.setEnabled(
-            not self._busy
-            and not self._research_active
-        )
+        self._update_workflow_buttons()
         self.status_package.setText(
             "○ Пакет выбран — не установлен"
         )
@@ -1284,8 +1377,7 @@ class MainWindow(QMainWindow):
         self.package_label.setText(
             "Package: установка…"
         )
-        self.start_button.setEnabled(False)
-        self.launch_package_button.setEnabled(False)
+        self.install_package_button.setEnabled(False)
         self.status_package.setText(
             "◌ Установка APK/XAPK"
         )
@@ -1376,44 +1468,12 @@ class MainWindow(QMainWindow):
             self.progress_bar.setRange(0, 1)
             self.progress_bar.setValue(1)
             self.progress_label.setText("Готово")
-        self.choose_apk_button.setEnabled(
-            not busy
-            and not self._research_active
-        )
-        self.install_package_button.setEnabled(
-            not busy
-            and not self._research_active
-            and bool(self._selected_package_path)
-        )
-        self.launch_package_button.setEnabled(
-            not busy
-            and not self._research_active
-            and bool(self.controller.package_name)
-        )
-        self.prepare_button.setEnabled(
-            not busy
-            and not self._research_active
-        )
-        self.start_button.setEnabled(
-            not busy
-            and not self._research_active
-            and bool(
-                self.controller.package_name
-            )
-        )
-        self.stop_button.setEnabled(
-            self._research_active
-        )
+        self._update_workflow_buttons()
         settings_enabled = (
-            not busy
-            and not self._research_active
+            not busy and not self._research_active and not self._analysis_active
         )
-        self.reset_android_button.setEnabled(
-            settings_enabled
-        )
-        self.repair_components_button.setEnabled(
-            settings_enabled
-        )
+        self.reset_android_button.setEnabled(settings_enabled)
+        self.repair_components_button.setEnabled(settings_enabled)
         self._refresh_update_controls()
 
     def _on_environment_ready(
@@ -1441,10 +1501,9 @@ class MainWindow(QMainWindow):
                 suffix += f" • {transport_name}"
             if gpu_mode:
                 suffix += f" • GPU {gpu_mode}"
-            self.android_hint.setText(
-                "Embedded gRPC/MMAP • мышь = touch • "
-                "Ctrl+drag = pinch/rotate • "
-                "Shift+drag = tilt • колесо = swipe"
+            self.android_view.setToolTip(
+                "Мышь: касание • Ctrl+перетаскивание: жест двумя пальцами • "
+                "Shift+перетаскивание: наклон • колесо: прокрутка"
             )
             self.status_android.setText(
                 "● Android готов" + suffix
@@ -1494,67 +1553,28 @@ class MainWindow(QMainWindow):
                 "Android готов"
             )
 
-    def _on_apk_ready(
-        self,
-        path: str,
-        package: str,
-    ) -> None:
+    def _on_apk_ready(self, path: str, package: str) -> None:
         self._selected_package_path = path
         self.apk_path.setText(path)
-        self.package_label.setText(
-            f"Package: {package}"
-        )
-        self.install_package_button.setText(
-            "Переустановить в эмулятор"
-        )
-        self.launch_package_button.setEnabled(
-            not self._busy
-            and not self._research_active
-        )
-        self.status_package.setText(
-            "● Пакет установлен"
-        )
-        self.status_package.setStyleSheet(
-            "color: #238636;"
-        )
-        self.start_button.setEnabled(
-            not self._busy
-        )
-        self.global_status.setText(
-            "Готово к исследованию"
-        )
+        self._preferred_package = package
+        self.package_label.setText("Установлено: " + package)
+        self.status_package.setText("● Приложение установлено")
+        self.global_status.setText("Приложение установлено")
+        self._update_workflow_buttons()
 
-    def _on_research_started(
-        self,
-        data: dict,
-    ) -> None:
+    def _on_research_started(self, data: dict) -> None:
+        self._recording_starting = False
         self._research_active = True
-        session_path = data.get("session_root")
-        if session_path:
-            self.https_view.begin_session(
-                str(session_path), str(data.get("package") or "")
-            )
         self.session_label.setText(
-            "● Запись идёт\n"
-            f"{data.get('package', '')}"
+            "● Запись ZIP идёт\\n" + str(data.get("package") or "")
         )
-        self.global_status.setText(
-            "● ИДЁТ ИССЛЕДОВАНИЕ"
-        )
+        self.global_status.setText("● ЗАПИСЬ ZIP")
         self.global_status.setStyleSheet(
             "color: #d29922; font-weight: 700;"
         )
-        self.start_button.setEnabled(False)
-        self.stop_button.setEnabled(True)
-        self.choose_apk_button.setEnabled(False)
-        self.install_package_button.setEnabled(False)
-        self.launch_package_button.setEnabled(False)
-        self.status_network.setText(
-            "● Сетевые пакеты записываются"
-        )
-        self.status_network.setStyleSheet(
-            "color: #238636;"
-        )
+        self.status_network.setText("● Запись полных данных выполняется")
+        self.status_network.setStyleSheet("color: #238636;")
+        self._update_workflow_buttons()
 
     def _on_research_health(
         self,
@@ -1576,53 +1596,32 @@ class MainWindow(QMainWindow):
             )
         )
 
-    def _on_research_finished(
-        self,
-        data: dict,
-    ) -> None:
+    def _on_research_finished(self, data: dict) -> None:
+        self._recording_starting = False
         self._research_active = False
-        self._last_archive = str(
-            data.get("archive")
-            or ""
-        )
-        status = str(
-            data.get("session_status")
-            or "unknown"
-        )
-        issues = data.get(
-            "validation_issues"
-        )
+        self._last_archive = str(data.get("archive") or "")
+        status = str(data.get("session_status") or "unknown")
+        issues = data.get("validation_issues")
         self.session_label.setText(
             ("● ZIP сохранён" if status == "complete"
-             else f"● Запись завершена: {status}")
+             else "● Запись завершена: " + status)
             + (" · есть замечания" if issues else "")
-            + f"\n{self._last_archive}"
+            + "\\n" + self._last_archive
         )
         self.global_status.setText(
-            "Исследование завершено: "
-            f"{status}"
+            "ZIP сохранён · HTTPS-анализ продолжается"
+            if self._analysis_active else "Запись завершена"
         )
-        self.global_status.setStyleSheet(
-            "font-weight: 600;"
-        )
-        self.stop_button.setEnabled(False)
-        self.start_button.setEnabled(
-            bool(
-                self.controller.package_name
+        self.global_status.setStyleSheet("font-weight: 600;")
+        self.status_network.setText("○ Запись ZIP выключена")
+        # Do NOT reload the archived slice into the live HTTPS table: the
+        # sole analyzer remains active and supplies subsequent transactions.
+        if self._analysis_active:
+            self.https_view.note.setText(
+                "● Анализ HTTPS продолжается. Последний ZIP сохранён отдельно."
             )
-        )
-        self.choose_apk_button.setEnabled(True)
-        self.install_package_button.setEnabled(
-            bool(self._selected_package_path)
-        )
-        self.launch_package_button.setEnabled(
-            bool(self.controller.package_name)
-        )
-        self.status_network.setText(
-            "● Сетевые пакеты сохранены"
-        )
-        self.https_view.finish_session(self._last_archive)
         self._refresh_results()
+        self._update_workflow_buttons()
 
     def _on_archive_inspection(
         self,
@@ -1704,6 +1703,9 @@ class MainWindow(QMainWindow):
         self.global_status.setStyleSheet(
             "color: #f85149; font-weight: 700;"
         )
+        self._analysis_starting = False
+        self._recording_starting = False
+        self._update_workflow_buttons()
         QMessageBox.critical(
             self,
             "apk-research",
