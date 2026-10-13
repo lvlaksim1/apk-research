@@ -8,3 +8,9 @@ Status reconciled on 2026-10-13; authoritative manager generation 32.
 4. Validate next owner Research ZIP for six normalized outputs: dns, tls-sessions, network-timings, action-network-links, screen-timing, network-enrichment, and retain existing raw PCAP, HTTPS bodies, video and checksums. State extraction limits and confidence; never fabricate unavailable data.
 5. Maintain two main tabs, embedded Android gRPC/MMAP, ARM64/XAPK support, dedicated Windows updater, no unnecessary extra GUI sections, and the owner's cancellation of Android launcher shortcut.
 6. Do not expose sensitive ZIP contents in public GitHub. Use neutral Russian terminology. All development/merges/installer releases need new explicit user scope and normal release gates.
+
+
+## Owner-directed active task, 2026-10-13
+
+13 October 2026: Owner explicitly directed integrated HTTPS list/details to the right of the Android view, click sorting, a non-obscuring Android status line, and immediate right-side emulator controls. Active PR #35, branch feature/v0.35-unified-https-workspace, final candidate 51050663f68516ce0dddec6dfe157f8a931fcab9, version 0.35.0. CI, real Android 15 AVD and ARM64 tests passed. Windows desktop build passed; clean Windows provisioning is in progress. Product main/latest release still 0.34.0 until full verification/merge/main pipeline. The app-specific Android 15 enforced edge-to-edge opt-out is a best-effort compatibility command, recorded in session events; owner app screenshot must confirm visual effect. Do not claim field acceptance without evidence.
+After the last Windows provisioning gate passes, promote draft PR #35, merge only verified final SHA, run main publication gates, verify actual v0.35.0 Setup/Update assets, update this capsule, request owner field screenshot and ZIP.

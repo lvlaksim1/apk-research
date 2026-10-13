@@ -33,3 +33,8 @@ Private Research ZIP files can expose session tokens and authentication content;
 ## NEXT CHAT
 
 Restore this capsule generation 32 from `context`, reconcile live main/releases, then await owner field-test feedback or explicit task. Start from v0.34.0 stable. Use neutral Russian terms and conservative status. Preserve owner's cancelled launcher-icon request.
+
+
+## Current handoff for active v0.35 implementation
+
+13 October 2026: Owner explicitly directed integrated HTTPS list/details to the right of the Android view, click sorting, a non-obscuring Android status line, and immediate right-side emulator controls. Active PR #35, branch feature/v0.35-unified-https-workspace, final candidate 51050663f68516ce0dddec6dfe157f8a931fcab9, version 0.35.0. CI, real Android 15 AVD and ARM64 tests passed. Windows desktop build passed; clean Windows provisioning is in progress. Product main/latest release still 0.34.0 until full verification/merge/main pipeline. The app-specific Android 15 enforced edge-to-edge opt-out is a best-effort compatibility command, recorded in session events; owner app screenshot must confirm visual effect. Do not claim field acceptance without evidence.

@@ -88,3 +88,8 @@ Source implemented in draft PR #32; v0.34.0 is not yet published. Required remai
 Status: **published and passed all required release checks**, exact main `2efec386cff0b204ee56d8bee365f3c52caefcb5`. Owner approved a conventional right-side emulator control strip and greater network/session evidence without restoring the technical navigation tabs. Implemented through PR #32, not unmerged/closed PR #33. Retain two user tabs, RAW PCAP, HTTPS request/response bodies, independent screen recording, ARM64 APK/XAPK, installed Android data and dedicated Windows Update installer. Six normalized JSON/JSONL evidence files are supplied; data provenance remains explicit.
 
 Owner has not yet provided post-release field acceptance. Next work is practical v0.34.0 usage validation; any new task or bug fix should be scoped from observed behavior. Owner explicitly chose not to release speculative Android network recovery because reboot resolved that transient issue.
+
+
+## ACTIVE — v0.35 UI delivery, 2026-10-13
+
+13 October 2026: Owner explicitly directed integrated HTTPS list/details to the right of the Android view, click sorting, a non-obscuring Android status line, and immediate right-side emulator controls. Active PR #35, branch feature/v0.35-unified-https-workspace, final candidate 51050663f68516ce0dddec6dfe157f8a931fcab9, version 0.35.0. CI, real Android 15 AVD and ARM64 tests passed. Windows desktop build passed; clean Windows provisioning is in progress. Product main/latest release still 0.34.0 until full verification/merge/main pipeline. The app-specific Android 15 enforced edge-to-edge opt-out is a best-effort compatibility command, recorded in session events; owner app screenshot must confirm visual effect. Do not claim field acceptance without evidence.
