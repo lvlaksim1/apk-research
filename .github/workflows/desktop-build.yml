@@ -175,10 +175,20 @@ jobs:
 
       - name: Upgrade previous release with dedicated update installer
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # The repository intentionally retains only the latest published
           # release. Never pin a historical installer that may be deleted.
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/lvlaksim1/apk-research/releases/latest" -Headers @{ "User-Agent" = "apk-research-ci" }
+          # Authenticate to prevent anonymous runner-IP GitHub API rate limits.
+          if (-not $env:GH_TOKEN) { throw "GitHub token is not available" }
+          $headers = @{
+            "User-Agent" = "apk-research-ci"
+            "Accept" = "application/vnd.github+json"
+            "Authorization" = "Bearer $env:GH_TOKEN"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/lvlaksim1/apk-research/releases/latest" -Headers $headers
           $previousVersion = $release.tag_name.TrimStart("v")
           $previousInstaller = Join-Path $env:RUNNER_TEMP "apk-research-setup_v$previousVersion.exe"
           $asset = $release.assets | Where-Object { $_.name -eq "apk-research-setup_v$previousVersion.exe" } | Select-Object -First 1
