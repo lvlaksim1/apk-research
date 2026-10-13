@@ -292,16 +292,16 @@ class LiveHttpsView(QWidget):
                     self.table.setItem(row, col, cell)
                 if index == selected_id:
                     restore = row
+            if restore < 0 and indices:
+                restore = 0
             if restore >= 0:
                 self.table.selectRow(restore)
-            elif indices and selected_id is None:
-                self.table.selectRow(0)
         finally:
             self.table.blockSignals(previous_signals)
             self.table.setUpdatesEnabled(True)
         if restore >= 0:
             self._show_selected(restore)
-        elif not indices:
+        else:
             for field in (
                 self.info, self.request_headers, self.request_body,
                 self.response_headers, self.response_body,

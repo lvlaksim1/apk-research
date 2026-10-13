@@ -127,6 +127,7 @@ def test_https_sorting_preserves_details_after_new_records(app):
         assert "/second" in view.info.toPlainText()
         view.table.horizontalHeader().sectionClicked.emit(4)
         assert [view.table.item(i, 4).text() for i in range(2)] == ["301", "200"]
+        view.table.selectRow(0)
         view._show_selected(0)
         assert "/first" in view.info.toPlainText()
         c = _transaction()
