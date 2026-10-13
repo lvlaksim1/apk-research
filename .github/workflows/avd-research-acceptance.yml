@@ -165,6 +165,9 @@ jobs:
       - name: Run HTTPS interception acceptance
         run: python tools/acceptance_https.py
 
+      - name: Verify independent HTTPS analysis and ZIP recording
+        run: python tools/acceptance_independent_https.py
+
       - name: Run real AVD acceptance
         run: python tools/acceptance_avd.py
 
