@@ -183,3 +183,48 @@ def test_https_method_and_domain_headers_use_independent_filters(app):
     finally:
         view.timer.stop()
         view.close()
+
+
+
+def test_https_analysis_and_zip_have_independent_window_states(app, tmp_path):
+    window = MainWindow()
+    try:
+        window._on_installed_apps(["com.example.alpha", "com.example.beta"])
+        assert window.installed_apps.count() == 2
+        assert window.controller.package_name == "com.example.alpha"
+        starts = []
+        zips = []
+        window.controller.start_analysis = lambda package: starts.append(package)
+        window.controller.start_research = lambda: zips.append("start")
+        window._toggle_analysis()
+        assert starts == ["com.example.alpha"]
+        assert not zips
+        assert window._analysis_starting
+        window._on_analysis_started({
+            "package": "com.example.alpha",
+            "session_root": str(tmp_path),
+        })
+        assert window._analysis_active
+        assert window.https_view.timer.isActive()
+        assert window.start_button.text() == "Остановить"
+        assert window.stop_button.isEnabled()
+        window._toggle_zip()
+        assert zips == ["start"]
+        window._on_research_started({"package": "com.example.alpha"})
+        assert window._research_active
+        assert window.https_view.timer.isActive()
+        window._on_research_finished({
+            "archive": str(tmp_path / "recording.research.zip"),
+            "session_status": "complete",
+            "validation_issues": 0,
+        })
+        assert not window._research_active
+        assert window._analysis_active
+        assert window.https_view.timer.isActive()
+        assert window.installed_apps.isEnabled() is False
+        window._on_analysis_stopped("com.example.alpha")
+        assert not window.https_view.timer.isActive()
+    finally:
+        window.https_view.timer.stop()
+        window.controller.close()
+        window.close()

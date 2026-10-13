@@ -40,6 +40,7 @@ class DesktopController(QObject):
     apkReady = Signal(str, str)
     researchStarted = Signal(dict)
     researchFinished = Signal(dict)
+    researchFailed = Signal(str)
     researchHealth = Signal(dict)
     screenFrame = Signal(object)
     operationBusy = Signal(bool)
@@ -844,6 +845,8 @@ class DesktopController(QObject):
                     "и сохранила аварийный Research ZIP."
                 )
             self.error.emit(message)
+            if not recovered:
+                self.researchFailed.emit(message)
         finally:
             self._set_screen_presentation_hold(False)
             self.orchestrator = None

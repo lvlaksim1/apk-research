@@ -219,7 +219,7 @@ class LiveHttpsView(QWidget):
     @staticmethod
     def _domain(item: dict) -> str:
         url = urlsplit(str(item.get("url") or ""))
-        return str(item.get("host") or url.hostname or "").casefold()
+        return str(url.hostname or item.get("host") or "").casefold()
 
     def _filter_options(self, column: int) -> list[str]:
         if column == 1:

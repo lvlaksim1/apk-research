@@ -950,6 +950,7 @@ class MainWindow(QMainWindow):
         c.researchFinished.connect(
             self._on_research_finished
         )
+        c.researchFailed.connect(self._on_research_failed)
         c.screenFrame.connect(
             self.android_view.set_frame
         )
@@ -1288,7 +1289,7 @@ class MainWindow(QMainWindow):
             if self._analysis_active else "Начать анализ"
         )
         self.start_button.setEnabled(
-            (self._analysis_active and not self._research_active)
+            (self._analysis_active and not self._research_active and not self._busy)
             or (editable and bool(self.installed_apps.currentData()))
         )
         self.stop_button.setText(
@@ -1635,6 +1636,13 @@ class MainWindow(QMainWindow):
                 "● Анализ HTTPS продолжается. Последний ZIP сохранён отдельно."
             )
         self._refresh_results()
+        self._update_workflow_buttons()
+
+    def _on_research_failed(self, message: str) -> None:
+        self._recording_starting = False
+        self._research_active = False
+        self.status_network.setText("○ Запись ZIP выключена")
+        self.session_label.setText("Запись ZIP завершилась с ошибкой")
         self._update_workflow_buttons()
 
     def _on_archive_inspection(
