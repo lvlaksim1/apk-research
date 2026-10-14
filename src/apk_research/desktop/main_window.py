@@ -312,6 +312,12 @@ class MainWindow(QMainWindow):
         self.status_android = QLabel("○ Android не подготовлен")
         self.status_android.setWordWrap(True)
         left_layout.addWidget(self.status_android)
+        self.network_restore_button = QPushButton("Восстановить сеть Android")
+        self.network_restore_button.setToolTip(
+            "Удалить оставшиеся настройки прокси и маршрута apk-research "
+            "после прерванного анализа, не удаляя приложения и их данные"
+        )
+        left_layout.addWidget(self.network_restore_button)
         self.status_adb = QLabel("○ ADB")
         self.status_root = QLabel("○ Root")
         self.status_adb.hide()
@@ -908,6 +914,8 @@ class MainWindow(QMainWindow):
             self._install_selected_package
         )
         self.prepare_button.clicked.connect(self._prepare_environment)
+        self.network_restore_button.clicked.connect(c.restore_android_network)
+        c.networkRestored.connect(self._on_network_restored)
         self.refresh_apps_button.clicked.connect(c.refresh_installed_apps)
         self.installed_apps.currentIndexChanged.connect(
             self._on_selected_app
@@ -1278,6 +1286,7 @@ class MainWindow(QMainWindow):
             and not self._analysis_starting and not self._research_active
         )
         self.prepare_button.setEnabled(editable)
+        self.network_restore_button.setEnabled(editable)
         self.choose_apk_button.setEnabled(editable)
         self.install_package_button.setEnabled(
             editable and bool(self._selected_package_path)
@@ -1475,6 +1484,21 @@ class MainWindow(QMainWindow):
             f"{message} — "
             f"{current_mb:.1f} / {total_mb:.1f} МБ "
             f"({ratio * 100:.0f}%)"
+        )
+
+    def _on_network_restored(self, report: dict) -> None:
+        cleared = bool(report.get("managed_proxy_removed"))
+        self.session_label.setText(
+            "● Сеть Android восстановлена · анализ выключен"
+        )
+        QMessageBox.information(
+            self,
+            "Сеть Android",
+            "Сетевые настройки apk-research проверены.\n"
+            + ("Оставшийся системный прокси удалён.\n" if cleared
+               else "Посторонние настройки прокси не изменялись.\n")
+            + "Правила маршрутизации HTTPS удалены.\n"
+            + "Данные приложений сохранены.",
         )
 
     def _on_busy(self, busy: bool) -> None:
