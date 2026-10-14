@@ -90,6 +90,8 @@ class ReplayDialog(QDialog):
         except ReplayError as exc:
             initial = b""
             self._load_error = str(exc)
+        self._original_body = initial
+        self._body_edited = False
         text_mode, initial_text = _body_for_editor(initial)
         layout = QVBoxLayout(self)
 
@@ -135,6 +137,7 @@ class ReplayDialog(QDialog):
         mode_row.addStretch()
         request_layout.addLayout(mode_row)
         self.request_body = QPlainTextEdit(initial_text)
+        self.request_body.textChanged.connect(self._mark_body_edited)
         self.request_body.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         request_layout.addWidget(self.request_body)
         self.tabs.addTab(request_page, "Тело запроса")
@@ -184,6 +187,19 @@ class ReplayDialog(QDialog):
             self.status.setText("Нельзя повторить запрос: " + self._load_error)
             self.send.setEnabled(False)
 
+    def _mark_body_edited(self) -> None:
+        self._body_edited = True
+
+    def _prepared_body(self) -> bytes:
+        # Merely showing a prettified JSON copy must not rewrite a
+        # signature-sensitive original request body.
+        if not self._body_edited:
+            return self._original_body
+        return _edited_bytes(
+            self.request_body.toPlainText(),
+            str(self.request_mode.currentData()),
+        )
+
     def _convert_request_mode(self, *_args) -> None:
         current = self.request_body.toPlainText()
         destination = self.request_mode.currentData()
@@ -197,14 +213,13 @@ class ReplayDialog(QDialog):
             self.request_mode.blockSignals(False)
             self.status.setText("Невозможно преобразовать бинарное тело в текст; используйте HEX.")
             return
+        self.request_body.blockSignals(True)
         self.request_body.setPlainText(result)
+        self.request_body.blockSignals(False)
 
     def _send_request(self) -> None:
         try:
-            body = _edited_bytes(
-                self.request_body.toPlainText(),
-                str(self.request_mode.currentData()),
-            )
+            body = self._prepared_body()
             # Validate before starting a worker; worker repeats validation.
             from apk_research.desktop.request_replay import (
                 parse_headers, validate_target, MAX_REQUEST_BYTES,

@@ -396,12 +396,16 @@ def test_replay_dialog_json_pretty_and_original_evidence_unchanged(app, tmp_path
         assert '"a": 1' in dialog.request_body.toPlainText()
         assert '"x": 2' in dialog.request_body.toPlainText()
         assert dialog.send.isEnabled()
+        assert dialog._prepared_body() == body
         dialog.request_mode.setCurrentIndex(1)
         assert body[:3].hex(" ") in dialog.request_body.toPlainText() is False or (
             "7b 0a" in dialog.request_body.toPlainText()
         )
         dialog.request_mode.setCurrentIndex(0)
-        assert '"a": 1' in dialog.request_body.toPlainText()
+        assert dialog._prepared_body() == body
+        dialog.request_body.setPlainText('{"a":3}')
+        assert dialog._prepared_body() == b'{"a":3}'
+        assert '"a": 3' in dialog.request_body.toPlainText()
         assert (path / "one.request.body").read_bytes() == body
     finally:
         dialog.close()
