@@ -7,10 +7,13 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from PySide6.QtCore import Qt
+from apk_research.desktop.body_display import format_http_body, MAX_TEXT_BYTES
+
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QComboBox,
     QMainWindow,
     QPlainTextEdit,
     QSplitter,
@@ -94,35 +97,14 @@ def _is_textual(content_type: str) -> bool:
 def _decode_body(
     data: bytes,
     content_type: str,
+    content_encoding: str = "",
+    mode: str = "text",
+    truncated: bool = False,
 ) -> str:
-    if not data:
-        return ""
-    if not _is_textual(content_type):
-        preview = data[:4096].hex(" ")
-        suffix = (
-            ""
-            if len(data) <= 4096
-            else "\n… hex preview limited to 4096 bytes"
-        )
-        return (
-            f"<binary body: {len(data)} bytes>\n"
-            f"{preview}{suffix}"
-        )
-    text = data.decode(
-        "utf-8",
-        errors="replace",
+    return format_http_body(
+        data, content_type, content_encoding,
+        mode=mode, truncated=truncated,
     )
-    if "json" in content_type.lower():
-        try:
-            value = json.loads(text)
-        except Exception:
-            return text
-        return json.dumps(
-            value,
-            ensure_ascii=False,
-            indent=2,
-        )
-    return text
 
 
 class HttpTransactionsWindow(QMainWindow):
@@ -204,6 +186,21 @@ class HttpTransactionsWindow(QMainWindow):
         self.summary.setReadOnly(True)
         self.summary.setMaximumHeight(120)
         details_layout.addWidget(self.summary)
+
+        mode_line = QHBoxLayout()
+        mode_line.addWidget(QLabel("Отображение тел:"))
+        self.body_mode = QComboBox()
+        self.body_mode.addItem("Текст (авто)", "text")
+        self.body_mode.addItem("HEX", "hex")
+        self.body_mode.setToolTip(
+            "HEX показывает исходные байты без преобразований."
+        )
+        self.body_mode.currentIndexChanged.connect(
+            self._body_mode_changed
+        )
+        mode_line.addWidget(self.body_mode)
+        mode_line.addStretch(1)
+        details_layout.addLayout(mode_line)
 
         self.detail_tabs = QTabWidget()
         self.request_headers = QPlainTextEdit()
@@ -484,6 +481,11 @@ class HttpTransactionsWindow(QMainWindow):
             )
         )
 
+    def _body_mode_changed(self, *_args) -> None:
+        row = self.table.currentRow()
+        if 0 <= row < len(self.filtered):
+            self._show_transaction(self.filtered[row])
+
     def _body_text(
         self,
         body: dict,
@@ -496,18 +498,19 @@ class HttpTransactionsWindow(QMainWindow):
             with zipfile.ZipFile(
                 self.archive_path
             ) as archive:
-                data = archive.read(member)
+                with archive.open(member) as reader:
+                    data = reader.read(MAX_TEXT_BYTES + 1)
         except Exception as exc:
             return (
                 "Не удалось прочитать тело: "
                 + (str(exc) or exc.__class__.__name__)
             )
         return _decode_body(
-            data,
-            str(
-                body.get("content_type")
-                or ""
-            ),
+            data[:MAX_TEXT_BYTES],
+            str(body.get("content_type") or ""),
+            str(body.get("content_encoding") or ""),
+            mode=str(self.body_mode.currentData() or "text"),
+            truncated=len(data) > MAX_TEXT_BYTES,
         )
 
     def _clear_details(self) -> None:
