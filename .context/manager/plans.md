@@ -1,5 +1,16 @@
 # Manager plans
 
+## Next-stage plan after published v0.36.0 — 2026-10-14
+
+1. Restore sealed `context` and reconcile current main and release before future work.
+2. Use v0.36.0 exact main `5f66b1940acd6b867d569d8a62faae4c338bde4f` as baseline. Ask owner to update then report actual independent HTTPS/ZIP workflow, filters, toolbar, Android top bar and ZIP correctness.
+3. On specific reported defects: reproduce, branch off verified main, run CI + real Android 15 AVD + Windows GUI/Setup/Update/clean provisioning and ARM64 where applicable; merge after success, release only through main workflow.
+4. Preserve no-ZIP during HTTPS-only mode, single persistent HTTPS analyzer, bounded recordings, privacy, full Research ZIP integrity and no added Settings tab. WHPX #38439063246 not confirmed completed.
+
+---
+
+## Archived previous-generation notes — superseded where inconsistent
+
 ## Default change/release plan
 
 1. Reinstate from `context` and reconcile live `main`, latest release and CI.

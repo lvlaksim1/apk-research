@@ -1,5 +1,13 @@
 # Manager goals
 
+## Current v0.36 product goals — 2026-10-14
+
+Preserve the independently controlled HTTPS/ZIP lifecycle, scope captured data to the explicit ZIP interval, and make all emulator controls and domain/method filters accessible. Preserve RAW PCAP, gRPC/MMAP, ARM64/XAPK, setup/update workflow and privacy. No new Settings tab without explicit approval. Published authority: main `5f66b1940acd6b867d569d8a62faae4c338bde4f`.
+
+---
+
+## Archived previous-generation notes — superseded where inconsistent
+
 - Preserve continuity of apk-research across chats/runtimes without relying on conversational memory alone.
 - Keep the Windows GUI and managed Android research workflow reliable and understandable for the owner.
 - Preserve forensic correctness: RAW-first evidence, explicit provenance, exact packet/flow accounting and no causal overclaim.

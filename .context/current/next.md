@@ -1,21 +1,13 @@
 # Next Actions
 
-Status reconciled on 2026-10-13; authoritative manager generation 32.
+Verified 2026-10-14; capsule generation **35**; GitHub Release **v0.36.0**, main SHA `5f66b1940acd6b867d569d8a62faae4c338bde4f`, pipeline #38439063318 fully SUCCESS.
 
-1. Treat **apk-research v0.34.0** on `main` `2efec386cff0b204ee56d8bee365f3c52caefcb5` as current published baseline. GitHub Release https://github.com/lvlaksim1/apk-research/releases/tag/v0.34.0 has standalone Setup, dedicated Update and SHA256SUMS. Release pipeline #38375309755 passed all mandatory stages. PR #32 merged; PR #33 was closed unmerged.
-2. Continue in a NEW CHAT only after loading sealed capsule from branch `context`. Ask for owner's first hands-on findings on v0.34.0: right Android toolbar, safe controls while recording, normal app network access and new ZIP evidence.
-3. If a concrete bug is reported, reproduce using branch off this exact main commit; avoid changing emulator network state or data without evidence and approval. Previous loading issue after v0.33 was transient and cleared with restart, with no proven root cause.
-4. Validate next owner Research ZIP for six normalized outputs: dns, tls-sessions, network-timings, action-network-links, screen-timing, network-enrichment, and retain existing raw PCAP, HTTPS bodies, video and checksums. State extraction limits and confidence; never fabricate unavailable data.
-5. Maintain two main tabs, embedded Android gRPC/MMAP, ARM64/XAPK support, dedicated Windows updater, no unnecessary extra GUI sections, and the owner's cancellation of Android launcher shortcut.
-6. Do not expose sensitive ZIP contents in public GitHub. Use neutral Russian terminology. All development/merges/installer releases need new explicit user scope and normal release gates.
+1. Resume by reading `context` integrity marker and checking all coupled blob SHA-1 digests, then fetch live main and release.
+2. Provide owner versioned Update https://github.com/lvlaksim1/apk-research/releases/download/v0.36.0/apk-research-update_v0.36.0.exe or Setup https://github.com/lvlaksim1/apk-research/releases/download/v0.36.0/apk-research-setup_v0.36.0.exe as relevant. Do not assume v0.36.0 already installed.
+3. Request real field feedback: prepare Android; choose/install APK/XAPK; choose installed app and start HTTPS (app auto-launched after analysis starts, no ZIP); independently start/stop ZIP; verify HTTPS continues; open ZIP folder.
+4. Inspect method/domain header filters, combined search, 18 controls on emulator strip, absence of Settings tab, built-in updater under Program menu and saved UI state. Request screenshot for Android 15 top-bar concern.
+5. Review provided private ZIP locally for bounded interval, requests, bodies, PCAP/video/logs and SHA256 verification, without publishing confidential artifacts. Do not infer complete HTTPS visibility.
+6. Only for new explicit owner direction, branch from verified `main`, test candidate on CI + Android 15 + Windows Setup/Update/clean provisioning and ARM64 where appropriate, then merge, publish release through main pipeline, verify assets and reseal capsule. No bypasses.
+7. WHPX #38439063246 was queued at inspection; check fresh state if relevant, no presumption of success.
 
-
-## Owner-directed active task, 2026-10-13
-
-13 October 2026: Owner explicitly directed integrated HTTPS list/details to the right of the Android view, click sorting, a non-obscuring Android status line, and immediate right-side emulator controls. Active PR #35, branch feature/v0.35-unified-https-workspace, final candidate 51050663f68516ce0dddec6dfe157f8a931fcab9, version 0.35.0. CI, real Android 15 AVD and ARM64 tests passed. Windows desktop build passed; clean Windows provisioning is in progress. Product main/latest release still 0.34.0 until full verification/merge/main pipeline. The app-specific Android 15 enforced edge-to-edge opt-out is a best-effort compatibility command, recorded in session events; owner app screenshot must confirm visual effect. Do not claim field acceptance without evidence.
-After the last Windows provisioning gate passes, promote draft PR #35, merge only verified final SHA, run main publication gates, verify actual v0.35.0 Setup/Update assets, update this capsule, request owner field screenshot and ZIP.
-
-
-## Next continuation — main v0.35 release gate
-
-On 2026-10-13, PR #35 was merged into product main by verified merge commit 2076cb8c2fa4d5fead39e2b4edb5829fab8e4cbd after final PR CI, real AVD, ARM64, Windows build, previous-version Update and clean provisioning all succeeded. main now contains 0.35.0 source. GitHub Release v0.35.0 remains NOT YET PUBLISHED pending main workflow run 38416539695. Within that run CI, Windows build, actual 0.34.0 to 0.35.0 Update and clean Windows provisioning passed; main AVD test is still installing Google Android SDK components at this checkpoint. Continue monitoring the exact main run and retry its failed mandatory gates if SDK distribution fails; NEVER bypass AVD or claim release prematurely. Confirm published version, commit and SHA256 assets before terminalizing work. Android insets per-app effect needs a user screenshot.
+No pending coding task is currently authorized; await owner test or a new request.
