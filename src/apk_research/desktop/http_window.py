@@ -264,7 +264,9 @@ class HttpTransactionsWindow(QMainWindow):
         layout.addWidget(splitter, 1)
         self.setCentralWidget(central)
 
-    def _populate(self) -> None:
+    def _populate(self, select_id: str | None = None) -> None:
+        if select_id is None:
+            select_id = self._selected_preview_id
         self.table.setRowCount(
             len(self.filtered)
         )
@@ -356,10 +358,13 @@ class HttpTransactionsWindow(QMainWindow):
             f"{len(self.filtered)} / {len(self.transactions)}"
         )
         if self.filtered:
-            self.table.selectRow(0)
-            self._show_transaction(
-                self.filtered[0]
+            selected_row = next(
+                (row for row, item in enumerate(self.filtered)
+                 if item.get("transaction_id") == select_id),
+                0,
             )
+            self.table.selectRow(selected_row)
+            self._show_transaction(self.filtered[selected_row])
         else:
             self._clear_details()
 
@@ -379,6 +384,8 @@ class HttpTransactionsWindow(QMainWindow):
                     transaction, ensure_ascii=False,
                     default=lambda value: "" if isinstance(value, bytes) else str(value),
                 ).lower()
+                if transaction.get("capture_mode") == "manual_replay":
+                    haystack += " повтор ↻ вручную"
                 if needle in haystack:
                     values.append(transaction)
             self.filtered = values
@@ -533,14 +540,22 @@ class HttpTransactionsWindow(QMainWindow):
         key = record.get("transaction_id")
         if record.get("capture_mode") != "manual_replay" or not key:
             return
+        newly_added = True
         for index, existing in enumerate(self.transactions):
             if (existing.get("transaction_id") == key
                     and existing.get("capture_mode") == "manual_replay"):
                 self.transactions[index] = record
+                newly_added = False
                 break
-        else:
+        if newly_added:
             self.transactions.append(record)
         self._apply_filter(self.search.text())
+        if newly_added:
+            for index, row in enumerate(self.filtered):
+                if row.get("transaction_id") == key:
+                    self.table.selectRow(index)
+                    self._show_transaction(row)
+                    break
 
     def _body_mode_changed(self, *_args) -> None:
         self.body_page.setEnabled(self.body_mode.currentData() == "text")
