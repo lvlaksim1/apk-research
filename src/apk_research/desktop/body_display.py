@@ -122,6 +122,10 @@ def _multipart(data: bytes, content_type: str) -> str | None:
         return None
     # Multipart body is parsed as a single MIME entity, with bounded input.
     safe_type = content_type.replace("\r", "").replace("\n", "")
+    # Some applications send non-standard ", boundary=" rather than "; boundary=".
+    safe_type = re.sub(
+        r",\s*(boundary\s*=)", r"; \1", safe_type, flags=re.IGNORECASE,
+    )
     message = BytesParser(policy=policy.default).parsebytes(
         b"Content-Type: " + safe_type.encode("ascii", "replace")
         + b"\r\nMIME-Version: 1.0\r\n\r\n" + data
