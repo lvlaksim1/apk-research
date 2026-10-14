@@ -483,3 +483,115 @@ def test_new_replay_response_shows_pretty_json_without_writing_archive(app):
         assert "7b 22 64 61" in dialog.response_body.toPlainText()
     finally:
         dialog.close()
+
+
+def test_modeless_replay_send_immediately_populates_live_list(
+    app, tmp_path, monkeypatch
+):
+    from PySide6.QtWidgets import QMessageBox
+    from apk_research.desktop import replay_dialog
+    from apk_research.desktop.request_replay import ReplayResult
+
+    def reject_extra_question(*_args, **_kwargs):
+        raise AssertionError("Unexpected send confirmation")
+    monkeypatch.setattr(QMessageBox, "question", reject_extra_question)
+    monkeypatch.setattr(replay_dialog._ReplayWorker, "start", lambda self: None)
+    view = LiveHttpsView()
+    original = _transaction()
+    original["request"]["body"] = {"present": False}
+    original["response"]["body"] = {"present": False}
+    view.transactions = [original]
+    view._apply_filter()
+    view.table.selectRow(0)
+    view._show_selected(0)
+    try:
+        view._open_replay_dialog()
+        assert len(view._replay_dialogs) == 1
+        dialog = view._replay_dialogs[0]
+        assert not dialog.isModal()
+        assert dialog.windowModality() == Qt.WindowModality.NonModal
+        assert view.isEnabled()
+        view.search.setText("")
+        dialog.url.setText("https://evrasia.spb.ru/api/v3/new/")
+        dialog.method.setCurrentText("POST")
+        dialog.request_body.setPlainText('{"test":2}')
+        dialog._send_request()
+        assert len(view.transactions) == 2
+        row = next(r for r in view.transactions
+                   if r.get("capture_mode") == "manual_replay")
+        assert row["state"] == "Выполняется"
+        assert row["request"]["body"]["_inline_bytes"] == b'{"test":2}'
+        assert any(view.table.item(i, 1).text().startswith("↻ ")
+                   for i in range(view.table.rowCount()))
+        dialog._show_result(ReplayResult(
+            201, "Created", [("content-type", "application/json")],
+            b'{"saved":true}', False, 33,
+        ))
+        assert len(view.transactions) == 2
+        manual = next(r for r in view.transactions
+                      if r.get("capture_mode") == "manual_replay")
+        assert manual["response"]["status_code"] == 201
+        replay_row = next(i for i in range(view.table.rowCount())
+                          if view.table.item(i, 1).text().startswith("↻ "))
+        view.table.selectRow(replay_row)
+        view._show_selected(replay_row)
+        assert '"saved": true' in view.response_body.toPlainText()
+        assert '"test": 2' in view.request_body.toPlainText()
+        view.search.setText("new")
+        assert view.table.rowCount() == 1
+        assert view.table.item(0, 1).text() == "↻ POST"
+    finally:
+        for d in list(view._replay_dialogs):
+            d.close()
+        view.timer.stop()
+        view.close()
+
+
+def test_manual_replay_rows_in_saved_archive_window(
+    app, tmp_path, monkeypatch
+):
+    from PySide6.QtWidgets import QMessageBox
+    from apk_research.desktop import replay_dialog
+    from apk_research.desktop.http_window import HttpTransactionsWindow
+    from apk_research.desktop.request_replay import ReplayResult
+
+    monkeypatch.setattr(
+        QMessageBox, "question",
+        lambda *_a, **_k: (_ for _ in ()).throw(
+            AssertionError("Confirmation must not occur")),
+    )
+    monkeypatch.setattr(replay_dialog._ReplayWorker, "start", lambda self: None)
+    record = _transaction()
+    record["request"]["body"] = {"present": False}
+    record["response"]["body"] = {"present": False}
+    archive = tmp_path / "source.research.zip"
+    with zipfile.ZipFile(archive, "w") as stream:
+        stream.writestr(
+            "02_normalized/http-transactions.jsonl",
+            json.dumps(record) + "\n",
+        )
+    original_archive = archive.read_bytes()
+    window = HttpTransactionsWindow(archive)
+    try:
+        assert window.table.rowCount() == 1
+        window._open_replay_dialog()
+        dialog = window._replay_dialogs[0]
+        assert not dialog.isModal()
+        assert window.isEnabled()
+        dialog.request_body.setPlainText('{"id":9}')
+        dialog._send_request()
+        assert len(window.transactions) == 2
+        assert any(window.table.item(i, 2).text().startswith("↻ ")
+                   for i in range(window.table.rowCount()))
+        dialog._show_result(ReplayResult(
+            200, "OK", [("content-type", "application/json")],
+            b'{"ok":true}', False, 10,
+        ))
+        assert '"ok": true' in window.response_body.toPlainText()
+        window.search.setText("повтор")
+        assert window.table.rowCount() == 1
+        assert archive.read_bytes() == original_archive
+    finally:
+        for d in list(window._replay_dialogs):
+            d.close()
+        window.close()
