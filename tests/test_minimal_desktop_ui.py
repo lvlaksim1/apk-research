@@ -409,3 +409,75 @@ def test_replay_dialog_json_pretty_and_original_evidence_unchanged(app, tmp_path
         assert (path / "one.request.body").read_bytes() == body
     finally:
         dialog.close()
+
+
+
+def test_pretty_json_requests_and_responses_live_and_zip(app, tmp_path):
+    from apk_research.desktop.http_window import HttpTransactionsWindow
+    item = _transaction()
+    request_raw = b'{"payload":{"y":2,"a":[1,3]}}'
+    response_raw = b'{"result":{"ok":true,"count":9}}'
+    item["request"]["body"] = {
+        "present": True, "path": "http-00000001.request.body",
+        "size": len(request_raw), "content_type": "application/json",
+    }
+    item["response"]["body"] = {
+        "present": True, "path": "http-00000001.response.body",
+        "size": len(response_raw), "content_type": "application/json",
+    }
+    folder = tmp_path / "02_normalized/http-bodies"
+    folder.mkdir(parents=True)
+    (folder / "http-00000001.request.body").write_bytes(request_raw)
+    (folder / "http-00000001.response.body").write_bytes(response_raw)
+    journal = tmp_path / "02_normalized/http-transactions.jsonl"
+    journal.write_text(json.dumps(item) + "\n", encoding="utf-8")
+    view = LiveHttpsView()
+    view.begin_session(tmp_path, "com.example.test")
+    try:
+        view.refresh()
+        view.table.selectRow(0)
+        assert '"payload": {\n    "y": 2' in view.request_body.toPlainText()
+        assert '"result": {\n    "ok": true' in view.response_body.toPlainText()
+        archive = tmp_path / "saved.research.zip"
+        with zipfile.ZipFile(archive, "w") as zipped:
+            zipped.write(journal, "02_normalized/http-transactions.jsonl")
+            for suffix in ("request", "response"):
+                zipped.write(
+                    folder / f"http-00000001.{suffix}.body",
+                    f"02_normalized/http-bodies/http-00000001.{suffix}.body",
+                )
+        legacy = HttpTransactionsWindow(archive)
+        try:
+            legacy._show_transaction(item)
+            assert '"payload": {\n    "y": 2' in legacy.request_body.toPlainText()
+            assert '"result": {\n    "ok": true' in legacy.response_body.toPlainText()
+        finally:
+            legacy.close()
+        assert view.replay_button.isEnabled()
+    finally:
+        view.timer.stop()
+        view.close()
+
+
+def test_new_replay_response_shows_pretty_json_without_writing_archive(app):
+    from apk_research.desktop.replay_dialog import ReplayDialog
+    from apk_research.desktop.request_replay import ReplayResult
+    record = {
+        "method": "GET", "url": "https://example.com/status",
+        "request": {"headers": [], "body": {"present": False}},
+    }
+    dialog = ReplayDialog(record)
+    try:
+        response = ReplayResult(
+            200, "OK", [("content-type", "application/json")],
+            b'{"data":{"ready":true,"entries":[1,2]}}',
+            limited=False, duration_ms=12,
+        )
+        dialog._show_result(response)
+        shown = dialog.response_body.toPlainText()
+        assert '"data": {\n    "ready": true' in shown
+        assert dialog.tabs.currentIndex() == 3
+        dialog.response_mode.setCurrentIndex(1)
+        assert "7b 22 64 61" in dialog.response_body.toPlainText()
+    finally:
+        dialog.close()
