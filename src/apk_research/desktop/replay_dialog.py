@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
     QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QTabWidget,
@@ -14,6 +14,9 @@ from PySide6.QtWidgets import (
 from apk_research.desktop.body_display import format_http_body
 from apk_research.desktop.request_replay import (
     ReplayError, ReplayResult, perform_replay, read_captured_body,
+)
+from apk_research.desktop.replay_records import (
+    create_replay_record, complete_replay_record,
 )
 
 
@@ -70,11 +73,15 @@ class _ReplayWorker(QThread):
 
 
 class ReplayDialog(QDialog):
-    """One manually submitted request. No edits to session or ZIP."""
+    """Non-modal editor; submitted traffic remains in-memory only."""
+
+    replayChanged = Signal(object)
 
     def __init__(self, record: dict, archive_path: Path | None = None,
                  session_root: Path | None = None, parent=None) -> None:
         super().__init__(parent)
+        self.setModal(False)
+        self.setWindowModality(Qt.WindowModality.NonModal)
         self.setWindowTitle("Изменить и повторить HTTPS-запрос")
         self.resize(900, 710)
         self._record = record
@@ -84,6 +91,7 @@ class ReplayDialog(QDialog):
         )
         self._worker: _ReplayWorker | None = None
         self._result: ReplayResult | None = None
+        self._pending_record: dict | None = None
         try:
             initial = read_captured_body(record, archive_path, session_root)
             self._load_error = ""
@@ -251,16 +259,11 @@ class ReplayDialog(QDialog):
         except ReplayError as exc:
             QMessageBox.warning(self, "Повторная отправка", str(exc))
             return
-        answer = QMessageBox.question(
-            self, "Подтвердить отправку",
-            "Отправить новый " + self.method.currentText().upper()
-            + "-запрос на " + self.url.text()
-            + "?\nДействие может изменить данные на сервере.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
+        self._pending_record = create_replay_record(
+            self._record, self.url.text(), self.method.currentText(),
+            self.headers.toPlainText(), body,
         )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
+        self.replayChanged.emit(self._pending_record)
         self.send.setEnabled(False)
         self.status.setText("Запрос выполняется… (TLS-проверка включена)")
         self._worker = _ReplayWorker((
@@ -274,6 +277,10 @@ class ReplayDialog(QDialog):
 
     def _show_result(self, result: ReplayResult) -> None:
         self._result = result
+        if self._pending_record is not None:
+            self.replayChanged.emit(
+                complete_replay_record(self._pending_record, result)
+            )
         self.response_headers.setPlainText(
             "\n".join(f"{k}: {v}" for k, v in result.headers)
         )
@@ -301,6 +308,10 @@ class ReplayDialog(QDialog):
         ))
 
     def _show_error(self, message: str) -> None:
+        if self._pending_record is not None:
+            self.replayChanged.emit(
+                complete_replay_record(self._pending_record, None, message)
+            )
         self.status.setText("Не удалось отправить запрос: " + message)
 
     def _finished(self) -> None:
