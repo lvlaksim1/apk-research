@@ -58,6 +58,7 @@ def test_main_window_integrates_https_beside_android(app):
         assert window.https_view is not None
         assert window.stop_button.text() == "5. Начать запись ZIP"
         assert window.start_button.text() == "Начать анализ"
+        assert window.network_restore_button.text() == "Восстановить сеть Android"
         assert window.installed_apps.count() == 0
         assert len(window.emulator_buttons) == 18
         assert "more" not in window.emulator_buttons
