@@ -154,6 +154,10 @@ class LiveHttpsView(QWidget):
     def _clear(self) -> None:
         self.transactions.clear()
         self.filtered_indices.clear()
+        self._selected_preview_id = None
+        self.body_page.blockSignals(True)
+        self.body_page.setValue(1)
+        self.body_page.blockSignals(False)
         self._method_filter = None
         self._domain_filter = None
         self._update_filter_titles()

@@ -97,12 +97,16 @@ def _text(
             continue
         try:
             decoded = data.decode(str(encoding), errors="strict")
-        except UnicodeDecodeError:
-            if not incomplete:
+        except UnicodeDecodeError as exc:
+            # Only trim an *incomplete trailing* code point at a page
+            # boundary; do not silently discard arbitrary invalid bytes.
+            if (
+                not incomplete or exc.reason != "unexpected end of data"
+                or exc.start < len(data) - 4
+            ):
                 continue
-            # Pages may end in the middle of a UTF-8 character.
             try:
-                decoded = data.decode(str(encoding), errors="ignore")
+                decoded = data[:exc.start].decode(str(encoding), errors="strict")
             except (UnicodeError, LookupError, ValueError):
                 continue
         except (LookupError, ValueError):

@@ -80,11 +80,32 @@ def test_multipart_with_fields_file_and_nonstandard_comma_boundary():
     assert payload[:12].hex(" ") in hexed
 
 
-def test_bounded_decompression_preserves_original_bytes_on_excess():
-    bomb = zlib.compress(b"X" * (128 * 1024 + 1))
-    result = format_http_body(bomb, "application/zlib")
-    assert "128 КиБ" in result
-    assert bomb[:2].hex(" ") in result
+def test_large_zlib_response_is_readable_in_pages_and_hex_is_unchanged():
+    raw = b'{"records":"' + b"A" * (360 * 1024) + b'"}'
+    packed = zlib.compress(raw, level=9)
+    assert packed[:2] == b"\x78\xda"
+    first = format_http_body(packed, "application/zlib", "gzip", page=0)
+    second = format_http_body(packed, "application/zlib", "gzip", page=1)
+    third = format_http_body(packed, "application/zlib", "gzip", page=2)
+    assert "Фрагмент 1 из 3" in first
+    assert "Фрагмент 2 из 3" in second
+    assert "Фрагмент 3 из 3" in third
+    assert "A" * 200 in second
+    assert "Ошибка распаковки" not in first
+    assert format_http_body(
+        packed, "application/zlib", "gzip", mode="hex"
+    ).splitlines()[-1].startswith(packed[:8].hex(" "))
+
+
+def test_genuine_oversized_expansion_stops_at_8_mib_with_readable_prefix():
+    from apk_research.desktop.body_display import MAX_INFLATE_BYTES
+    bomb = zlib.compress(b"X" * (MAX_INFLATE_BYTES + 1000), level=9)
+    first = format_http_body(bomb, "application/zlib", page=0)
+    last = format_http_body(bomb, "application/zlib", page=63)
+    assert "предел распаковки 8 МиБ" in first
+    assert "X" * 200 in first
+    assert "Фрагмент 64 из 64" in last
+    assert "Ошибка распаковки" not in last
 
 
 def test_invalid_truncated_and_genuine_binary_are_not_fabricated_as_text():
