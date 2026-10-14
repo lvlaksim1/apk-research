@@ -317,3 +317,54 @@ def test_http_text_and_hex_in_live_and_saved_zip(app, tmp_path):
     finally:
         view.timer.stop()
         view.close()
+
+
+
+def test_large_zlib_body_paging_live_and_archived(app, tmp_path):
+    from apk_research.desktop.http_window import HttpTransactionsWindow
+    import zlib
+    text = (b'{"values":"' + b"A" * 300000 + b'"}')
+    compressed = zlib.compress(text, level=9)
+    item = _transaction()
+    item["response"]["body"].update(
+        size=len(compressed),
+        content_type="application/zlib",
+        content_encoding="gzip",
+    )
+    location = tmp_path / "02_normalized/http-bodies"
+    location.mkdir(parents=True)
+    (location / "http-00000001.response.body").write_bytes(compressed)
+    journal = tmp_path / "02_normalized/http-transactions.jsonl"
+    journal.write_text(json.dumps(item) + "\n", encoding="utf-8")
+    view = LiveHttpsView()
+    view.begin_session(tmp_path, "com.example.test")
+    try:
+        view.refresh()
+        view.table.selectRow(0)
+        assert "Фрагмент 1 из 3" in view.response_body.toPlainText()
+        view.body_page.setValue(2)
+        assert "Фрагмент 2 из 3" in view.response_body.toPlainText()
+        view.body_mode.setCurrentIndex(1)
+        assert compressed[:8].hex(" ") in view.response_body.toPlainText()
+        view.body_mode.setCurrentIndex(0)
+        assert "Фрагмент 2 из 3" in view.response_body.toPlainText()
+        archive = tmp_path / "saved.research.zip"
+        with zipfile.ZipFile(archive, "w") as zipped:
+            zipped.write(journal, "02_normalized/http-transactions.jsonl")
+            zipped.write(
+                location / "http-00000001.response.body",
+                "02_normalized/http-bodies/http-00000001.response.body",
+            )
+        view.finish_session(archive)
+        view.body_page.setValue(3)
+        assert "Фрагмент 3 из 3" in view.response_body.toPlainText()
+        reader = HttpTransactionsWindow(archive)
+        try:
+            reader._show_transaction(item)
+            reader.body_page.setValue(2)
+            assert "Фрагмент 2 из 3" in reader.response_body.toPlainText()
+        finally:
+            reader.close()
+    finally:
+        view.timer.stop()
+        view.close()
