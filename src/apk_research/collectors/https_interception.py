@@ -161,6 +161,7 @@ class HttpsInterceptionCollector:
     METADATA_ARTIFACT = "02_normalized/http-interception.json"
     STDERR_ARTIFACT = "01_raw/network/https-proxy.stderr.txt"
     DEVICE_PROXY_PORT = 38887
+    MANAGED_PROXY = "127.0.0.1:38887"
     DEVICE_ROUTE_PORT = 38888
     ROUTE_CHAIN = "APKRS_HTTPS32"
     ROUTE_ROOT = "/data/local/tmp/apk-research/https-route32"
@@ -194,6 +195,7 @@ class HttpsInterceptionCollector:
         self._ca_subject_hash = ""
         self._finished = False
         self._proxy_configured = False
+        self._proxy_cleanup_error: str | None = None
         self._reverse_configured = False
         self._ca_injected = False
         self._ca_injection_succeeded = False
@@ -419,7 +421,7 @@ class HttpsInterceptionCollector:
         count = self._transaction_count()
         cleanup_error = (
             "Не удалось подтвердить удаление сетевого правила Android"
-            if self._route_cleanup_confirmed is False else None
+            if self._route_cleanup_confirmed is False else self._proxy_cleanup_error
         )
         status = "failed" if cleanup_error else "completed"
         self.session.update_collector(
@@ -562,6 +564,88 @@ test -s "$SYSTEM/{self._ca_subject_hash}.0"
             timeout=timeout,
         )
 
+
+    @classmethod
+    def restore_stale_android_network(
+        cls, adb: AdbClient, serial: str,
+    ) -> dict[str, object]:
+        """Remove only apk-research's orphaned proxy and TCP/443 route.
+
+        Called only while no HTTPS analysis/Research ZIP is active. Never
+        overwrite a custom proxy belonging to the user or another service.
+        """
+        previous = adb.shell_output(
+            serial, "settings", "get", "global", "http_proxy",
+        ).strip()
+        if previous == cls.MANAGED_PROXY:
+            adb.shell_output(
+                serial, "settings", "put", "global", "http_proxy", ":0",
+            )
+        current = adb.shell_output(
+            serial, "settings", "get", "global", "http_proxy",
+        ).strip()
+        if current == cls.MANAGED_PROXY:
+            raise HttpsInterceptionCollectorError(
+                "Системный прокси Android остался включённым"
+            )
+
+        # Check iptables availability rather than reporting success on
+        # missing privileges. Scope cleanup to our uniquely named chain.
+        script = f"""
+set -u
+CHAIN={cls.ROUTE_CHAIN}
+ROOT={cls.ROUTE_ROOT}
+iptables -t nat -L OUTPUT >/dev/null 2>&1 || exit 24
+iptables -t nat -S OUTPUT 2>/dev/null | grep -F -- "-j $CHAIN" | while read -r TYPE TABLE REST; do
+  if [ "$TYPE" = "-A" ] && [ "$TABLE" = "OUTPUT" ]; then
+    set -- $REST
+    iptables -t nat -D OUTPUT "$@" 2>/dev/null || true
+  fi
+done
+iptables -t nat -F "$CHAIN" 2>/dev/null || true
+iptables -t nat -X "$CHAIN" 2>/dev/null || true
+PID="$ROOT/route.pid"
+BIN="$ROOT/apk-research-https-route"
+if [ -f "$PID" ]; then
+  VALUE=$(cat "$PID" 2>/dev/null || true)
+  case "$VALUE" in
+    ''|*[!0-9]*) ;;
+    *)
+      EXE=$(readlink "/proc/$VALUE/exe" 2>/dev/null || true)
+      if [ "$EXE" = "$BIN" ] || [ "$EXE" = "$BIN (deleted)" ]; then
+        kill "$VALUE" 2>/dev/null || true
+      fi ;;
+  esac
+fi
+if iptables -t nat -S OUTPUT 2>/dev/null | grep -F -- "-j $CHAIN" >/dev/null; then
+  echo ROUTE_STILL_ACTIVE
+elif iptables -t nat -S "$CHAIN" >/dev/null 2>&1; then
+  echo ROUTE_STILL_ACTIVE
+else
+  rm -rf "$ROOT"
+  echo ROUTE_REMOVED
+fi
+"""
+        report = adb.shell_output(
+            serial, "sh -c " + shlex.quote(script), timeout=25.0,
+        )
+        if "ROUTE_REMOVED" not in report:
+            raise HttpsInterceptionCollectorError(
+                "Не удалось подтвердить удаление старых правил HTTPS"
+            )
+        # Removing an absent reverse mapping is harmless; some ADB versions
+        # return an error when it does not exist.
+        try:
+            adb.remove_reverse_tcp(serial, cls.DEVICE_PROXY_PORT)
+        except AdbError:
+            pass
+        return {
+            "proxy_before": previous,
+            "proxy_after": current,
+            "managed_proxy_removed": previous == cls.MANAGED_PROXY,
+            "route_removed": True,
+        }
+
     def _configure_proxy(self) -> None:
         serial = self._serial
         current = self.adb.shell_output(
@@ -571,7 +655,12 @@ test -s "$SYSTEM/{self._ca_subject_hash}.0"
             "global",
             "http_proxy",
         ).strip()
-        self._previous_proxy = current
+        # A leftover copy of our own address is not a valid previous
+        # configuration: restoring it after stop would strand Android on a
+        # proxy that is no longer listening.
+        self._previous_proxy = (
+            ":0" if current == self.MANAGED_PROXY else current
+        )
         self.adb.reverse_tcp(
             serial,
             device_port=self.DEVICE_PROXY_PORT,
@@ -768,22 +857,30 @@ fi
                 previous = (
                     self._previous_proxy
                     if self._previous_proxy not in {
-                        None,
-                        "",
-                        "null",
+                        None, "", "null", self.MANAGED_PROXY,
                     }
                     else ":0"
                 )
-                self.adb.shell_output(
-                    serial,
-                    "settings",
-                    "put",
-                    "global",
-                    "http_proxy",
-                    previous,
+                current = self.adb.shell_output(
+                    serial, "settings", "get", "global", "http_proxy",
+                ).strip()
+                if current == self.MANAGED_PROXY:
+                    self.adb.shell_output(
+                        serial, "settings", "put", "global", "http_proxy",
+                        previous,
+                    )
+                    verified = self.adb.shell_output(
+                        serial, "settings", "get", "global", "http_proxy",
+                    ).strip()
+                    if verified == self.MANAGED_PROXY:
+                        raise HttpsInterceptionCollectorError(
+                            "Прокси Android не отключился после анализа"
+                        )
+                # A user-changed proxy is left untouched.
+            except Exception as exc:
+                self._proxy_cleanup_error = (
+                    "Не удалось восстановить прокси Android: " + str(exc)
                 )
-            except Exception:
-                pass
             self._proxy_configured = False
         if self._reverse_configured:
             try:
@@ -894,6 +991,7 @@ rm -rf /data/local/tmp/apk-research/https-ca /data/local/tmp/apk-research/https
                     else None
                 ),
                 "previous_android_proxy": self._previous_proxy,
+                "proxy_cleanup_error": self._proxy_cleanup_error,
                 "system_ca_injected": self._ca_injected,
                 "target_uid": self._route_uid,
                 "direct_tcp443_route_configured": self._route_active,
