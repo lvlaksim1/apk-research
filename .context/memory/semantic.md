@@ -32,3 +32,14 @@ v0.17.0 Unified Evidence Explorer is presentation-only. It navigates existing Ti
 
 - source: private owner-supplied Research ZIP inspected 2026-10-14 and verified main source at `be63ad0e00894da424660cbb1a6da91ed69dd0ce`
 - authority: owner evidence plus inspected repository source; hypotheses explicitly qualified
+
+## 2026-10-14 — Retained Android global proxy after HTTPS analysis stop (verified defect, not fixed)
+
+- Owner field test reports **the same Mail.ru “no internet” authentication error with network analysis turned off**. This supersedes the earlier assumption that the error requires an actively running HTTPS analyzer. No off-mode Research ZIP or new log has yet been captured, so identical root cause of the app error is not independently proven.
+- Concrete archive evidence: private v0.38.0 Research ZIP `20261014T154140.312362Z-81d7ef81.research.zip`, `02_normalized/http-interception.json`, records `previous_android_proxy: "127.0.0.1:38887"`, exactly equal to `device_proxy`. Thus the **global Android proxy was already set to the application's own analyzer address before that analyzer's start at 15:40:11 UTC**; this is positive evidence of a stale or pre-existing setting, not an inference that the recording caused it.
+- Verified main code at `be63ad0e00894da424660cbb1a6da91ed69dd0ce`: `HttpsInterceptionCollector._configure_proxy` saves whatever is in `settings get global http_proxy` into `_previous_proxy`, then writes `127.0.0.1:38887`. On stop, `_cleanup_device_best_effort` blindly restores `_previous_proxy` even if identical to its own address, and removes the ADB reverse mapping. **When the recorded pre-existing value is identical to the analyzer address, a normal stop therefore leaves a now-dead proxy address configured**. This is a reproducible logic defect that can cause the network failure to persist when analysis is turned off.
+- Next safe diagnostic: after the analyzer has fully stopped, read `adb shell settings get global http_proxy`; if it reads `127.0.0.1:38887`, reset it to `:0` and verify again. Also verify the routing chain is removed; repeat Mail.ru authentication. A clean per-app route design and explicit proxy-state restore verification are candidate product corrections, but no code/release was authorized by this owner observation alone.
+- Do not claim the Mail.ru app's TLS behavior is resolved until a new off/on controlled test confirms it. Do not commit user-supplied private ZIP, account information, or credentials.
+
+- provenance: owner follow-up statement (2026-10-14), private Research ZIP metadata, GitHub collector implementation verified 2026-10-14
+- authority: verified source logic plus owner field observation; root cause of remaining Mail.ru error still under test
