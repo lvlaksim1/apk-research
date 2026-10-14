@@ -13,8 +13,11 @@ from apk_research.collectors.https_interception import (
 
 
 class FakeAdb:
-    def __init__(self, listed: str = "package:com.example.target uid:10156\n"):
+    def __init__(self, listed: str = "package:com.example.target uid:10156\n", proxy: str = ":0"):
         self.listed = listed
+        self.proxy = proxy
+        self.reverse_removed = False
+        self.proxy_write_rejected = False
         self.shells: list[str] = []
         self.remote_dirs: list[str] = []
         self.uploads: list[tuple[str, str]] = []
@@ -23,6 +26,12 @@ class FakeAdb:
     def shell_output(self, serial, *arguments, timeout=10):
         assert serial == "emulator-5554"
         self.shells.append(" ".join(str(a) for a in arguments))
+        if arguments[:4] == ("settings", "get", "global", "http_proxy"):
+            return self.proxy + "\n"
+        if arguments[:4] == ("settings", "put", "global", "http_proxy"):
+            if not self.proxy_write_rejected:
+                self.proxy = str(arguments[4])
+            return ""
         if arguments[0] == "cmd":
             return self.listed
         if any("ROUTE_REMOVED" in str(a) for a in arguments):
@@ -30,6 +39,12 @@ class FakeAdb:
         if any("ROUTE_ACTIVE" in str(a) for a in arguments):
             return "ROUTE_ACTIVE\n"
         return ""
+
+    def reverse_tcp(self, serial, device_port, host_port):
+        self.shells.append("reverse " + str(device_port))
+
+    def remove_reverse_tcp(self, serial, port):
+        self.reverse_removed = True
 
     def make_remote_directory(self, serial, path):
         self.remote_dirs.append(path)
@@ -122,3 +137,73 @@ def test_metadata_records_scope_and_route_usage(tmp_path):
     assert data["direct_tcp443_route_configured"] is False
     assert data["transport_intervention"]["other_android_apps_unmodified"]
     assert data["transport_intervention"]["quic_udp443_not_handled"]
+
+
+def test_managed_proxy_left_by_previous_session_is_cleared(tmp_path):
+    adb = FakeAdb(proxy="127.0.0.1:38887")
+    result = HttpsInterceptionCollector.restore_stale_android_network(
+        adb, "emulator-5554",
+    )
+    assert result["managed_proxy_removed"] is True
+    assert result["proxy_after"] == ":0"
+    assert result["route_removed"] is True
+    assert adb.proxy == ":0"
+    assert adb.reverse_removed
+    commands = "\n".join(adb.shells)
+    assert "CHAIN=APKRS_HTTPS32" in commands
+    assert 'iptables -t nat -D OUTPUT "$@"' in commands
+    assert "iptables -t nat -X" in commands
+
+
+def test_restoration_preserves_unrelated_user_proxy(tmp_path):
+    adb = FakeAdb(proxy="192.168.7.10:8888")
+    result = HttpsInterceptionCollector.restore_stale_android_network(
+        adb, "emulator-5554",
+    )
+    assert result["managed_proxy_removed"] is False
+    assert result["proxy_after"] == "192.168.7.10:8888"
+    assert adb.proxy == "192.168.7.10:8888"
+    assert not any("settings put" in call for call in adb.shells)
+
+
+def test_restoration_fails_if_owned_proxy_cannot_be_disabled(tmp_path):
+    adb = FakeAdb(proxy="127.0.0.1:38887")
+    adb.proxy_write_rejected = True
+    with pytest.raises(HttpsInterceptionCollectorError, match="прокси"):
+        HttpsInterceptionCollector.restore_stale_android_network(
+            adb, "emulator-5554",
+        )
+    assert adb.proxy == "127.0.0.1:38887"
+
+
+def test_normal_analysis_does_not_restore_its_own_stale_proxy(tmp_path):
+    adb = FakeAdb(proxy="127.0.0.1:38887")
+    collector = _collector(tmp_path, adb)
+    collector._host_port = 51515
+    collector._configure_proxy()
+    assert collector._previous_proxy == ":0"
+    assert collector._proxy_configured
+    collector._cleanup_device_best_effort()
+    assert adb.proxy == ":0"
+    assert collector._proxy_cleanup_error is None
+
+
+def test_stop_preserves_proxy_changed_by_user_during_analysis(tmp_path):
+    adb = FakeAdb(proxy="10.0.0.2:8080")
+    collector = _collector(tmp_path, adb)
+    collector._host_port = 51515
+    collector._configure_proxy()
+    assert collector._previous_proxy == "10.0.0.2:8080"
+    adb.proxy = "10.0.0.3:9090"
+    collector._cleanup_device_best_effort()
+    assert adb.proxy == "10.0.0.3:9090"
+
+
+def test_cleanup_surfaces_failure_to_restore_proxy(tmp_path):
+    adb = FakeAdb(proxy=":0")
+    collector = _collector(tmp_path, adb)
+    collector._host_port = 51515
+    collector._configure_proxy()
+    adb.proxy_write_rejected = True
+    collector._cleanup_device_best_effort()
+    assert "Не удалось восстановить" in collector._proxy_cleanup_error

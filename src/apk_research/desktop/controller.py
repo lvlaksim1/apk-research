@@ -52,6 +52,7 @@ class DesktopController(QObject):
     installedAppsReady = Signal(list)
     analysisStarted = Signal(dict)
     analysisStopped = Signal(str)
+    networkRestored = Signal(dict)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -129,6 +130,36 @@ class DesktopController(QObject):
         self._thread(
             self._prepare_environment_worker
         )
+
+    def restore_android_network(self) -> None:
+        """Run managed-network recovery outside the GUI thread."""
+        if self._analysis_running.is_set() or (
+            self._analysis_thread is not None
+            and self._analysis_thread.is_alive()
+        ) or (self._research_thread is not None
+              and self._research_thread.is_alive()):
+            self.error.emit("Сначала остановите анализ HTTPS и запись ZIP")
+            return
+        self._thread(self._restore_android_network_worker)
+
+    def _restore_android_network_worker(self) -> None:
+        try:
+            self._set_busy(True)
+            self.runtime.ensure_ready(
+                self._progress_callback, self._display_ready_callback,
+            )
+            client = AdbClient(self.runtime.paths.adb)
+            result = HttpsInterceptionCollector.restore_stale_android_network(
+                client, self.runtime.SERIAL,
+            )
+            self.log.emit("Сеть Android восстановлена: "
+                          + str(result["proxy_after"]))
+            self.networkRestored.emit(result)
+        except Exception as exc:
+            self.error.emit("Восстановление сети Android: "
+                            + (str(exc) or exc.__class__.__name__))
+        finally:
+            self._set_busy(False)
 
     def launch_installed_package(self) -> None:
         if not self.package_name:
@@ -664,6 +695,12 @@ class DesktopController(QObject):
             self.runtime.ensure_ready(
                 self._progress_callback,
                 self._display_ready_callback,
+            )
+            # Clean orphaned managed proxy/route after an interrupted
+            # earlier run before declaring Android ready for use.
+            client = AdbClient(self.runtime.paths.adb)
+            HttpsInterceptionCollector.restore_stale_android_network(
+                client, self.runtime.SERIAL,
             )
             self._start_screen_stream(
                 wait_for_first_frame=True,
