@@ -368,3 +368,40 @@ def test_large_zlib_body_paging_live_and_archived(app, tmp_path):
     finally:
         view.timer.stop()
         view.close()
+
+
+
+def test_replay_dialog_json_pretty_and_original_evidence_unchanged(app, tmp_path):
+    from apk_research.desktop.replay_dialog import (
+        ReplayDialog, _edited_bytes, _body_for_editor,
+    )
+    assert _body_for_editor(b'{"a":1,"b":{"x":2}}')[1].startswith('{\n  "a": 1')
+    assert _body_for_editor(b"\x00\xff") == ("hex", "00 ff")
+    assert _edited_bytes("00 ff", "hex") == b"\x00\xff"
+
+    body = b'{"a":1,"b":{"x":2}}'
+    path = tmp_path / "02_normalized/http-bodies"
+    path.mkdir(parents=True)
+    (path / "one.request.body").write_bytes(body)
+    record = {
+        "method": "POST", "url": "https://example.com/items",
+        "request": {
+            "headers": [["content-type", "application/json"], ["Host", "example.com"]],
+            "body": {"present": True, "path": "one.request.body"},
+        },
+    }
+    dialog = ReplayDialog(record, session_root=tmp_path)
+    try:
+        assert dialog.method.currentText() == "POST"
+        assert '"a": 1' in dialog.request_body.toPlainText()
+        assert '"x": 2' in dialog.request_body.toPlainText()
+        assert dialog.send.isEnabled()
+        dialog.request_mode.setCurrentIndex(1)
+        assert body[:3].hex(" ") in dialog.request_body.toPlainText() is False or (
+            "7b 0a" in dialog.request_body.toPlainText()
+        )
+        dialog.request_mode.setCurrentIndex(0)
+        assert '"a": 1' in dialog.request_body.toPlainText()
+        assert (path / "one.request.body").read_bytes() == body
+    finally:
+        dialog.close()
