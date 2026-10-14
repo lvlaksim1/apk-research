@@ -43,3 +43,14 @@ v0.17.0 Unified Evidence Explorer is presentation-only. It navigates existing Ti
 
 - provenance: owner follow-up statement (2026-10-14), private Research ZIP metadata, GitHub collector implementation verified 2026-10-14
 - authority: verified source logic plus owner field observation; root cause of remaining Mail.ru error still under test
+
+## 2026-10-14 — v0.38.2 Android network recovery fix merged (release pipeline pending at time of record)
+
+- Supersedes both preceding "not fixed" diagnostic sections as to **implementation status**, but does NOT prove Mail.ru login now succeeds on the owner's computer.
+- Owner requested direct implementation without further manual experiments. PR #43 `fix/v0.38.2-android-network-recovery` merged to product `main`, commit `ce09a1ec1a0086ad797c667a2d2ca59351747708`. Changes: normalize stale `127.0.0.1:38887` proxy when starting, verified proxy cleanup on stop, selective stale route/proxy/ADB reverse restoration from "Подготовить Android" and new "Восстановить сеть Android" button, preserve unrelated proxy, report cleanup failure.
+- PR verification on head `34c71b4c67ecf1ad31c233a49b2cbf547e7efb9f`: core CI #38601002524, Android AVD #38601002729, ARM64 #38601003020, Windows build/provisioning/setup/update #38601002938 and storage #38601002895 all **success**.
+- Main release workflow #38602120990 was **in progress** at record time; do not claim v0.38.2 published without checking its final result and GitHub Release artifacts. Secondary WHPX may remain queued and is non-gating.
+- The fix addresses the proven stale proxy defect; independent TLS app trust/pinning has not been modified. Keep the prior private Research ZIP out of the repository.
+- provenance: GitHub PR/Actions/main commit verified during user-directed implementation 2026-10-14
+- authority: verified product repository / CI; owner field acceptance still pending
+
