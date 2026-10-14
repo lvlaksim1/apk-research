@@ -20,3 +20,12 @@ Durable manager updates go to the permanent `context` branch, not feature branch
 
 - source: canonical Context Capsule install protocol and owner-approved bootstrap
 - authority: verified-core-protocol
+
+## v0.38.2 release documentation gate — verified rule
+
+Before the next release, synchronize the version in `README.md`, `REFACTORING.md`, `CHANGELOG.md`, `RELEASE_NOTES.md`, `pyproject.toml`, and `src/apk_research/__init__.py`. The Publish Release job checks the document strings and refuses publication if any required version entry is missing. This blocked the first v0.38.2 release attempt #38602120990. The corrected final complete pipeline #38604038134 succeeded.
+
+A transient Android ADB 255 failure requires examining the job log and bounded retest, not bypassing a required acceptance gate; v0.38.2 passed on a repeated AVD check.
+
+- provenance: verified GitHub Actions logs and final published v0.38.2, 2026-10-14
+- authority: verified repository procedure

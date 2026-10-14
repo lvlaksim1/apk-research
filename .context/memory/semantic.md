@@ -54,3 +54,11 @@ v0.17.0 Unified Evidence Explorer is presentation-only. It navigates existing Ti
 - provenance: GitHub PR/Actions/main commit verified during user-directed implementation 2026-10-14
 - authority: verified product repository / CI; owner field acceptance still pending
 
+## 2026-10-14 — v0.38.2 published, Android network restoration
+
+The previously verified stale `127.0.0.1:38887` proxy defect was fixed in PR #43 and published as v0.38.2 at `75665ad39b103703ba5cd7b60823d411a43fcfab`. Main CI/AVD/Windows/Release #38604038134 completed successfully. Preparation of Android and the new explicit "Восстановить сеть Android" control clear only apk-research's abandoned proxy/routing state; the ordinary stop path no longer restores its own dead proxy. Data and unrelated proxies are preserved.
+
+This corrects older memory entries stating the defect was "not fixed." **User field acceptance of Mail.ru login is still unknown**. The release did not remove custom TLS trust limits.
+
+- provenance: private owner-supplied Research ZIP and owner off-analysis observation; reviewed implementation, merged PR #43, published release and completed main pipeline
+- authority: verified product/release, field result pending
