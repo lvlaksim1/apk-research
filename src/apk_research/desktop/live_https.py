@@ -63,6 +63,13 @@ class LiveHttpsView(QWidget):
         self.open_archive_button.clicked.connect(self._choose_archive)
         search_row.addWidget(self.open_archive_button)
         outer.addLayout(search_row)
+        self.replay_button = QPushButton("Изменить и отправить…")
+        self.replay_button.setEnabled(False)
+        self.replay_button.setToolTip(
+            "Изменить копию запроса и отправить вручную; исходный ZIP не меняется."
+        )
+        self.replay_button.clicked.connect(self._open_replay_dialog)
+        header.addWidget(self.replay_button)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
         self.table = QTableWidget(0, 5)
@@ -155,6 +162,7 @@ class LiveHttpsView(QWidget):
         self.transactions.clear()
         self.filtered_indices.clear()
         self._selected_preview_id = None
+        self.replay_button.setEnabled(False)
         self.body_page.blockSignals(True)
         self.body_page.setValue(1)
         self.body_page.blockSignals(False)
@@ -467,6 +475,26 @@ class LiveHttpsView(QWidget):
         self.response_headers.setPlainText(_header_text(response.get("headers")))
         self.request_body.setPlainText(self._body_preview(request.get("body")))
         self.response_body.setPlainText(self._body_preview(response.get("body")))
+        self.replay_button.setEnabled(
+            str(record.get("url") or "").startswith("https://")
+        )
+
+    def _open_replay_dialog(self) -> None:
+        row = self.table.currentRow()
+        if row < 0:
+            return
+        first = self.table.item(row, 0)
+        index = first.data(Qt.ItemDataRole.UserRole) if first else None
+        if not isinstance(index, int) or not (0 <= index < len(self.transactions)):
+            return
+        from apk_research.desktop.replay_dialog import ReplayDialog
+        dialog = ReplayDialog(
+            self.transactions[index],
+            archive_path=self.archive_path,
+            session_root=self.session_root if self.archive_path is None else None,
+            parent=self,
+        )
+        dialog.exec()
 
     def _body_mode_changed(self, *_args) -> None:
         self.body_page.setEnabled(self.body_mode.currentData() == "text")
