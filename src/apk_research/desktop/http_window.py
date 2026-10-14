@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPushButton,
     QComboBox,
     QSpinBox,
     QMainWindow,
@@ -148,6 +149,13 @@ class HttpTransactionsWindow(QMainWindow):
         top.addWidget(self.search, 1)
         self.count_label = QLabel()
         top.addWidget(self.count_label)
+        self.replay_button = QPushButton("Изменить и отправить…")
+        self.replay_button.setToolTip(
+            "Повторная отправка вручную; оригинальная запись и ZIP не меняются."
+        )
+        self.replay_button.setEnabled(False)
+        self.replay_button.clicked.connect(self._open_replay_dialog)
+        top.addWidget(self.replay_button)
         layout.addLayout(top)
 
         splitter = QSplitter(
@@ -410,6 +418,9 @@ class HttpTransactionsWindow(QMainWindow):
             transaction.get("request")
             or {}
         )
+        self.replay_button.setEnabled(
+            str(transaction.get("url") or "").startswith("https://")
+        )
         response = (
             transaction.get("response")
             or {}
@@ -499,6 +510,16 @@ class HttpTransactionsWindow(QMainWindow):
             )
         )
 
+    def _open_replay_dialog(self) -> None:
+        row = self.table.currentRow()
+        if not (0 <= row < len(self.filtered)):
+            return
+        from apk_research.desktop.replay_dialog import ReplayDialog
+        dialog = ReplayDialog(
+            self.filtered[row], archive_path=self.archive_path, parent=self
+        )
+        dialog.exec()
+
     def _body_mode_changed(self, *_args) -> None:
         self.body_page.setEnabled(self.body_mode.currentData() == "text")
         row = self.table.currentRow()
@@ -534,6 +555,7 @@ class HttpTransactionsWindow(QMainWindow):
         )
 
     def _clear_details(self) -> None:
+        self.replay_button.setEnabled(False)
         for widget in (
             self.summary,
             self.request_headers,
