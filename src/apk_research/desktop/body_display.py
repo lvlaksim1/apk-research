@@ -31,6 +31,10 @@ def _content_params(content_type: str) -> Message:
     header = Message()
     # Never allow a header value to inject extra email parser headers.
     safe = content_type.replace("\r", "").replace("\n", "")
+    # A few observed applications use a comma instead of a semicolon.
+    safe = re.sub(
+        r",\s*(boundary\s*=)", r"; \1", safe, flags=re.IGNORECASE
+    )
     header["Content-Type"] = safe
     return header
 
