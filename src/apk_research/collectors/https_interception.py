@@ -675,6 +675,9 @@ fi
             "http_proxy",
             f"127.0.0.1:{self.DEVICE_PROXY_PORT}",
         )
+        # Even if subsequent verification fails, startup cleanup must undo
+        # the setting we have just written.
+        self._proxy_configured = True
         verified = self.adb.shell_output(
             serial,
             "settings",
