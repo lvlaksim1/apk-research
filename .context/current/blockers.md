@@ -1,10 +1,5 @@
 # Current Blockers and Unknowns
 
-2026-10-14 generation36. v0.37.0 published, main workflow #38539863949 passed. **No release blockers.**
+Поколение 37; v0.37.1 опубликована, pipeline #38553459909 полностью SUCCESS. **Нет препятствий для публикации.**
 
-- Owner v0.37 hands-on acceptance for actual `ch.pala.resources` data remains unverified; without the saved body cannot know whether zlib yields JSON or proprietary binary.
-- Compact UI text preview is intentionally limited to 128KiB; HEX view to 4096 bytes, underlying body stored unchanged.
-- Format guessing beyond confirmed gzip/zlib/multipart is prohibited.
-- Previous Android status bar on owner's third-party APK remains a per-app field question, not a proven current defect.
-- TLS custom trust, pinned certificates, QUIC/HTTP3 and non-IPv4 paths remain outside guaranteed read scope.
-- No Settings tab; privacy and no public research ZIP/credentials remain mandatory.
+Не проверено владельцем: показывает ли текст реальный 49 433-байтный application/zlib после распаковки; возможно, внутри собственный двоичный протокол. Без исходного тела точное содержимое не устанавливается. До 8 МиБ распаковки, по 128 КиБ на фрагмент; за пределом безопасной распаковки — частичный результат с предупреждением. Старые ограничения QUIC/IPv6/custom certificate остаются, как и визуальная особенность Android status bar у отдельных приложений. Исходные ZIP/токены не публиковать. Новую вкладку «Настройки» не добавлять.

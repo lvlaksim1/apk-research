@@ -1,5 +1,13 @@
 # Manager goals
 
+## Текущий ориентир — поколение 37
+
+В v0.37.1 корректные большие zlib/gzip-ответы не должны ошибочно объявляться повреждёнными из-за размера 128 КиБ. Отображать до 8 МиБ распакованного содержимого по 128-КиБ фрагментам, неизменно сохранять исходный HEX/ZIP; не домысливать двоичные форматы. Базовый коммит `41b3105aa4e2335a975eb6d126e61ed771e32b59`. Сохранить независимый режим HTTPS/ZIP и отказ от вкладки настроек.
+
+---
+
+## Предыдущие поколения (история)
+
 ## Current goal — v0.37.0
 
 Keep published text/HEX presentation reliable and non-destructive. Maintain bounded gzip/zlib/multipart decoding in live and saved ZIP; preserve RAW evidence and all v0.36 interaction semantics. Ask for owner field sample when a binary protocol remains after decompression; never guess missing content. Exact main aa2cb71ab637c203810174a521e62aa1cf05c5df.
