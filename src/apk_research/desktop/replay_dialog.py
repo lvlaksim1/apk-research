@@ -134,6 +134,10 @@ class ReplayDialog(QDialog):
         self.request_mode.setCurrentIndex(1 if text_mode == "hex" else 0)
         self.request_mode.currentIndexChanged.connect(self._convert_request_mode)
         mode_row.addWidget(self.request_mode)
+        self.pretty_button = QPushButton("Форматировать JSON")
+        self.pretty_button.setEnabled(text_mode == "text")
+        self.pretty_button.clicked.connect(self._pretty_request_json)
+        mode_row.addWidget(self.pretty_button)
         mode_row.addStretch()
         request_layout.addLayout(mode_row)
         self.request_body = QPlainTextEdit(initial_text)
@@ -200,7 +204,23 @@ class ReplayDialog(QDialog):
             str(self.request_mode.currentData()),
         )
 
+    def _pretty_request_json(self) -> None:
+        if self.request_mode.currentData() != "text":
+            return
+        try:
+            value = json.loads(self.request_body.toPlainText())
+        except json.JSONDecodeError:
+            QMessageBox.warning(
+                self, "Форматирование JSON",
+                "Текст пока не является корректным JSON.",
+            )
+            return
+        self.request_body.setPlainText(
+            json.dumps(value, indent=2, ensure_ascii=False)
+        )
+
     def _convert_request_mode(self, *_args) -> None:
+        self.pretty_button.setEnabled(self.request_mode.currentData() == "text")
         current = self.request_body.toPlainText()
         destination = self.request_mode.currentData()
         previous = "hex" if destination == "text" else "text"

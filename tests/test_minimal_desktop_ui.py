@@ -405,7 +405,9 @@ def test_replay_dialog_json_pretty_and_original_evidence_unchanged(app, tmp_path
         assert dialog._prepared_body() == body
         dialog.request_body.setPlainText('{"a":3}')
         assert dialog._prepared_body() == b'{"a":3}'
+        dialog.pretty_button.click()
         assert '"a": 3' in dialog.request_body.toPlainText()
+        assert b'\n' in dialog._prepared_body()
         assert (path / "one.request.body").read_bytes() == body
     finally:
         dialog.close()
