@@ -124,6 +124,7 @@ class HttpTransactionsWindow(QMainWindow):
         self.filtered: list[dict] = list(
             self.transactions
         )
+        self._replay_dialogs: list = []
         self.setWindowTitle(
             "HTTP/HTTPS — " + self.archive_path.name
         )
@@ -311,16 +312,15 @@ class HttpTransactionsWindow(QMainWindow):
                     ).get("tls_decrypted")
                     else "нет"
                 ),
-                str(
-                    transaction.get("method")
-                    or ""
-                ),
+                ("↻ " if transaction.get("capture_mode") == "manual_replay" else "")
+                + str(transaction.get("method") or ""),
                 str(
                     transaction.get("host")
                     or parsed.hostname
                     or ""
                 ),
-                parsed.path
+                ("↻ " if transaction.get("capture_mode") == "manual_replay" else "")
+                + parsed.path
                 + (
                     ("?" + parsed.query)
                     if parsed.query
@@ -329,10 +329,7 @@ class HttpTransactionsWindow(QMainWindow):
                 str(
                     response.get("status_code")
                     if response
-                    else transaction.get(
-                        "state"
-                    )
-                    or ""
+                    else transaction.get("state") or ""
                 ),
                 content_type,
                 (
@@ -379,8 +376,8 @@ class HttpTransactionsWindow(QMainWindow):
             values: list[dict] = []
             for transaction in self.transactions:
                 haystack = json.dumps(
-                    transaction,
-                    ensure_ascii=False,
+                    transaction, ensure_ascii=False,
+                    default=lambda value: "" if isinstance(value, bytes) else str(value),
                 ).lower()
                 if needle in haystack:
                     values.append(transaction)
@@ -427,6 +424,10 @@ class HttpTransactionsWindow(QMainWindow):
         )
         summary = [
             f"ID: {transaction.get('transaction_id', '—')}",
+            *(
+                ["↻ Повторная отправка с компьютера (не в ZIP)"]
+                if transaction.get("capture_mode") == "manual_replay" else []
+            ),
             f"{transaction.get('method', '')} {transaction.get('url', '')}",
             (
                 "Статус: "
@@ -518,7 +519,28 @@ class HttpTransactionsWindow(QMainWindow):
         dialog = ReplayDialog(
             self.filtered[row], archive_path=self.archive_path, parent=self
         )
-        dialog.exec()
+        dialog.replayChanged.connect(self._upsert_replay_record)
+        self._replay_dialogs.append(dialog)
+        dialog.finished.connect(
+            lambda _result, item=dialog: (
+                self._replay_dialogs.remove(item)
+                if item in self._replay_dialogs else None
+            )
+        )
+        dialog.show()
+
+    def _upsert_replay_record(self, record: dict) -> None:
+        key = record.get("transaction_id")
+        if record.get("capture_mode") != "manual_replay" or not key:
+            return
+        for index, existing in enumerate(self.transactions):
+            if (existing.get("transaction_id") == key
+                    and existing.get("capture_mode") == "manual_replay"):
+                self.transactions[index] = record
+                break
+        else:
+            self.transactions.append(record)
+        self._apply_filter(self.search.text())
 
     def _body_mode_changed(self, *_args) -> None:
         self.body_page.setEnabled(self.body_mode.currentData() == "text")
@@ -530,6 +552,16 @@ class HttpTransactionsWindow(QMainWindow):
         self,
         body: dict,
     ) -> str:
+        data = body.get("_inline_bytes")
+        if isinstance(data, bytes):
+            return _decode_body(
+                data,
+                str(body.get("content_type") or ""),
+                str(body.get("content_encoding") or ""),
+                mode=str(self.body_mode.currentData() or "text"),
+                truncated=bool(body.get("_limited")),
+                page=self.body_page.value() - 1,
+            )
         path = body.get("path")
         if not path:
             return ""

@@ -102,6 +102,11 @@ def read_captured_body(
     record: dict, archive_path: Path | None, session_root: Path | None,
 ) -> bytes:
     body = (record.get("request") or {}).get("body") or {}
+    inline = body.get("_inline_bytes")
+    if isinstance(inline, bytes):
+        if len(inline) > MAX_REQUEST_BYTES:
+            raise ReplayError("Тело запроса больше 8 МиБ.")
+        return inline
     if not body.get("present"):
         return b""
     name = body.get("path")

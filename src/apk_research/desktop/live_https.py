@@ -37,6 +37,7 @@ class LiveHttpsView(QWidget):
         self.archive_path: Path | None = None
         self._reader: IncrementalHttpReader | None = None
         self.transactions: list[dict] = []
+        self._replay_dialogs: list = []
         self._selected_preview_id = None
         self.filtered_indices: list[int] = []
         self._sort_column = 0
@@ -209,7 +210,13 @@ class LiveHttpsView(QWidget):
         self.refresh()
         self.timer.stop()
         if archive and Path(archive).is_file():
+            manual = [
+                record for record in self.transactions
+                if record.get("capture_mode") == "manual_replay"
+            ]
             self.load_archive(archive)
+            for record in manual:
+                self._upsert_replay_record(record)
             self.note.setText(
                 "Исследование завершено. Показаны данные сохранённого Research ZIP."
             )
@@ -418,10 +425,15 @@ class LiveHttpsView(QWidget):
                 parsed = urlsplit(url)
                 values = [
                     time_text,
-                    str(record.get("method") or "—"),
+                    ("↻ " if record.get("capture_mode") == "manual_replay" else "")
+                    + str(record.get("method") or "—"),
                     str(record.get("host") or parsed.hostname or "—"),
-                    parsed.path + (("?" + parsed.query) if parsed.query else ""),
-                    str((record.get("response") or {}).get("status_code") or "Ошибка"),
+                    ("↻ " if record.get("capture_mode") == "manual_replay" else "")
+                    + parsed.path + (("?" + parsed.query) if parsed.query else ""),
+                    str(
+                        (record.get("response") or {}).get("status_code")
+                        or record.get("state") or "Ошибка"
+                    ),
                 ]
                 for col, value in enumerate(values):
                     cell = QTableWidgetItem(value)
@@ -467,7 +479,10 @@ class LiveHttpsView(QWidget):
         response = record.get("response") or {}
         self.info.setPlainText(
             str(record.get("method") or "") + " " + str(record.get("url") or "")
-            + "\nHTTP: " + str(response.get("status_code") or "Ошибка")
+            + ("\n↻ Повторная отправка с компьютера (не в ZIP)"
+               if record.get("capture_mode") == "manual_replay" else "")
+            + "\nHTTP: " + str(response.get("status_code")
+                                or record.get("state") or "Ошибка")
             + "\nДлительность: " + str(record.get("duration_ms") or 0) + " мс"
             + ("\nОшибка: " + str(record.get("error")) if record.get("error") else "")
         )
@@ -494,7 +509,40 @@ class LiveHttpsView(QWidget):
             session_root=self.session_root if self.archive_path is None else None,
             parent=self,
         )
-        dialog.exec()
+        source = (self.session_root, self.archive_path)
+        dialog.replayChanged.connect(
+            lambda record, context=source: (
+                self._upsert_replay_record(record)
+                if context == (self.session_root, self.archive_path) else None
+            )
+        )
+        self._replay_dialogs.append(dialog)
+        dialog.finished.connect(
+            lambda _result, item=dialog: (
+                self._replay_dialogs.remove(item)
+                if item in self._replay_dialogs else None
+            )
+        )
+        dialog.show()
+
+    def _upsert_replay_record(self, record: dict) -> None:
+        key = record.get("transaction_id")
+        if record.get("capture_mode") != "manual_replay" or not key:
+            return
+        index = next(
+            (i for i, row in enumerate(self.transactions)
+             if row.get("transaction_id") == key
+             and row.get("capture_mode") == "manual_replay"),
+            None,
+        )
+        if index is None:
+            self.transactions.append(record)
+        else:
+            self.transactions[index] = record
+        self._apply_filter()
+        self.count.setText(f"{len(self.transactions)} запросов"
+                           " (↻ — вручную)")
+        self.countChanged.emit(len(self.transactions))
 
     def _body_mode_changed(self, *_args) -> None:
         self.body_page.setEnabled(self.body_mode.currentData() == "text")
@@ -505,6 +553,16 @@ class LiveHttpsView(QWidget):
     def _body_preview(self, details) -> str:
         if not isinstance(details, dict) or not details.get("present"):
             return "Тело отсутствует"
+        raw = details.get("_inline_bytes")
+        if isinstance(raw, bytes):
+            return _decode_body(
+                raw,
+                str(details.get("content_type") or ""),
+                str(details.get("content_encoding") or ""),
+                mode=str(self.body_mode.currentData() or "text"),
+                truncated=bool(details.get("_limited")),
+                page=self.body_page.value() - 1,
+            )
         name = details.get("path")
         if not isinstance(name, str) or not name or Path(name).name != name:
             return "Путь к телу ответа не подтверждён"
