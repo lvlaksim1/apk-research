@@ -1,13 +1,9 @@
 # Next Actions
 
-Verified 2026-10-14; capsule generation **35**; GitHub Release **v0.36.0**, main SHA `5f66b1940acd6b867d569d8a62faae4c338bde4f`, pipeline #38439063318 fully SUCCESS.
+Generation36, 2026-10-14. Published release v0.37.0 / main `aa2cb71ab637c203810174a521e62aa1cf05c5df` / final pipeline #38539863949 SUCCESS.
 
-1. Resume by reading `context` integrity marker and checking all coupled blob SHA-1 digests, then fetch live main and release.
-2. Provide owner versioned Update https://github.com/lvlaksim1/apk-research/releases/download/v0.36.0/apk-research-update_v0.36.0.exe or Setup https://github.com/lvlaksim1/apk-research/releases/download/v0.36.0/apk-research-setup_v0.36.0.exe as relevant. Do not assume v0.36.0 already installed.
-3. Request real field feedback: prepare Android; choose/install APK/XAPK; choose installed app and start HTTPS (app auto-launched after analysis starts, no ZIP); independently start/stop ZIP; verify HTTPS continues; open ZIP folder.
-4. Inspect method/domain header filters, combined search, 18 controls on emulator strip, absence of Settings tab, built-in updater under Program menu and saved UI state. Request screenshot for Android 15 top-bar concern.
-5. Review provided private ZIP locally for bounded interval, requests, bodies, PCAP/video/logs and SHA256 verification, without publishing confidential artifacts. Do not infer complete HTTPS visibility.
-6. Only for new explicit owner direction, branch from verified `main`, test candidate on CI + Android 15 + Windows Setup/Update/clean provisioning and ARM64 where appropriate, then merge, publish release through main pipeline, verify assets and reseal capsule. No bypasses.
-7. WHPX #38439063246 was queued at inspection; check fresh state if relevant, no presumption of success.
-
-No pending coding task is currently authorized; await owner test or a new request.
+1. Owner installs Update https://github.com/lvlaksim1/apk-research/releases/download/v0.37.0/apk-research-update_v0.37.0.exe or Setup https://github.com/lvlaksim1/apk-research/releases/download/v0.37.0/apk-research-setup_v0.37.0.exe and tests request/response "Текст (авто)" / "HEX" on `ch.pala.resources`.
+2. Verify observed 664-byte multipart form fields and 1190-byte `application/zlib` response decode where data permits. If it remains binary, do not invent; inspect only owner-supplied sample privately.
+3. Confirm saved ZIP and live views produce same result, byte-for-byte raw HEX retained, truncated/corrupt payloads handled safely.
+4. New coding only if owner reports a reproducible defect or authorizes another feature. Preserve separate HTTPS/ZIP workflows, 18 emulator controls and updater under Program.
+5. Next release, if requested: branch from verified main, run CI, Android 15 AVD, Windows Setup/Update/clean provisioning, merge exact tested SHA, validate published assets and reseal context.

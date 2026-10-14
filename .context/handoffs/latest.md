@@ -1,29 +1,15 @@
 # Latest Handoff
 
-Generation: **35**
-Date: 2026-10-14
-Manager: apk-research-project-manager
-Product authority: `main`
-Manager-state authority: `context`
+Manager apk-research-project-manager; **generation 36** (2026-10-14). Product main/release SHA `aa2cb71ab637c203810174a521e62aa1cf05c5df`. Published v0.37.0 https://github.com/lvlaksim1/apk-research/releases/tag/v0.37.0. Full main pipeline #38539863949 SUCCESS; Setup https://github.com/lvlaksim1/apk-research/releases/download/v0.37.0/apk-research-setup_v0.37.0.exe, Update https://github.com/lvlaksim1/apk-research/releases/download/v0.37.0/apk-research-update_v0.37.0.exe, SHA256SUMS published.
 
-## Current verified checkpoint
+- Version **v0.37.0** is PUBLISHED, release target/main SHA `aa2cb71ab637c203810174a521e62aa1cf05c5df`, published 2026-10-14, https://github.com/lvlaksim1/apk-research/releases/tag/v0.37.0.
+- Full main GitHub Actions run #38539863949 **SUCCESS**, including CI, Android 15 AVD, Windows build, v0.36-to-v0.37 Update, clean Windows provisioning, publishing and cleanup.
+- PR #39 implemented a **display-only** HTTP-body reader. No changes to source PCAP, HTTPS body bytes, collectors, packet routing, Research ZIP format, or checksums.
+- `desktop/body_display.py` renders `multipart/form-data` by MIME fields (also accepts real-world `, boundary=` headers); formats text and JSON; inflates gzip/zlib only if saved byte signatures confirm compression. The HTTPS recorder's `get_content(strict=False)` may already decompress the HTTP layer, so no redundant decompression from `Content-Encoding: gzip` alone.
+- `Текст (авто)` is default; `HEX` shows **original saved bytes**. Works in live `LiveHttpsView` and ZIP viewers, including `HttpTransactionsWindow`. Max raw preview 128 KiB, max decompressed 128 KiB, HEX 4096 bytes; malformed/unknown data remains binary with explanatory message.
+- Unit tests include 0x78da zlib with Content-Encoding gzip, multipart/form-data with comma-boundary, gzip, JSON, binary, damaged/truncated/zip-bomb data and original HEX. Windows GUI tests include switching modes in both live and archive. All release gates passed.
+- SHA256 (GitHub Release asset digest) Setup: `5c83dddc5a18dd2cc180bfc53048801eee7b34eb694fce1e7ef9545491556eeb`; Update: `dfa8b7854c50408a188d3376af3d5daa60809c1b90f50392a084984820fcf6c4`. Setup https://github.com/lvlaksim1/apk-research/releases/download/v0.37.0/apk-research-setup_v0.37.0.exe; Update https://github.com/lvlaksim1/apk-research/releases/download/v0.37.0/apk-research-update_v0.37.0.exe. `SHA256SUMS.txt` published.
+- Prior owner v0.36 report was generally working. NEW v0.37 behavior on `ch.pala.resources` still needs owner field acceptance: actual sample may contain an undocumented binary format after zlib. Never fabricate decoded fields or guarantee readable content.
+- Preserve owner-approved v0.36 workflow, separate HTTPS analysis and ZIP start/stop, 18 toolbar controls, filters by method/domain, updater under the Program menu. No new Settings tab (explicitly cancelled).
 
-- Product: published **v0.36.0**, main/Release commit `5f66b1940acd6b867d569d8a62faae4c338bde4f`; PR #38 merged.
-- Final main GitHub Actions #38439063318 **SUCCESS**: CI, Android 15, Windows build, clean Windows provisioning, publish and cleanup. PR final tests CI #38438091809, Windows #38438091746, Android #38438092086, ARM64 #38438091891 all passed.
-- Release https://github.com/lvlaksim1/apk-research/releases/tag/v0.36.0; Setup https://github.com/lvlaksim1/apk-research/releases/download/v0.36.0/apk-research-setup_v0.36.0.exe; Update https://github.com/lvlaksim1/apk-research/releases/download/v0.36.0/apk-research-update_v0.36.0.exe; `SHA256SUMS.txt` published.
-- Owner cancelled new `Настройки` tab; updater remains under `Программа` → `Обновление и обслуживание…`.
-- Left workflow: prepare Android → select APK/XAPK → install → choose installed app, start/stop HTTPS analysis → separate ZIP start/stop → open ZIP folder.
-- HTTPS analysis is started **before** automatic app launch; no ZIP is generated until the user starts recording. A single HTTPS analyzer/route persists during ZIP; the ZIP captures HTTPS and other materials for its bounded recording interval. Stopping ZIP does not stop HTTPS analysis or relaunch the app.
-- One main Research tab with Android + right-side HTTPS list and request details; all 18 emulator actions placed on slim strip (scroll when necessary); Method and Address headers filter by HTTP method/domain with multi-select/search; other headers sort.
-- No hands-on owner confirmation yet for installed v0.36.0. Android 15 status-bar overlap on actual owner's app not independently verified. Never invent per-app success; private Research ZIP and its tokens must not be made public.
-- Separate post-merge WHPX #38439063246 was queued when inspected on 2026-10-14; no assertion of success. It is not a failed gate of the fully successful main publication.
-
-## Downloads and published SHA256
-
-- Setup: https://github.com/lvlaksim1/apk-research/releases/download/v0.36.0/apk-research-setup_v0.36.0.exe — `f471c13f2efd72f6f7f3eac6d273cb84f43505c81f8ed9e2bcb34f127cd706b8`.
-- Update: https://github.com/lvlaksim1/apk-research/releases/download/v0.36.0/apk-research-update_v0.36.0.exe — `0965e99d22e91a1005fca80d3d7dbf3b4618adf274b29272e741162d205df1f5`.
-- Checksums at https://github.com/lvlaksim1/apk-research/releases/tag/v0.36.0; main pipeline https://github.com/lvlaksim1/apk-research/actions/runs/38439063318 verified SUCCESS. Hashes from GitHub asset digest.
-
-## Continuation
-
-No release blocker and no user field acceptance for installed v0.36.0 yet. Ask for observed behavior of the six-button workflow, continuous HTTPS during/after ZIP recording, live table filters and right emulator toolbar, plus app screenshot for Android system bar. New developer work only after specific owner scope. Maintain single HTTPS analyzer, bounded ZIP, confidential evidence, previous user cancellation of Settings tab and mandatory gates. v0.35 release-pending notes and prior v0.34/current assumptions are obsolete.
+**Next:** user field acceptance of original 664-byte multipart request and 1190-byte zlib response in live/saved ZIP. Stop at bona fide binary format rather than claiming decoded text. Preserve v0.36 independent HTTPS and ZIP, no Settings tab. No outstanding mandated release work.

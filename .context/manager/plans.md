@@ -1,5 +1,17 @@
 # Manager plans
 
+## Plan after v0.37.0 release, 2026-10-14
+
+1. Restore and check capsule generation 36, reconcile GitHub main and release.
+2. Base any future changes on aa2cb71ab637c203810174a521e62aa1cf05c5df; obtain owner field feedback for HTTP body display on `ch.pala.resources` and compare original HEX with derived text.
+3. When a real compressed body decodes to an unknown binary structure, request a sanitized/privately supplied body or ZIP, investigate actual binary schema without inventing text.
+4. Preserve all v0.36 controls, independent HTTPS/ZIP and actual source evidence. Changes require user approval plus CI/AVD/Windows setup/update/provisioning and verified release gates.
+5. Never introduce an unrequested Settings tab.
+
+---
+
+## Исторический контекст предыдущих поколений
+
 ## Next-stage plan after published v0.36.0 — 2026-10-14
 
 1. Restore sealed `context` and reconcile current main and release before future work.
