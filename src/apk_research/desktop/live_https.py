@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 from PySide6.QtCore import Qt, QTimer, Signal, QPoint
 from PySide6.QtWidgets import (
     QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit,
-    QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget,
+    QComboBox, QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget,
     QMenu, QWidgetAction,
     QVBoxLayout, QWidget,
 )
@@ -87,6 +87,25 @@ class LiveHttpsView(QWidget):
         self.table.currentCellChanged.connect(self._show_selected)
         splitter.addWidget(self.table)
 
+        details_container = QWidget()
+        details_layout = QVBoxLayout(details_container)
+        details_layout.setContentsMargins(0, 0, 0, 0)
+        details_layout.setSpacing(4)
+        mode_line = QHBoxLayout()
+        mode_line.addWidget(QLabel("Отображение тел:"))
+        self.body_mode = QComboBox()
+        self.body_mode.addItem("Текст (авто)", "text")
+        self.body_mode.addItem("HEX", "hex")
+        self.body_mode.setToolTip(
+            "HEX показывает сохранённые байты без распаковки."
+        )
+        self.body_mode.currentIndexChanged.connect(
+            self._body_mode_changed
+        )
+        mode_line.addWidget(self.body_mode)
+        mode_line.addStretch(1)
+        details_layout.addLayout(mode_line)
+
         self.details_tabs = QTabWidget()
         self.info = QPlainTextEdit()
         self.request_headers = QPlainTextEdit()
@@ -107,7 +126,8 @@ class LiveHttpsView(QWidget):
             ("Тело ответа", self.response_body),
         ):
             self.details_tabs.addTab(widget, label)
-        splitter.addWidget(self.details_tabs)
+        details_layout.addWidget(self.details_tabs, 1)
+        splitter.addWidget(details_container)
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
         outer.addWidget(splitter, 1)
@@ -429,6 +449,11 @@ class LiveHttpsView(QWidget):
         self.request_body.setPlainText(self._body_preview(request.get("body")))
         self.response_body.setPlainText(self._body_preview(response.get("body")))
 
+    def _body_mode_changed(self, *_args) -> None:
+        row = self.table.currentRow()
+        if row >= 0:
+            self._show_selected(row)
+
     def _body_preview(self, details) -> str:
         if not isinstance(details, dict) or not details.get("present"):
             return "Тело отсутствует"
@@ -449,8 +474,12 @@ class LiveHttpsView(QWidget):
         except (OSError, KeyError, zipfile.BadZipFile):
             return "Тело пока недоступно"
         content_type = str(details.get("content_type") or "")
+        content_encoding = str(details.get("content_encoding") or "")
         truncated = len(value) > MAX_PREVIEW_BYTES
-        preview = _decode_body(value[:MAX_PREVIEW_BYTES], content_type)
-        if truncated:
-            preview += "\n\n… Предпросмотр ограничен 128 КБ; полное тело сохранено в ZIP."
-        return preview
+        return _decode_body(
+            value[:MAX_PREVIEW_BYTES],
+            content_type,
+            content_encoding,
+            mode=str(self.body_mode.currentData() or "text"),
+            truncated=truncated,
+        )

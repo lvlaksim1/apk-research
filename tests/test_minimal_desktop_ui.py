@@ -228,3 +228,92 @@ def test_https_analysis_and_zip_have_independent_window_states(app, tmp_path):
         window.https_view.timer.stop()
         window.controller.close()
         window.close()
+
+
+
+def test_http_text_and_hex_in_live_and_saved_zip(app, tmp_path):
+    import zlib
+    from apk_research.desktop.http_window import HttpTransactionsWindow
+
+    boundary = "--dio-boundary-3334630000"
+    form = (
+        "--" + boundary + "\r\n"
+        'Content-Disposition: form-data; name="action"\r\n\r\n'
+        "readField\r\n"
+        "--" + boundary + "--\r\n"
+    ).encode()
+    raw_response = zlib.compress(
+        '{"ok":true,"message":"русский текст"}'.encode("utf-8"), level=9
+    )
+    assert raw_response[:2] == b"\x78\xda"
+    item = _transaction()
+    item["method"] = "POST"
+    item["request"]["headers"] = [
+        ["content-type", "multipart/form-data, boundary=" + boundary]
+    ]
+    item["request"]["body"] = {
+        "present": True, "path": "http-00000001.request.body",
+        "content_type": "multipart/form-data, boundary=" + boundary,
+        "size": len(form),
+    }
+    item["response"]["headers"] = [
+        ["content-type", "application/zlib"],
+        ["content-encoding", "gzip"],
+    ]
+    item["response"]["body"] = {
+        "present": True, "path": "http-00000001.response.body",
+        "content_type": "application/zlib", "content_encoding": "gzip",
+        "size": len(raw_response),
+    }
+    session = tmp_path / "live"
+    bodies = session / "02_normalized/http-bodies"
+    bodies.mkdir(parents=True)
+    (bodies / "http-00000001.request.body").write_bytes(form)
+    (bodies / "http-00000001.response.body").write_bytes(raw_response)
+    line = json.dumps(item).encode("utf-8") + b"\n"
+    (session / "02_normalized/http-transactions.jsonl").write_bytes(line)
+    view = LiveHttpsView()
+    view.begin_session(session, "com.example.test")
+    try:
+        view.refresh()
+        view.table.selectRow(0)
+        view._show_selected(0)
+        assert "Поле: action" in view.request_body.toPlainText()
+        assert "readField" in view.request_body.toPlainText()
+        assert '"message": "русский текст"' in view.response_body.toPlainText()
+        view.body_mode.setCurrentIndex(1)
+        assert form[:8].hex(" ") in view.request_body.toPlainText()
+        assert raw_response[:8].hex(" ") in view.response_body.toPlainText()
+        view.body_mode.setCurrentIndex(0)
+        assert '"ok": true' in view.response_body.toPlainText()
+
+        archive = tmp_path / "saved.research.zip"
+        with zipfile.ZipFile(archive, "w") as zipped:
+            zipped.writestr("02_normalized/http-transactions.jsonl", line)
+            zipped.write(
+                bodies / "http-00000001.request.body",
+                "02_normalized/http-bodies/http-00000001.request.body",
+            )
+            zipped.write(
+                bodies / "http-00000001.response.body",
+                "02_normalized/http-bodies/http-00000001.response.body",
+            )
+        view.finish_session(archive)
+        assert '"message": "русский текст"' in view.response_body.toPlainText()
+        view.body_mode.setCurrentIndex(1)
+        assert raw_response[:8].hex(" ") in view.response_body.toPlainText()
+        view.body_mode.setCurrentIndex(0)
+
+        legacy = HttpTransactionsWindow(archive)
+        try:
+            legacy.table.selectRow(0)
+            legacy._show_transaction(item)
+            assert "readField" in legacy.request_body.toPlainText()
+            assert '"message": "русский текст"' in legacy.response_body.toPlainText()
+            legacy.body_mode.setCurrentIndex(1)
+            assert raw_response[:8].hex(" ") in legacy.response_body.toPlainText()
+        finally:
+            legacy.close()
+    finally:
+        view.timer.stop()
+        view.close()
