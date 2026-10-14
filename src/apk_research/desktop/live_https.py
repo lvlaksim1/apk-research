@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 from PySide6.QtCore import Qt, QTimer, Signal, QPoint
 from PySide6.QtWidgets import (
     QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit,
-    QComboBox, QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget,
+    QComboBox, QSpinBox, QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget,
     QMenu, QWidgetAction,
     QVBoxLayout, QWidget,
 )
@@ -37,6 +37,7 @@ class LiveHttpsView(QWidget):
         self.archive_path: Path | None = None
         self._reader: IncrementalHttpReader | None = None
         self.transactions: list[dict] = []
+        self._selected_preview_id = None
         self.filtered_indices: list[int] = []
         self._sort_column = 0
         self._sort_ascending = False
@@ -103,6 +104,14 @@ class LiveHttpsView(QWidget):
             self._body_mode_changed
         )
         mode_line.addWidget(self.body_mode)
+        mode_line.addWidget(QLabel("Фрагмент:"))
+        self.body_page = QSpinBox()
+        self.body_page.setRange(1, 64)
+        self.body_page.setToolTip(
+            "Страницы распакованного текста по 128 КиБ, до 8 МиБ."
+        )
+        self.body_page.valueChanged.connect(self._body_mode_changed)
+        mode_line.addWidget(self.body_page)
         mode_line.addStretch(1)
         details_layout.addLayout(mode_line)
 
@@ -436,6 +445,12 @@ class LiveHttpsView(QWidget):
         if not isinstance(index, int) or not (0 <= index < len(self.transactions)):
             return
         record = self.transactions[index]
+        key = record.get("transaction_id") or id(record)
+        if key != self._selected_preview_id:
+            self._selected_preview_id = key
+            self.body_page.blockSignals(True)
+            self.body_page.setValue(1)
+            self.body_page.blockSignals(False)
         request = record.get("request") or {}
         response = record.get("response") or {}
         self.info.setPlainText(
@@ -450,6 +465,7 @@ class LiveHttpsView(QWidget):
         self.response_body.setPlainText(self._body_preview(response.get("body")))
 
     def _body_mode_changed(self, *_args) -> None:
+        self.body_page.setEnabled(self.body_mode.currentData() == "text")
         row = self.table.currentRow()
         if row >= 0:
             self._show_selected(row)
@@ -482,4 +498,5 @@ class LiveHttpsView(QWidget):
             content_encoding,
             mode=str(self.body_mode.currentData() or "text"),
             truncated=truncated,
+            page=self.body_page.value() - 1,
         )

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QComboBox,
+    QSpinBox,
     QMainWindow,
     QPlainTextEdit,
     QSplitter,
@@ -100,10 +101,11 @@ def _decode_body(
     content_encoding: str = "",
     mode: str = "text",
     truncated: bool = False,
+    page: int = 0,
 ) -> str:
     return format_http_body(
         data, content_type, content_encoding,
-        mode=mode, truncated=truncated,
+        mode=mode, truncated=truncated, page=page,
     )
 
 
@@ -126,6 +128,7 @@ class HttpTransactionsWindow(QMainWindow):
         )
         self.resize(1250, 780)
         self.setMinimumSize(900, 560)
+        self._selected_preview_id = None
         self._build_ui()
         self._populate()
 
@@ -199,6 +202,15 @@ class HttpTransactionsWindow(QMainWindow):
             self._body_mode_changed
         )
         mode_line.addWidget(self.body_mode)
+        mode_line.addWidget(QLabel("Фрагмент:"))
+        self.body_page = QSpinBox()
+        self.body_page.setRange(1, 64)
+        self.body_page.setValue(1)
+        self.body_page.setToolTip(
+            "Страницы распакованного текста по 128 КиБ; максимум 8 МиБ."
+        )
+        self.body_page.valueChanged.connect(self._body_mode_changed)
+        mode_line.addWidget(self.body_page)
         mode_line.addStretch(1)
         details_layout.addLayout(mode_line)
 
@@ -388,6 +400,12 @@ class HttpTransactionsWindow(QMainWindow):
         self,
         transaction: dict,
     ) -> None:
+        key = transaction.get("transaction_id") or id(transaction)
+        if key != self._selected_preview_id:
+            self._selected_preview_id = key
+            self.body_page.blockSignals(True)
+            self.body_page.setValue(1)
+            self.body_page.blockSignals(False)
         request = (
             transaction.get("request")
             or {}
@@ -482,6 +500,7 @@ class HttpTransactionsWindow(QMainWindow):
         )
 
     def _body_mode_changed(self, *_args) -> None:
+        self.body_page.setEnabled(self.body_mode.currentData() == "text")
         row = self.table.currentRow()
         if 0 <= row < len(self.filtered):
             self._show_transaction(self.filtered[row])
@@ -511,6 +530,7 @@ class HttpTransactionsWindow(QMainWindow):
             str(body.get("content_encoding") or ""),
             mode=str(self.body_mode.currentData() or "text"),
             truncated=len(data) > MAX_TEXT_BYTES,
+            page=self.body_page.value() - 1,
         )
 
     def _clear_details(self) -> None:
