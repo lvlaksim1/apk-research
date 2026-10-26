@@ -5,7 +5,7 @@
 - User screenshot: «Подготовить Android» fails with `Emulator gRPC did not become ready on port 65144`. Occurs during local emulator control-plane startup, before the Android app/research; do not conflate with Android internet access.
 - Verified product code: `grpc.insecure_channel("127.0.0.1:<port>")` without proxy exclusion, 20-second readiness check; original failure path did not surface already-available process-exit / `emulator.log` diagnostics.
 - External gRPC C Core documentation describes the possible influence of `grpc_proxy`/`https_proxy`/`http_proxy` and a supported per-channel `grpc.enable_http_proxy=0` option. This is a real code risk, **not** proven root cause on this Windows computer.
-- Draft PR #44 commit `d66cc930bc5f5c933a2ad6ecd8fe3c7c6ceb64f9` isolates loopback gRPC from proxies and reports local process/log evidence; targeted tests plus CI/AVD/ARM64 pass; Windows build and field acceptance not yet verified.
+- Draft PR #44 commit `d66cc930bc5f5c933a2ad6ecd8fe3c7c6ceb64f9` isolates loopback gRPC from proxies and reports local process/log evidence; targeted tests plus CI/AVD/ARM64 pass; Windows Desktop Build #40346936316 subsequently completed SUCCESS; field acceptance and release remain pending.
 - Historic WHPX workflow #38602121316 failed waiting for mismatched release SHA and skipped the actual WHPX test.
 - provenance: owner screenshot 2026-10-26; verified GitHub code, PR and CI; upstream gRPC C Core documentation.
 - authority: verified observation and code; precise field cause uncertain.

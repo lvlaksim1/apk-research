@@ -1,8 +1,8 @@
 # Manager intentions and commitments
 
-## Действующие обязательства — поколение 41, 26.10.2026
+## Действующие обязательства — поколение 42, 26.10.2026
 
-- **ACTIVE:** устранение ошибки подготовки Android (`Emulator gRPC did not become ready on port 65144`). Диагностирован текущий путь; создан черновик PR #44 `d66cc930bc5f5c933a2ad6ecd8fe3c7c6ceb64f9` с защитой локального gRPC от HTTP-прокси и диагностикой запуска. CI/AVD/ARM64/Storage успешны, Windows Desktop Build ещё выполняется.
+- **ACTIVE:** устранение ошибки подготовки Android (`Emulator gRPC did not become ready on port 65144`). Диагностирован текущий путь; создан черновик PR #44 `d66cc930bc5f5c933a2ad6ecd8fe3c7c6ceb64f9` с защитой локального gRPC от HTTP-прокси и диагностикой запуска. CI/AVD/ARM64/Storage успешны, Windows Desktop Build #40346936316 также SUCCESS.
 - **Не выполнено:** точное подтверждение причины по `emulator.log`, полевой тест на Windows владельца, выпуск установщика. Не считать правку гарантированным устранением ошибки.
 - **OPEN отдельно:** полевая проверка Mail.ru после v0.38.2.
 - **COMPLETED:** v0.38.2 исправила остаточный Android system proxy; эта старая задача не открывается заново.
