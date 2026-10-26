@@ -1835,10 +1835,22 @@ class AndroidRuntime:
                     client.close()
                 except Exception:
                     pass
+            detail = str(exc) or exc.__class__.__name__
+            try:
+                self._ensure_process_alive()
+            except AndroidRuntimeError as process_error:
+                detail += "\n" + str(process_error)
+            else:
+                detail += (
+                    "\nПроцесс Android Emulator работает, "
+                    "но локальный gRPC-порт не отвечает."
+                    "\nЖурнал запуска: "
+                    + str(self.paths.root / "emulator.log")
+                )
             raise AndroidRuntimeError(
                 "Обязательный Emulator gRPC transport "
                 "недоступен: "
-                + (str(exc) or exc.__class__.__name__)
+                + detail
             ) from exc
 
         with self._grpc_lock:

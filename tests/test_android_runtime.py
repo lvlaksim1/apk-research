@@ -840,3 +840,83 @@ def test_touch_input_never_falls_back_to_adb(
     ):
         runtime.touch_down(10, 20)
 
+
+
+def test_grpc_failure_reports_emulator_exit_and_log(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    runtime = AndroidRuntime(manager)
+    runtime._grpc_port = 65144
+
+    log_path = runtime.paths.root / "emulator.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(
+        "PANIC: emulator failed to start\n", encoding="utf-8"
+    )
+
+    class ExitedEmulator:
+        returncode = 27
+
+        def poll(self):
+            return self.returncode
+
+    class UnreadyGrpc:
+        def __init__(self, port):
+            assert port == 65144
+
+        def wait_ready(self, timeout):
+            raise TimeoutError("gRPC not ready")
+
+        def close(self):
+            pass
+
+    runtime.process = ExitedEmulator()
+    monkeypatch.setattr(
+        "apk_research.desktop.android_runtime.EmulatorGrpcClient",
+        UnreadyGrpc,
+    )
+    with pytest.raises(AndroidRuntimeError) as error:
+        runtime._ensure_live_transport(None, timeout=0.5)
+
+    message = str(error.value)
+    assert "gRPC not ready" in message
+    assert "завершился с кодом 27" in message
+    assert "PANIC: emulator failed to start" in message
+
+
+def test_grpc_failure_reports_log_location_for_live_emulator(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    manager = ComponentManager(tmp_path)
+    runtime = AndroidRuntime(manager)
+    runtime._grpc_port = 65144
+
+    class LiveEmulator:
+        def poll(self):
+            return None
+
+    class UnreadyGrpc:
+        def __init__(self, port):
+            assert port == 65144
+
+        def wait_ready(self, timeout):
+            raise TimeoutError("gRPC not ready")
+
+        def close(self):
+            pass
+
+    runtime.process = LiveEmulator()
+    monkeypatch.setattr(
+        "apk_research.desktop.android_runtime.EmulatorGrpcClient",
+        UnreadyGrpc,
+    )
+    with pytest.raises(AndroidRuntimeError) as error:
+        runtime._ensure_live_transport(None, timeout=0.5)
+
+    message = str(error.value)
+    assert "gRPC not ready" in message
+    assert "emulator.log" in message
+    assert "Процесс Android Emulator работает" in message
