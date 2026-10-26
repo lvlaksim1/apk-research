@@ -71,6 +71,40 @@ def acceleration_provider(detail: str) -> str:
     return "unknown"
 
 
+def describe_emulator_commit_failure(log_text: str) -> str | None:
+    """Explain the specific Windows commit-limit failure from the current run."""
+
+    marker = "ERROR: Insufficient RAM free for launching emulator."
+    index = log_text.rfind(marker)
+    if index < 0:
+        return None
+
+    details = log_text[index:index + 1000]
+    remaining = re.search(
+        r"Remaining:\s*([0-9.]+)\s*MB",
+        details,
+    )
+    needed = re.search(
+        r"Needed:\s*([0-9.]+)\s*MB",
+        details,
+    )
+    message = (
+        "Недостаточно резерва выделенной памяти Windows "
+        "для запуска эмулятора Android."
+    )
+    if remaining is not None and needed is not None:
+        message += (
+            "\nДоступно: " + remaining.group(1) + " МБ; "
+            "требуется: " + needed.group(1) + " МБ."
+        )
+    return (
+        message
+        + "\nОсвободите память, закрыв ненужные программы, "
+        "или проверьте, что файл подкачки Windows "
+        "управляется системой. Настройки VPN менять не требуется."
+    )
+
+
 class AndroidRuntime:
     """Managed, private Android Emulator for the desktop application."""
 
@@ -94,6 +128,7 @@ class AndroidRuntime:
         self._display_mode = "headless"
         self._startup_attempts: list[dict[str, object]] = []
         self._last_emulator_command: list[str] = []
+        self._emulator_log_start: int | None = None
         self._wipe_data_next_start = False
 
     @property
@@ -1378,6 +1413,7 @@ class AndroidRuntime:
             exist_ok=True,
         )
         log_handle = log_path.open("ab")
+        self._emulator_log_start = log_handle.tell()
         self._drop_grpc_client()
         self._grpc_port = self._find_free_tcp_port()
         command = self._emulator_command()
@@ -1835,10 +1871,30 @@ class AndroidRuntime:
                     client.close()
                 except Exception:
                     pass
+            detail = str(exc) or exc.__class__.__name__
+            try:
+                self._ensure_process_alive()
+            except AndroidRuntimeError as process_error:
+                detail += "\n" + str(process_error)
+            else:
+                memory_error = describe_emulator_commit_failure(
+                    self._emulator_log_tail()
+                )
+                if memory_error:
+                    detail += "\n" + memory_error
+                else:
+                    detail += (
+                        "\nПроцесс Android Emulator работает, "
+                        "но локальный gRPC-порт не отвечает."
+                    )
+                detail += (
+                    "\nЖурнал запуска: "
+                    + str(self.paths.root / "emulator.log")
+                )
             raise AndroidRuntimeError(
                 "Обязательный Emulator gRPC transport "
                 "недоступен: "
-                + (str(exc) or exc.__class__.__name__)
+                + detail
             ) from exc
 
         with self._grpc_lock:
@@ -1917,6 +1973,23 @@ class AndroidRuntime:
             for line in result.stdout.splitlines()
         )
 
+    def _emulator_log_tail(self) -> str:
+        log_path = self.paths.root / "emulator.log"
+        try:
+            with log_path.open("rb") as stream:
+                stream.seek(0, os.SEEK_END)
+                end = stream.tell()
+                start = max(
+                    self._emulator_log_start or 0,
+                    end - 8192,
+                )
+                stream.seek(start)
+                return stream.read().decode(
+                    "utf-8", errors="replace"
+                )[-4000:]
+        except OSError:
+            return ""
+
     def _ensure_process_alive(self) -> None:
         with self._process_lock:
             process = self.process
@@ -1924,16 +1997,15 @@ class AndroidRuntime:
             process is not None
             and process.poll() is not None
         ):
-            log_path = self.paths.root / "emulator.log"
-            tail = ""
-            if log_path.is_file():
-                try:
-                    tail = log_path.read_text(
-                        encoding="utf-8",
-                        errors="replace",
-                    )[-4000:]
-                except OSError:
-                    pass
+            tail = self._emulator_log_tail()
+            reason = describe_emulator_commit_failure(tail)
+            if reason:
+                raise AndroidRuntimeError(
+                    "Android Emulator завершился с кодом "
+                    f"{process.returncode}.\n{reason}"
+                    "\nЖурнал запуска: "
+                    + str(self.paths.root / "emulator.log")
+                )
             raise AndroidRuntimeError(
                 "Android Emulator завершился с кодом "
                 f"{process.returncode}.\n{tail}"
