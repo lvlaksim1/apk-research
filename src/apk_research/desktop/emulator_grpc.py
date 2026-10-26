@@ -335,10 +335,6 @@ class EmulatorGrpcClient:
             options=(
                 ("grpc.max_receive_message_length", 32 * 1024 * 1024),
                 ("grpc.max_send_message_length", 4 * 1024 * 1024),
-                # The emulator is a local control endpoint: external HTTP
-                # proxies (including VPN-managed proxy settings) must not
-                # intercept the loopback gRPC connection.
-                ("grpc.enable_http_proxy", 0),
             ),
         )
         prefix = f"/{_SERVICE}/"

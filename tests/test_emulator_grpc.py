@@ -323,31 +323,3 @@ def test_secondary_touch_modes_are_geometry_bounded() -> None:
         2000,
         "horizontal_tilt",
     ) == (100, 1799)
-
-
-def test_grpc_control_channel_never_uses_environment_http_proxy(
-    monkeypatch,
-) -> None:
-    from apk_research.desktop import emulator_grpc
-
-    original = emulator_grpc.grpc.insecure_channel
-    calls = []
-
-    def capture_channel(target, options=()):
-        calls.append((target, tuple(options)))
-        return original(target, options=options)
-
-    monkeypatch.setenv(
-        "grpc_proxy", "http://127.0.0.1:59999"
-    )
-    monkeypatch.setattr(
-        emulator_grpc.grpc, "insecure_channel", capture_channel
-    )
-
-    client = EmulatorGrpcClient(8554)
-    try:
-        target, options = calls[0]
-        assert target == "127.0.0.1:8554"
-        assert ("grpc.enable_http_proxy", 0) in options
-    finally:
-        client.close()
