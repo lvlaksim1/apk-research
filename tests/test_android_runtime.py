@@ -925,13 +925,13 @@ def test_grpc_failure_reports_log_location_for_live_emulator(
 
 def test_windows_commit_limit_failure_is_reported_with_memory_numbers() -> None:
     log = (
-        "WHPX accelerator is operational\\n"
-        "ERROR: Insufficient RAM free for launching emulator.\\n"
-        "Stats:\\n"
-        "    Currently committed: 89943.949219 MB\\n"
-        "    Commit limit: 92115.562500 MB\\n"
-        "    Remaining: 2171.613281 MB\\n"
-        "    Needed: 4096.000000 MB\\n"
+        "WHPX accelerator is operational\n"
+        "ERROR: Insufficient RAM free for launching emulator.\n"
+        "Stats:\n"
+        "    Currently committed: 89943.949219 MB\n"
+        "    Commit limit: 92115.562500 MB\n"
+        "    Remaining: 2171.613281 MB\n"
+        "    Needed: 4096.000000 MB\n"
     )
     message = describe_emulator_commit_failure(log)
     assert message is not None
@@ -954,11 +954,11 @@ def test_emulator_log_tail_only_reads_current_start_attempt(
     runtime = AndroidRuntime(manager)
     log_path = runtime.paths.root / "emulator.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    previous = "ERROR: Insufficient RAM free for launching emulator.\\n"
+    previous = "ERROR: Insufficient RAM free for launching emulator.\n"
     log_path.write_text(previous, encoding="utf-8")
     runtime._emulator_log_start = len(previous.encode("utf-8"))
     with log_path.open("a", encoding="utf-8") as stream:
-        stream.write("ERROR: New unrelated failure\\n")
+        stream.write("ERROR: New unrelated failure\n")
     current_tail = runtime._emulator_log_tail()
     assert "Insufficient RAM" not in current_tail
     assert "New unrelated failure" in current_tail
@@ -974,9 +974,9 @@ def test_grpc_startup_shows_windows_commit_limit_root_cause(
     log_path = runtime.paths.root / "emulator.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text(
-        "ERROR: Insufficient RAM free for launching emulator.\\n"
-        "    Remaining: 2171.613281 MB\\n"
-        "    Needed: 4096.000000 MB\\n",
+        "ERROR: Insufficient RAM free for launching emulator.\n"
+        "    Remaining: 2171.613281 MB\n"
+        "    Needed: 4096.000000 MB\n",
         encoding="utf-8",
     )
 

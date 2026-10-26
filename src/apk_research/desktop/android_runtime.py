@@ -81,11 +81,11 @@ def describe_emulator_commit_failure(log_text: str) -> str | None:
 
     details = log_text[index:index + 1000]
     remaining = re.search(
-        r"Remaining:\\s*([0-9.]+)\\s*MB".replace("\\\\", "\\"),
+        r"Remaining:\s*([0-9.]+)\s*MB",
         details,
     )
     needed = re.search(
-        r"Needed:\\s*([0-9.]+)\\s*MB".replace("\\\\", "\\"),
+        r"Needed:\s*([0-9.]+)\s*MB",
         details,
     )
     message = (
