@@ -1,5 +1,16 @@
 # Semantic Memory
 
+## 2026-10-26 — Confirmed Windows commit exhaustion blocks Android gRPC startup
+
+The owner's private `emulator.log` contains two final AVD launch failures:
+- `Insufficient RAM free for launching emulator`, `Remaining 2256.441406 MB`, `Needed 4096 MB`;
+- `Remaining 2171.613281 MB`, `Needed 4096 MB`, with overall Windows commit `89943.949219 / 92115.562500 MB`.
+WHPX is operational. Product config defines `hw.ramSize=4096`. Older successful sessions had the same Vulkan incompatibility warning, so do not blame the Vulkan warning for these particular fatal resource failures. gRPC has no port to reach after QEMU terminates, hence the secondary timeout. A local gRPC proxy was never demonstrated to be the cause of these final failures; the speculative change was removed from PR #44.
+
+The safe remediation is to release host committed memory or use a system-managed Windows pagefile (Google Emulator troubleshooting). **Do not automatically reduce guest RAM** for Android 15/Google APIs without acceptance evidence or silently change user's system VPN/pagefile. The code change is to surface the verified reason, not to conjure more host capacity. Revised draft PR #44 `f1fd2f8fe7b9337d0a6fc5c85cb99a590bd867fc`, CI #40350445610 SUCCESS, other tests pending.
+
+Provenance: user-supplied private emulator.log (not published), repo components.py and android_runtime.py, Google Android Emulator troubleshooting `windows_free_ram_and_commit_charge`, GitHub PR #44. Authority: verified device trace plus code; exact resource consumers unknown.
+
 ## 2026-10-26 — Local Emulator gRPC readiness timeout (root unverified)
 
 - User screenshot: «Подготовить Android» fails with `Emulator gRPC did not become ready on port 65144`. Occurs during local emulator control-plane startup, before the Android app/research; do not conflate with Android internet access.
