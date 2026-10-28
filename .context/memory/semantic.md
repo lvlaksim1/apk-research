@@ -11,6 +11,7 @@ The safe remediation is to release host committed memory or use a system-managed
 
 Provenance: user-supplied private emulator.log (not published), repo components.py and android_runtime.py, Google Android Emulator troubleshooting `windows_free_ram_and_commit_charge`, GitHub PR #44. Authority: verified device trace plus code; exact resource consumers unknown.
 
+- source: legacy-v2-state
 ## 2026-10-26 — Local Emulator gRPC readiness timeout (root unverified)
 
 - User screenshot: «Подготовить Android» fails with `Emulator gRPC did not become ready on port 65144`. Occurs during local emulator control-plane startup, before the Android app/research; do not conflate with Android internet access.
@@ -21,6 +22,7 @@ Provenance: user-supplied private emulator.log (not published), repo components.
 - provenance: owner screenshot 2026-10-26; verified GitHub code, PR and CI; upstream gRPC C Core documentation.
 - authority: verified observation and code; precise field cause uncertain.
 
+- source: legacy-v2-state
 ## Proven runtime architecture
 
 The reliable Windows runtime is hidden Emulator → gRPC/MMAP framebuffer → AndroidView with gRPC input; v0.10.5 is the startup/clean-launch sequencing baseline.
@@ -65,6 +67,7 @@ v0.17.0 Unified Evidence Explorer is presentation-only. It navigates existing Ti
 - provenance: owner follow-up statement (2026-10-14), private Research ZIP metadata, GitHub collector implementation verified 2026-10-14
 - authority: verified source logic plus owner field observation; root cause of remaining Mail.ru error still under test
 
+- source: legacy-v2-state
 ## 2026-10-14 — v0.38.2 Android network recovery fix merged (release pipeline pending at time of record)
 
 - Supersedes both preceding "not fixed" diagnostic sections as to **implementation status**, but does NOT prove Mail.ru login now succeeds on the owner's computer.
@@ -75,6 +78,7 @@ v0.17.0 Unified Evidence Explorer is presentation-only. It navigates existing Ti
 - provenance: GitHub PR/Actions/main commit verified during user-directed implementation 2026-10-14
 - authority: verified product repository / CI; owner field acceptance still pending
 
+- source: legacy-v2-state
 ## 2026-10-14 — v0.38.2 published, Android network restoration
 
 The previously verified stale `127.0.0.1:38887` proxy defect was fixed in PR #43 and published as v0.38.2 at `75665ad39b103703ba5cd7b60823d411a43fcfab`. Main CI/AVD/Windows/Release #38604038134 completed successfully. Preparation of Android and the new explicit "Восстановить сеть Android" control clear only apk-research's abandoned proxy/routing state; the ordinary stop path no longer restores its own dead proxy. Data and unrelated proxies are preserved.
@@ -83,3 +87,5 @@ This corrects older memory entries stating the defect was "not fixed." **User fi
 
 - provenance: private owner-supplied Research ZIP and owner off-analysis observation; reviewed implementation, merged PR #43, published release and completed main pipeline
 - authority: verified product/release, field result pending
+
+- source: legacy-v2-state

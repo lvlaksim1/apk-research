@@ -29,3 +29,5 @@ A transient Android ADB 255 failure requires examining the job log and bounded r
 
 - provenance: verified GitHub Actions logs and final published v0.38.2, 2026-10-14
 - authority: verified repository procedure
+
+- source: legacy-v2-state

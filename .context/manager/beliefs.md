@@ -13,6 +13,8 @@
 
 ---
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Подтверждённое состояние — поколение 42, 26.10.2026
 
 - Последний опубликованный продукт: v0.38.2, `main` `75665ad39b103703ba5cd7b60823d411a43fcfab`.
@@ -25,6 +27,8 @@
 
 ---
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Текущее подтверждённое состояние — поколение 40, 14.10.2026
 
 - **Опубликована v0.38.2**: `main` и Release target совпадают на коммите `75665ad39b103703ba5cd7b60823d411a43fcfab`; https://github.com/lvlaksim1/apk-research/releases/tag/v0.38.2. Никакая версия v0.38.1 или старше не является актуальной базой.
@@ -40,10 +44,14 @@
 
 ---
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Архив предыдущих поколений (историческое состояние, не текущее)
 
 # Manager beliefs
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Проверенное текущее состояние — поколение 39 (2026-10-14)
 
 - **Текущая опубликованная версия: v0.38.1**, релиз опубликован 2026-10-14. Точный `main` SHA и release target `be63ad0e00894da424660cbb1a6da91ed69dd0ce`, PR #42 `fix/v0.38.1-modeless-replay-in-list` объединён. https://github.com/lvlaksim1/apk-research/releases/tag/v0.38.1
@@ -60,8 +68,12 @@
 
 ---
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Исторические записи (предыдущие поколения; не использовать как текущие)
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Действующее состояние — поколение 38, 2026-10-14
 
 - **Опубликована v0.38.0**: main / release-tag commit `5dc804027a112cef6a4c697fbd2b167537fca470`, merged PR #41, GitHub Release https://github.com/lvlaksim1/apk-research/releases/tag/v0.38.0.
@@ -79,8 +91,12 @@
 
 ---
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## История предыдущих поколений (состояния, заменённые выше)
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Установленное состояние — поколение 37
 
 **Текущая опубликованная версия: v0.37.1** (2026-10-14), `main` и Release tag `41b3105aa4e2335a975eb6d126e61ed771e32b59`. Полный выпуск GitHub Actions #38553459909 завершился SUCCESS: CI, Android 15 AVD, Windows сборка, обновление с v0.37.0, чистая Windows и публикация.
@@ -95,8 +111,12 @@
 
 ---
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Предыдущие поколения (история)
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Authoritative release baseline — generation 36, 2026-10-14
 
 - Version **v0.37.0** is PUBLISHED, release target/main SHA `aa2cb71ab637c203810174a521e62aa1cf05c5df`, published 2026-10-14, https://github.com/lvlaksim1/apk-research/releases/tag/v0.37.0.
@@ -111,8 +131,12 @@
 
 ---
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Исторический контекст предыдущих поколений
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Definitive published-state reconciliation — 2026-10-14, generation 35
 
 - Product: published **v0.36.0**, main/Release commit `5f66b1940acd6b867d569d8a62faae4c338bde4f`; PR #38 merged.
@@ -127,8 +151,12 @@
 
 ---
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Archived previous-generation notes — superseded where inconsistent
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Verified baseline
 
 Current product baseline is **apk-research v0.34.0** at `2efec386cff0b204ee56d8bee365f3c52caefcb5`. The previous verified baseline was v0.32.0.
@@ -142,6 +170,8 @@ Published assets:
 
 Main pipeline #143 passed all mandatory release gates and published v0.30.0.
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## HTTPS traffic analysis
 
 v0.30.0 adds first-class display of decrypted HTTP/HTTPS transactions in the managed Android research environment.
@@ -156,20 +186,28 @@ Passive RAW PCAP remains independently authoritative for packets observed in the
 
 Applications with certificate pinning or application-owned trust stores may reject the research CA. HTTP/3/QUIC content decryption is not claimed by v0.30.0.
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Windows installer/update architecture
 
 The separate Setup/Update architecture introduced in v0.29.2 remains intact. v0.30.0 successfully passed a real v0.29.2 → v0.30.0 update test using the dedicated Update installer.
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Android installation UX
 
 The redundant «Открыть главный экран Android» button remains removed.
 
 The Android home-screen shortcut requirement was explicitly cancelled by the owner on 2026-10-08 and must not be resumed unless explicitly reopened.
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Protected product semantics
 
 APK/XAPK handling, hidden Emulator → gRPC/MMAP → AndroidView, v0.10.5 startup sequencing, Research ZIP, RAW PCAP authority, evidence semantics and the accepted dual-source screen model remain protected.
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Owner-directed HTTPS follow-up after the v0.30.0 capsule (2026-10-08)
 
 The owner inspected the real archive `20261008T020126.928669Z-e336ad57.research.zip` after publication of v0.30.0. Prior-chat analysis reported 23 TCP connections to remote port 443, of which 21 connected to `evrasia.spb.ru`; the `02_normalized/http-transactions.jsonl` transaction list was empty. The analyzed `com.evrasia` application used direct HTTPS connections rather than the configured Android system proxy. These archive-specific observations are carried forward from the prior conversation and should be revalidated against the actual archive before a code-level diagnosis or claims of successful remediation.
@@ -182,6 +220,7 @@ For owner-visible communications, use neutral accurate language such as "HTTPS t
 - technical evidence: prior-chat Research ZIP analysis, not yet rechecked in this reinstantiated runtime;
 - product confirmation: GitHub main and latest release checked 2026-10-10.
 
+- source: legacy-v2-state
 ## Verified v0.31 ARM64 APK/XAPK compatibility
 
 On 2026-10-10 PR #29 merged and main pipeline #144 attempt 2 succeeded, publishing v0.31.0 at `5aab54adc807aff401b59d4c1018795246303b89`. ARM64-only XAPK now selects a separate Android 15 Google APIs x86_64 AVD with native ARM64 execution. The default AVD and userdata remain intact. Actual Android 15 proof: device reports x86_64,arm64-v8a and loads JNI ARM64 native library from synthetic XAPK (`ARM64_NATIVE_LOADED: PASS`). Legacy AVD research, Windows installer/update and clean provisioning passed. First main attempt had an intermittent ADB Settings start failure; same main SHA passed rerun. Owner's exact XAPK was not furnished; universal app compatibility is not claimed.
@@ -190,6 +229,8 @@ Setup: `apk-research-setup_v0.31.0.exe` SHA256 `8c253edf38759830fbe8e156282beaa1
 
 The independent owner directive to route direct HTTPS connections of `com.evrasia` through the local analyzer remains ACTIVE and unimplemented by v0.31.
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Verified v0.32.0 direct HTTPS application routing (2026-10-10)
 
 The owner's 2026-10-10 directive extended HTTP/HTTPS analysis to direct TCP/443 connections bypassing Android's system proxy. PR #30 merged to main `a2f0bbbca364714d37f7697ffa5ccb8204bc94b1`; pipeline #145 attempt 1 SUCCESS, GitHub Release v0.32.0 targets that exact SHA.
@@ -202,6 +243,8 @@ Published Setup SHA-256 `226d8b4bf12ccab0b07620b8110107354b15873c1f1f93c925bc28d
 
 The actual owner's `com.evrasia` app/Research ZIP has NOT been retested with v0.32.0. Continue that validation as an ACTIVE owner-target task, not a verified field success. IPv6, QUIC/UDP443, custom TLS stores/pinning remain explicit boundaries. Terminology in owner-visible reports must be neutral; avoid language owner prohibited.
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Field-verification of owner app on v0.32.0 (2026-10-10)
 
 Owner uploaded a private Research ZIP from v0.32.0, session 20261010T021552.574206Z-3e8e2043, app com.evrasia. **Do not copy the archive to public GitHub**: it contains authentication credential fields in saved JSON bodies. Only non-sensitive aggregates are recorded here.
@@ -216,6 +259,8 @@ Independent raw PCAP: 22,525 packets captured; tcpdump reported 615 packets drop
 
 The owner's previously unverified direct HTTPS target is NOW **field-verified functional** under v0.32.0. A future improvement to raw PCAP completeness/ownership accuracy is distinct and requires bounded scoping. Scope remains IPv4 TCP/443; no assertions about QUIC, IPv6 or arbitrary trust/pinning.
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## Verified v0.33.0 minimal Research/Live HTTPS desktop (2026-10-10)
 
 Owner requested to remove the overwhelming technical UI and retain two functions: full Research ZIP and dynamic HTTPS request/response viewing. PR #31 merged to main `3f3f1144e0ea8944a065e7d5950fd07fd1e17abf`; main pipeline #146 attempt 1 SUCCESS, GitHub Release v0.33.0 targets that exact commit.
@@ -226,12 +271,16 @@ The actual desktop entrypoint now launches base `MainWindow` instead of the inhe
 
 Main gate #146 includes unit tests, actual Android 15 AVD research/HTTPS ZIP, standalone Windows GUI, verified v0.32.0 to v0.33.0 in-place update, clean Windows provisioning and release publication. Assets: Setup SHA-256 `70788ed8a2cf8885eea5beb77df1cd560ad41aaa67d49978ba9e972def114718`; Update SHA-256 `a6db937f410f03b49fbc8bff4791a93b367d905245a5b4554aaeab0adb12b38a`.
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## v0.34.0 development in progress — NOT yet released (2026-10-10)
 
 Owner requested an LDPlayer-style vertical Android emulator control strip and additional useful research metadata in ZIP. Source implemented on PR #32 `feature/v0.34-emulator-controls-network-evidence`, latest candidate SHA `8c1dbcc81fa3620ed96b30300211c90fb7872ec3`. Published main remains v0.33.0 until acceptance passes and GitHub Release is issued. GUI controls include Back/Home/Recents, volume, orientation, screenshots, fullscreen, APK selection/installation and restart. More-menu supports shared-storage file transfer, selected-app stop/clear/settings, geo, shake and typing PC clipboard text. Destructive commands ask confirmation / stop when research active. No claim of full bidirectional clipboard or standalone manual screen recording; existing screen video remains automatic during research.
 
 Derived Research ZIP files: dns.jsonl, tls-sessions.jsonl, network-timings.jsonl, action-network-links.jsonl, screen-timing.jsonl, network-enrichment.json. All are optional derived summaries from existing RAW PCAP, HTTPS, user action and media timestamps, preserving independent original records. TLS hello detection supports local Android transport ports. No invented cause/action or visual reaction latency. First exact Android acceptance candidate (8afe5c1d) passed and verified these artifacts, 3660 PCAP packets scanned. Latest 8c1 candidate has pending CI, AVD, Windows acceptance. Earlier intermediate AVD runs intermittently failed on Android Settings ADB start exit 255, unrelated to parsing; retry the exact final candidate, do not bypass required gates.
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## v0.34.0 reconciliation after release (2026-10-13; generation 32)
 
 Current verified product and GitHub Release **v0.34.0** at exact `main` commit `2efec386cff0b204ee56d8bee365f3c52caefcb5` (pipeline #38375309755: full successful mandatory code, Android 15 AVD, standalone Windows, existing-version Update, clean Windows Android provisioning, publication). The prior v0.33.0 baseline and the generation-31 "v0.34 pending" statements are superseded.
@@ -245,6 +294,11 @@ Release assets: `apk-research-setup_v0.34.0.exe` SHA256 `7ba45c3d5fb4a91d5df8bc3
 Previously observed com.evrasia v0.32.0 direct HTTPS field success remains valid for that run. A separate v0.33.0 incident in which com.evrasia temporarily stalled during loading cleared after an emulator restart. No established code-level root cause or shipped fix; do not assert a cause. The separate network-recovery experiment remains unmerged and was explicitly deferred by the owner.
 
 
+- source: legacy-v2-state
+- authority: legacy-unverified
 ## v0.35 source merged, release still pending
 
 On 2026-10-13, PR #35 was merged into product main by verified merge commit 2076cb8c2fa4d5fead39e2b4edb5829fab8e4cbd after final PR CI, real AVD, ARM64, Windows build, previous-version Update and clean provisioning all succeeded. main now contains 0.35.0 source. GitHub Release v0.35.0 remains NOT YET PUBLISHED pending main workflow run 38416539695. Within that run CI, Windows build, actual 0.34.0 to 0.35.0 Update and clean Windows provisioning passed; main AVD test is still installing Google Android SDK components at this checkpoint. Continue monitoring the exact main run and retry its failed mandatory gates if SDK distribution fails; NEVER bypass AVD or claim release prematurely. Confirm published version, commit and SHA256 assets before terminalizing work. Android insets per-app effect needs a user screenshot.
+
+- source: legacy-v2-state
+- authority: legacy-unverified
