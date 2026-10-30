@@ -16,3 +16,7 @@
 - Use real Research ZIP evidence to validate user-visible forensic behavior when available.
 - Manager state is authoritative only on `context`; `main` is product authority plus discovery bootstrap.
 - Never persist credentials, tokens, cookies, private keys or hidden reasoning in Context Capsule.
+
+## Основная рабочая среда (OWNER-LOCAL-FIRST-2026-10-30)
+
+Основная разработка и хранение капсулы выполняются на DOMKAT, в каталоге D:\Dev. GitHub используется для истории версий, синхронизации и резервного восстановления, но прямая разработка в GitHub допускается как исключение. Сохранять полномочия веток продукта и менеджера, проверять целостность капсулы, расхождения Git и неопубликованные локальные изменения. Подробности в файле .context/rules/local-first-workspace.md.
