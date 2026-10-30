@@ -43,7 +43,8 @@
   },
   "current_state": ".context/current/state.md",
   "rules": [
-    ".context/rules/project-rules.md"
+    ".context/rules/project-rules.md",
+    ".context/rules/batch-development-standard.md"
   ],
   "decisions": [
     ".context/decisions/DEC-20261005-project-manager-bootstrap.md",
@@ -54,7 +55,8 @@
     ".context/decisions/DEC-20261007-v024-release-baseline.md",
     ".context/decisions/DEC-20261007-direct-github-self-update.md",
     ".context/decisions/DEC-20261007-mailru-installer-model.md",
-    ".context/decisions/DEC-20261007-v026-release-baseline.md"
+    ".context/decisions/DEC-20261007-v026-release-baseline.md",
+    ".context/decisions/owner-batched-development-2026-10-30.md"
   ],
   "dialogues": [
     ".context/dialogues/20261006-scrcpy-v5-applicability.md",
