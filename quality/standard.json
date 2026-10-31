@@ -1,0 +1,16 @@
+{
+  "schema": "engineering-quality-v1",
+  "project": "lvlaksim1/apk-research",
+  "quick": [
+    {
+      "id": "tracked_source_sanity",
+      "kind": "static",
+      "command": [
+        "python",
+        "scripts/quality_source_sanity.py"
+      ],
+      "timeout_sec": 65
+    }
+  ],
+  "full_additional": []
+}
