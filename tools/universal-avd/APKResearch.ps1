@@ -14,7 +14,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Create','Start','Stop','Status','Install','Launch')]
+    [ValidateSet('Create','Start','Stop','Status','Install','Launch','ProxyOn','ProxyOff','ProxyStatus')]
     [string]$Action = 'Status',
     [ValidatePattern('^[a-zA-Z][a-zA-Z0-9_]{2,60}$')]
     [string]$Name = 'APK_Research_API36',
@@ -22,6 +22,8 @@ param(
     [int]$Port = 5570,
     [string]$PackageFile,
     [string]$PackageName,
+    [ValidateRange(1,65535)]
+    [int]$ProxyPort = 10809,
     [string]$AvdRoot
 )
 Set-StrictMode -Version Latest
@@ -72,6 +74,13 @@ function Invoke-Device {
     if ($LASTEXITCODE -ne 0) {
         throw "ADB command failed (exit $LASTEXITCODE)."
     }
+}
+
+function Get-AndroidProxy {
+    Assert-AvdIdentity
+    $value = (& $adb -s $serial shell settings get global http_proxy).Trim()
+    if ($LASTEXITCODE -ne 0) { throw 'Unable to read current Android proxy' }
+    return $value
 }
 
 switch ($Action) {
@@ -220,6 +229,55 @@ switch ($Action) {
                 Remove-Item -LiteralPath $staging -Recurse -Force
             }
         }
+    }
+    'ProxyStatus' {
+        $current = Get-AndroidProxy
+        $expected = "10.0.2.2:$ProxyPort"
+        if ($current -eq $expected) {
+            Write-Output "AVD=$Name SERIAL=$serial PROXY=HAPP_HTTP ACTIVE PORT=$ProxyPort"
+        } elseif ($current -in @('null',':0','')) {
+            Write-Output "AVD=$Name SERIAL=$serial PROXY=DIRECT"
+        } else {
+            Write-Output "AVD=$Name SERIAL=$serial PROXY=OTHER (not altered)"
+        }
+    }
+    'ProxyOn' {
+        $current = Get-AndroidProxy
+        $expected = "10.0.2.2:$ProxyPort"
+        if ($current -eq $expected) {
+            Write-Output "ALREADY CONFIGURED: $Name HTTP proxy via host $expected"
+            break
+        }
+        if ($current -notin @('null',':0','')) {
+            throw 'Another Android proxy exists. Refusing to overwrite it.'
+        }
+        $listening = @(Get-NetTCPConnection -State Listen -LocalPort $ProxyPort -ErrorAction SilentlyContinue |
+            Where-Object { $_.LocalAddress -in @('127.0.0.1','0.0.0.0') })
+        if ($listening.Count -eq 0) {
+            throw "Host local HTTP proxy port $ProxyPort is not listening; verify Happ/Xray."
+        }
+        & $adb -s $serial shell settings put global http_proxy $expected
+        if ($LASTEXITCODE -ne 0) { throw 'Could not configure Android HTTP proxy.' }
+        if ((Get-AndroidProxy) -ne $expected) { throw 'Android did not retain the expected proxy.' }
+        Write-Output "HAPP HTTP PROXY ENABLED: $Name -> $expected"
+        Write-Output 'Restart the target Android app to apply the new proxy if it was already open.'
+    }
+    'ProxyOff' {
+        $current = Get-AndroidProxy
+        $expected = "10.0.2.2:$ProxyPort"
+        if ($current -in @('null',':0','')) {
+            Write-Output "ALREADY DIRECT: $Name"
+            break
+        }
+        if ($current -ne $expected) {
+            throw 'Unexpected Android proxy. Refusing to remove a third-party setting.'
+        }
+        & $adb -s $serial shell settings delete global http_proxy
+        if ($LASTEXITCODE -ne 0) { throw 'Could not remove our Android proxy.' }
+        $now = Get-AndroidProxy
+        if ($now -notin @('null',':0','')) { throw 'Proxy removal could not be verified.' }
+        Write-Output "HAPP HTTP PROXY DISABLED: $Name (direct Android network)"
+        Write-Output 'Restart the target Android app to apply the changed proxy if required.'
     }
     'Launch' {
         if (-not $PackageName -or $PackageName -notmatch '^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$') {

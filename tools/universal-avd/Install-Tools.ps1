@@ -22,7 +22,10 @@ $files = @(
     'Stop-APK-Research.cmd',
     'Status-APK-Research.cmd',
     'Install-APK-Research.cmd',
-    'Create-APK-Research-Profile.cmd'
+    'Create-APK-Research-Profile.cmd',
+    'Enable-Android-VPN.cmd',
+    'Disable-Android-VPN.cmd',
+    'Status-Android-VPN.cmd'
 )
 New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
 foreach ($file in $files) {
@@ -41,6 +44,9 @@ if (-not $NoShortcuts) {
         'Запустить эмулятор.lnk' = 'Start-APK-Research.cmd'
         'Остановить эмулятор.lnk' = 'Stop-APK-Research.cmd'
         'Состояние эмулятора.lnk' = 'Status-APK-Research.cmd'
+        'Включить VPN в Android.lnk' = 'Enable-Android-VPN.cmd'
+        'Отключить VPN в Android.lnk' = 'Disable-Android-VPN.cmd'
+        'Проверить VPN Android.lnk' = 'Status-Android-VPN.cmd'
     }
     foreach ($displayName in $links.Keys) {
         $shortcut = $shell.CreateShortcut((Join-Path $menu $displayName))
